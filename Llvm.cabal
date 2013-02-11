@@ -1,0 +1,67 @@
+Name:  Llvm
+Version: 0.1
+Description:  Haskell implementation of LLVM 
+License: BSD3
+License-file: LICENSE
+Author: Ning Wang
+Maintainer: email@ningwang.org
+Build-Type: Simple
+Cabal-Version: >= 1.6
+Stability: 0.1
+Synopsis: A library for processing LLVM Assembly
+Category: Compilers/Interpreters
+
+
+Library 
+  Build-Depends:     base >= 3 && < 5, 
+                     containers, 
+                     array, 
+                     bytestring, 
+                     mtl,
+                     filepath,
+                     directory,
+                     hoopl >=3.8.7.4 && <3.9,
+                     parsec >=3.1.2 && <3.2,
+                     cmdargs >=0.10 && <0.11
+
+  Exposed-modules:   Llvm.VmCore.AsmWriter,
+                     Llvm.VmCore.Ast2Ir,
+                     Llvm.VmCore.AstCanonicalization,
+                     Llvm.VmCore.Ast,
+                     Llvm.VmCore.AstWriter,
+                     Llvm.VmCore.AtomicEntity,
+                     Llvm.VmCore.AtomicEntityWriter,
+--                   Llvm.VmCore.ConstFold,
+                     Llvm.VmCore.Converter,
+                     Llvm.VmCore.CoreIr,
+                     Llvm.VmCore.CoreIrWriter,
+                     Llvm.VmCore.Ir2Ast,
+                     Llvm.VmCore.Ir,
+                     Llvm.VmCore.IrWriter,
+                     Llvm.VmCore.LabelMap,
+                     Llvm.AsmParser.Basic,
+                     Llvm.AsmParser.Block,
+                     Llvm.AsmParser.Const,
+                     Llvm.AsmParser.Instruction,
+                     Llvm.AsmParser.Module,
+                     Llvm.AsmParser.Rhs,
+                     Llvm.AsmParser.Type,
+--                   Llvm.Pass.ConstProp,
+                     Llvm.Pass.Dominator,
+                     Llvm.Pass.Liveness,
+                     Llvm.Pass.Mem2Reg,
+                     Llvm.Pass.NormalGraph,
+                     Llvm.Pass.Optimizer,
+                     Llvm.Pass.PassManager,
+                     Llvm.Pass.PhiElimination,
+                     Llvm.Pass.Rewriter,
+                     Llvm.Pass.Uda
+--  ghc-options:       -Wall -fno-warn-name-shadowing
+  ghc-options:       -Wall -fno-warn-name-shadowing
+  Extensions:        CPP 
+  hs-source-dirs:    src
+
+
+Executable llvm-test
+  Main-is:           LlvmTest.hs
+  hs-source-dirs:    src
