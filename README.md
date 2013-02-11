@@ -17,7 +17,7 @@ The test driver 'llvm-test' is generated at dist/build/llvm-test
 
 Test:
 ==============
-## test LLVM asmebler parser
+## test LLVM assembly parser
 dist/build/llvm-test/llvm-test parser test/test1.ll 
 
 ## test mem2reg pass
