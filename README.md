@@ -3,7 +3,8 @@ HsLlvm -- Haskell implementation of LLVM
 
 Goal: 
 ==========================================
-Provide type safe manipulation of LLVM code in Haskell
+- Port all LLVM optimizations
+- Provide functionalities to generate and maniuplate LLVM code
 
 
 Build:
