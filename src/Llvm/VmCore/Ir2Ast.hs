@@ -95,7 +95,7 @@ instance Converter v1 (LabelMapM v2) => Converter (I.BinExpr v1) (LabelMapM (A.B
                                                       I.Nuw -> [A.Nuw]
                                                       I.Nsuw -> [A.Nsw, A.Nuw]
                                               ) 
-                           cexact = maybe [] (\x -> [A.Exact])
+                           cexact = maybe [] (\_ -> [A.Exact])
                                    
                                              
 
@@ -251,6 +251,7 @@ instance Converter I.Value (LabelMapM A.Value) where
     convert (I.Ve a) = Md.liftM A.Ve (convert a)
     convert (I.Vc a) = Md.liftM A.Vc (convert a)
     convert (I.InlineAsm a1 a2 a3 a4) = return $ A.InlineAsm a1 a2 a3 a4
+    convert (I.Deref _) = error "I.Deref should be removed in optimization"
       
    
 instance Converter I.CallSite (LabelMapM A.CallSite) where
@@ -346,6 +347,7 @@ instance Converter I.TerminatorInst (LabelMapM A.TerminatorInst) where
                                       }
     convert (I.Resume tv) = convert tv >>= return . A.Resume
     convert I.Unreachable = return A.Unreachable
+    convert I.Unwind = return A.Unwind
 
 
 instance Converter I.Dbg (LabelMapM A.Dbg) where
@@ -368,8 +370,8 @@ instance Converter I.TerminatorInstWithDbg (LabelMapM A.TerminatorInstWithDbg) w
 
 type Pblock = (A.BlockLabel, [A.PhiInst], [A.ComputingInstWithDbg])
 
-getLabelId :: A.BlockLabel -> A.Lstring -- abelId
--- getLabelId (A.ImplicitBlockLabel l) = A.labelIdToString l
+getLabelId :: A.BlockLabel -> A.Lstring 
+getLabelId A.ImplicitBlockLabel  = error "ImplicitBlockLabel should be normalized"
 getLabelId (A.ExplicitBlockLabel l) = A.labelIdToString l
               
 convertNode :: I.Node e x -> LabelMapM (M.Map A.Lstring A.Block, Maybe Pblock) 
@@ -418,7 +420,7 @@ toplevel2Ast (I.ToplevelNamedMd m ns) = do { m' <- convert m
 toplevel2Ast (I.ToplevelDeclare f) = convert f >>= return . A.ToplevelDeclare
 
 
-toplevel2Ast (I.ToplevelDefine f e g) = 
+toplevel2Ast (I.ToplevelDefine f _ g) = 
   do { bm <- graphToBlocks g
      ; f' <- convert f
      ; bs' <- getAlist f'

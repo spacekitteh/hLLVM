@@ -218,6 +218,7 @@ uDofTerminatorInst (Switch c _ cases) = (uDofTypedValue c) `mappend`
 uDofTerminatorInst (Invoke lhsOpt cs _ _) = (d1ofMaybeGlobalOrLocalId lhsOpt) `mappend` (uDofCallSite cs)
 uDofTerminatorInst (Resume v) = uDofTypedValue v
 uDofTerminatorInst Unreachable = mempty
+uDofTerminatorInst Unwind = mempty
 
 
 

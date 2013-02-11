@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
 module Llvm.Pass.Rewriter where
@@ -69,7 +70,7 @@ rwConversion f (Conversion co tv1 t) = do { tv1' <- f tv1
 rwGetElemPtr :: Eq a => MaybeChange a -> MaybeChange (GetElemPtr a)
 rwGetElemPtr f (GetElemPtr b tv1 indices) = do { tv1' <- f tv1
                                                ; indices' <- fs f indices
-                                               ; return $ GetElemPtr b tv1 indices'
+                                               ; return $ GetElemPtr b tv1' indices'
                                                }
 
 rwSelect :: MaybeChange a -> MaybeChange (Select a)
@@ -97,15 +98,16 @@ rwExpr f (EfC a) = rwFcmp f a >>= return . EfC
 rwExpr f (Eb a) = rwBinExpr f a >>= return . Eb
 rwExpr f (Ec a) = rwConversion (tv2v f) a >>= return . Ec
 rwExpr f (Es a) = rwSelect (tv2v f) a >>= return . Es
+rwExpr _ (Ev _) = error "unexpected case"
                   
 
 rwMemOp :: MaybeChange Value -> MaybeChange Rhs 
 rwMemOp f (RmO (Allocate m t ms ma)) = do { ms' <- maybeM (tv2v f) ms
                                           ; return $ RmO $ Allocate m t ms' ma
                                           }
-rwMemOp f (RmO (Load a (TypedPointer (Tpointer t _) ptr) ma)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
-                                                                   ; return $ Re $ Ev tv
-                                                                   }
+rwMemOp f (RmO (Load _ (TypedPointer (Tpointer t _) ptr) _)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
+                                                                  ; return $ Re $ Ev tv
+                                                                  }
 rwMemOp f (RmO (Free tv)) = (tv2v f) tv >>= return . RmO . Free 
 rwMemOp f (RmO (Store a tv1 tv2 ma)) = do { tv1' <- (tv2v f) tv1
                                           ; return $ RmO $ Store a tv1' tv2 ma
@@ -116,6 +118,7 @@ rwMemOp f (RmO (CmpXchg b ptr v1 v2 b2 fe)) = do { (v1', v2') <- f2 (tv2v f) (v1
 rwMemOp f (RmO (AtomicRmw b ao ptr v1 b2 fe)) = do { v1' <- (tv2v f) v1
                                                    ; return $ RmO $ AtomicRmw b ao ptr v1' b2 fe
                                                    }
+rwMemOp _ _ = error "impossible case"                                                
 
 rwShuffleVector :: MaybeChange a -> MaybeChange (ShuffleVector a)
 rwShuffleVector f (ShuffleVector tv1 tv2 tv3) = do { (tv1', tv2', tv3') <- f3 f (tv1, tv2, tv3)
@@ -140,7 +143,7 @@ rwInsertElem f (InsertElem tv1 tv2 tv3) = do { (tv1', tv2', tv3') <- f3 f (tv1, 
                                               }
 rwRhs :: MaybeChange Value -> MaybeChange Rhs
 rwRhs f (RmO a) = rwMemOp f (RmO a) 
-rwRhs f (Call _ _) = Nothing
+rwRhs _ (Call _ _) = Nothing
 rwRhs f (Re a) = rwExpr f a >>= return . Re
 rwRhs f (ReE a) = rwExtractElem (tv2v f) a >>= return . ReE
 rwRhs f (RiE a) = rwInsertElem (tv2v f) a >>= return . RiE
@@ -148,7 +151,7 @@ rwRhs f (RsV a) = rwShuffleVector (tv2v f) a >>= return . RsV
 rwRhs f (ReV a) = rwExtractValue (tv2v f) a >>= return . ReV
 rwRhs f (RiV a) = rwInsertValue (tv2v f) a >>= return . RiV
 rwRhs f (VaArg tv t) = (tv2v f) tv >>= \tv' -> return $ VaArg tv' t
-rwRhs f (LandingPad t1 t2 p b c) = Nothing
+rwRhs _ (LandingPad _ _ _ _ _) = Nothing
 
 
 rwComputingInst :: MaybeChange Value -> MaybeChange ComputingInst
@@ -160,7 +163,7 @@ rwComputingInstWithDbg f (ComputingInstWithDbg cinst dbgs) = rwComputingInst f c
                                                                         
 rwCinst :: MaybeChange Value -> MaybeChange (Node e x)
 rwCinst f (Cinst c) = rwComputingInstWithDbg f c >>= return . Cinst
-rwCinst f _ = Nothing
+rwCinst _ _ = Nothing
 
 
 rwTerminatorInst :: MaybeChange Value -> MaybeChange TerminatorInst
@@ -170,7 +173,7 @@ rwTerminatorInst f (Return ls) = do { ls' <- fs (tv2v f) ls
 rwTerminatorInst f (Cbr v tl fl) = do { v' <- f v
                                       ; return $ Cbr v' tl fl
                                       }
-rwTerminatorInst f _  = Nothing                           
+rwTerminatorInst _ _  = Nothing                           
 -- rwTerminatorInst f e = error ("unhandled case " ++ (show e))
                        
 
@@ -180,13 +183,13 @@ rwTerminatorInstWithDbg f (TerminatorInstWithDbg cinst dbgs) = rwTerminatorInst 
                                                                         
 rwTinst :: MaybeChange Value -> MaybeChange (Node e x)
 rwTinst f (Tinst c) = rwTerminatorInstWithDbg f c >>= return . Tinst
-rwTinst f _ = Nothing
+rwTinst _ _ = Nothing
 
 
 rwNode :: MaybeChange Value -> MaybeChange (Node e x)
 rwNode f n@(Cinst _) = rwCinst f n
 rwNode f n@(Tinst _) = rwTinst f n
-rwNode f _  = Nothing
+rwNode _ _  = Nothing
 
 nodeToG :: Node e x -> H.Graph Node e x
 nodeToG n@(Nlabel _) = H.mkFirst n

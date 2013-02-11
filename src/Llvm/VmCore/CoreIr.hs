@@ -263,6 +263,7 @@ data TerminatorInst = Unreachable
                     -- | invoke d1 callsite t1 t2
                     | Invoke (Maybe GlobalOrLocalId) CallSite TargetLabel TargetLabel
                     | Resume TypedValue
+                    | Unwind
                     deriving (Eq,Show)
                              
                              
@@ -275,6 +276,7 @@ targetOf (IndirectBr _ ls) = ls
 targetOf (Switch _ d cases) = d:(map snd cases)
 targetOf (Invoke _ _ t1 t2) = [t1,t2]
 targetOf (Resume _) = []
+targetOf Unwind = []
 
                              
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg] 

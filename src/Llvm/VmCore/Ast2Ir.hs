@@ -31,7 +31,7 @@ instance Converter A.TargetLabel (LabelMapM I.TargetLabel) where
 
 
 instance Converter A.BlockLabel (LabelMapM I.BlockLabel) where
---    convert (A.ImplicitBlockLabel b) = convert b >>= return . I.ImplicitBlockLabel
+    convert A.ImplicitBlockLabel = error "ImplicitBlockLabel should be normalized"
     convert (A.ExplicitBlockLabel b) = convert b >>= return . I.BlockLabel
   
 instance Converter A.TypedConst (LabelMapM I.TypedConst) where
@@ -77,14 +77,14 @@ instance Converter v1 (LabelMapM v2) => Converter (A.BinExpr v1) (LabelMapM (I.B
                                            ; return $ f t u1' u2'
                                            }
                                         where
-                                            getnowrap cs = case cs of
+                                            getnowrap x = case x of
                                                              [A.Nsw] -> Just I.Nsw
                                                              [A.Nuw] -> Just I.Nuw
                                                              [A.Nsw,A.Nuw] -> Just I.Nsuw
                                                              [A.Nuw,A.Nsw] -> Just I.Nsuw
                                                              [] -> Nothing
                                                              _ -> error ("irrefutable error1 " ++ show cs)
-                                            getexact cs = case cs of 
+                                            getexact x = case x of 
                                                             [A.Exact] -> Just I.Exact
                                                             [] -> Nothing
                                                             _ -> error "irrefutable error2"
@@ -338,6 +338,7 @@ instance Converter A.TerminatorInst (LabelMapM I.TerminatorInst) where
                                       }
     convert (A.Resume tv) = convert tv >>= \tv' -> return $ I.Resume tv'
     convert A.Unreachable = return I.Unreachable
+    convert A.Unwind = return I.Unwind
 
 
 instance Converter A.Dbg (LabelMapM I.Dbg) where

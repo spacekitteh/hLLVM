@@ -60,7 +60,6 @@ Library
                      Ast2IrTester,
                      Ir2AstTester
 --  ghc-options:       -Wall -fno-warn-name-shadowing
-  ghc-options:       -Wall -fno-warn-name-shadowing
   Extensions:        CPP 
   hs-source-dirs:    src
 

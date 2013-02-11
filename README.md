@@ -1,9 +1,9 @@
-LLVM -- Haskell implementation of LLVM
+HsLlvm -- Haskell implementation of LLVM
 
 
 Goal: 
 ==========================================
-Provide type safe manipulation of LLVM code
+Provide type safe manipulation of LLVM code in Haskell
 
 
 Build:
@@ -18,15 +18,15 @@ The test driver 'llvm-test' is generated at dist/build/llvm-test
 Test:
 ==============
 ## test LLVM asmebler parser
-llvm-test parser test.ll 
+dist/build/llvm-test/llvm-test parser test/test1.ll 
 
 ## test mem2reg pass
-llvm-test pass -s=mem2reg -f=10000 test/test.ll
+dist/build/llvm-test/llvm-test pass -s=mem2reg -f=10000 test/test1.ll
 
 
 ## test dce pass
-llvm-test pass -s=dce -f=10000 test/test.ll
+dist/build/llvm-test/llvm-test pass -s=dce -f=10000 test/test1.ll
 
 
-## test multiple passes
-llvm-test pass -s=mem2reg -s=dce -f=10000 test/test.ll
+## test mem2reg and dce passes
+dist/build/llvm-test/llvm-test pass -s=mem2reg -s=dce -f=1000 test/test1.ll 

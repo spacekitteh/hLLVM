@@ -419,6 +419,7 @@ instance AsmWriter TerminatorInst where
                                              " unwind " ++ toLlvm unwindL
   toLlvm Unreachable = "unreachable"
   toLlvm (Resume a) = "resume " ++ toLlvm a
+  toLlvm Unwind = "unwind"
              
 instance AsmWriter TerminatorInstWithDbg where
   toLlvm (TerminatorInstWithDbg ins dbgs) = toLlvm ins ++ listToLlvm ", " dbgs ", " ""

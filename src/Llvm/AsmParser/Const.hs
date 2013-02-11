@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wall #-}
 module Llvm.AsmParser.Const where
 import Llvm.VmCore.Ast
 import Llvm.AsmParser.Basic
@@ -63,17 +64,17 @@ pIntOrFloat = lexeme (choice [try k, try u, try s, intOrFloat])
           ; cs <- many1 hexDigit
           ; return $ CpFloat (hd ++ t ++ cs)
           }
-   u = do { string "u0x"
+   u = do { ignore (string "u0x")
           ; cs <- many1 hexDigit
           ; return $ CpUhexInt cs
           }
-   s = do { string "s0x"
+   s = do { ignore (string "s0x")
           ; cs <- many1 hexDigit
           ; return $ CpShexInt cs
           }
    intOrFloat = do { i <- signedIntStr
                    ; option (CpInt i) 
-                                (do { char '.'
+                                (do { ignore (char '.')
                                     ; ne <- option "" (do { n <- numericLit
                                                          ; e <- option "" (do { e <- (string "E" <|> string "e")
                                                                              ; x <- signedIntStr
@@ -127,6 +128,7 @@ getType (TypedConst t1 _) (TypedConst t2 _) = if t1 == t2 then t1
                                               else error "t1 != t2"
 getType (TypedConstNull) (TypedConst t2 _) = t2
 getType (TypedConst t1 _) TypedConstNull = t1
+getType TypedConstNull TypedConstNull = error "unexpected case"
 
 getConst :: TypedConst -> Const
 getConst TypedConstNull = Ccp CpNull
@@ -172,11 +174,11 @@ pConstSelect = reserved "select" >> parens (pTriple pTypedConst) >>= return . (u
                   
 pConstConversion :: P (Conversion TypedConst)
 pConstConversion = do { op <- pConvertOp
-                   ; chartok '('
+                   ; ignore (chartok '(')
                    ; tc <- pTypedConst
                    ; reserved "to"
                    ; t <- pType
-                   ; chartok ')'
+                   ; ignore (chartok ')')
                    ; return $ Conversion op tc t
                    }
                    
@@ -184,13 +186,13 @@ pConstConversion = do { op <- pConvertOp
 pConstGetElemPtr :: P (GetElemPtr TypedConst)
 pConstGetElemPtr = do { reserved "getelementptr"
                       ; ib <- option False (reserved "inbounds" >> return True)
-                      ; chartok '('
+                      ; ignore (chartok '(')
                       ; tc1 <- pTypedConst
-                      ; idx <- option [] (do { comma
+                      ; idx <- option [] (do { ignore comma
                                             ; idx <- sepBy pTypedConst comma 
                                             ; return idx
                                             })
-                      ; chartok ')'
+                      ; ignore (chartok ')')
                       ; return $ GetElemPtr ib tc1 idx
                       }
                       
