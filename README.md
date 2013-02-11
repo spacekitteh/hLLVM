@@ -3,12 +3,13 @@ HsLlvm -- Haskell implementation of LLVM
 
 Goal: 
 ==========================================
-Provide type safe manipulation of LLVM code in Haskell
+- Port all LLVM optimizations
+- Provide functionalities to generate and maniuplate LLVM code
 
 
 Build:
 ==============
-From LLVM toplevel directory
+From HsLlvm toplevel directory
 
   cabal configure
   cabal build
