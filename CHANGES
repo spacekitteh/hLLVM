@@ -1,0 +1,3 @@
+0.1
+- support LLVM 3.1 syntax
+- Hoopl based implementation :mem2reg, dce, dominator 
