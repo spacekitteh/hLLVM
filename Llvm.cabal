@@ -55,7 +55,10 @@ Library
                      Llvm.Pass.PassManager,
                      Llvm.Pass.PhiElimination,
                      Llvm.Pass.Rewriter,
-                     Llvm.Pass.Uda
+                     Llvm.Pass.Uda,
+                     ParserTester,
+                     Ast2IrTester,
+                     Ir2AstTester
 --  ghc-options:       -Wall -fno-warn-name-shadowing
   ghc-options:       -Wall -fno-warn-name-shadowing
   Extensions:        CPP 
