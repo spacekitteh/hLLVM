@@ -12,6 +12,7 @@ Build:
 From HsLlvm toplevel directory
 
   cabal configure
+
   cabal build
 
 The test driver 'llvm-test' is generated at dist/build/llvm-test
