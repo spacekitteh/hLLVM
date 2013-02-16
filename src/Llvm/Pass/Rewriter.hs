@@ -98,7 +98,7 @@ rwExpr f (EfC a) = rwFcmp f a >>= return . EfC
 rwExpr f (Eb a) = rwBinExpr f a >>= return . Eb
 rwExpr f (Ec a) = rwConversion (tv2v f) a >>= return . Ec
 rwExpr f (Es a) = rwSelect (tv2v f) a >>= return . Es
-rwExpr _ (Ev _) = error "unexpected case"
+rwExpr f (Ev x) = (tv2v f x) >>= return . Ev
                   
 
 rwMemOp :: MaybeChange Value -> MaybeChange Rhs 

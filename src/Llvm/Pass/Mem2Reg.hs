@@ -77,7 +77,6 @@ memOp _ (Store _ (TypedValue _ v1) (TypedPointer _ (Pointer (VgOl (GolL ptr)))) 
     in
     if (x `Dm.member` f) then 
         insert x (PElem v1) f
---        Dm.insert x (PElem v1) f
     else
         f
 memOp _ _ f = f
