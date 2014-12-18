@@ -8,7 +8,7 @@ import qualified Data.List as L
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
-import Llvm.VmCore.LabelMapM (M)
+-- import Llvm.VmCore.LabelMapM (M)
 import Llvm.Pass.Uda
 import Llvm.VmCore.AsmWriter
 import Llvm.VmCore.CoreIrWriter()
@@ -105,7 +105,7 @@ dcePass = BwdPass { bp_lattice = liveLattice
                       
           
           
-dce :: Ds.Set (Type, GlobalId) -> Label -> Graph Node C C -> M (Graph Node C C)
+dce :: Ds.Set (Type, GlobalId) -> Label -> Graph Node C C -> CheckingFuelMonad SimpleUniqueMonad (Graph Node C C)
 dce _ entry graph = 
   do { (graph', _, _) <- analyzeAndRewriteBwd bwd (JustC [entry]) graph
                              mapEmpty       

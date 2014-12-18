@@ -18,4 +18,4 @@ import Llvm.VmCore.LabelMapM
 
 
 testIr2Ast :: IdLabelMap -> I.Module -> A.Module
-testIr2Ast m e = H.runSimpleUniqueMonad $ H.runWithFuel 100 (irToAst m e)
+testIr2Ast m e = H.runSimpleUniqueMonad $ irToAst m e

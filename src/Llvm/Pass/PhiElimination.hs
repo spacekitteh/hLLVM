@@ -7,7 +7,6 @@ module Llvm.Pass.PhiElimination (phiElimination) where
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
-import Llvm.VmCore.LabelMapM (M)
 import Llvm.VmCore.CoreIrWriter()
 
 import Llvm.Pass.Rewriter
@@ -81,7 +80,7 @@ fwdPass f = FwdPass { fp_lattice = lattice f
           
             
                
-phiElimination :: LabelMap Label -> Label -> Graph Node C C -> M (Graph Node C C)
+phiElimination :: LabelMap Label -> Label -> Graph Node C C -> CheckingFuelMonad SimpleUniqueMonad (Graph Node C C)
 #ifdef DEBUG
 phiElimination idom entry graph | trace ("killphi with idom " ++ show idom) False = undefined
 phiElimination idom entry graph | trace ("killphi with entry " ++ show entry) False = undefined

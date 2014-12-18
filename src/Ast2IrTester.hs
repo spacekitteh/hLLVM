@@ -15,4 +15,4 @@ import qualified Compiler.Hoopl as H
 
 
 testAst2Ir :: A.Module -> (IdLabelMap, I.Module)
-testAst2Ir e = H.runSimpleUniqueMonad $ H.runWithFuel 100 (astToIr e)
+testAst2Ir e = H.runSimpleUniqueMonad $ astToIr e

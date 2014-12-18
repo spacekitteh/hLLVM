@@ -7,7 +7,6 @@ module Llvm.Pass.Mem2Reg (mem2reg) where
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr 
 import Llvm.VmCore.Ir
-import Llvm.VmCore.LabelMapM (M)
 import qualified Data.Map as Dm
 import qualified Data.Set as Ds
 import Control.Monad
@@ -118,7 +117,7 @@ mem2RegPass = FwdPass { fp_lattice = mem2RegLattice
                       }
               
               
-mem2reg :: Ds.Set (Type, GlobalId) -> Label -> Graph Node C C -> M (Graph Node C C)
+mem2reg :: Ds.Set (Type, GlobalId) -> Label -> Graph Node C C -> CheckingFuelMonad SimpleUniqueMonad (Graph Node C C)
 mem2reg _ entry graph = 
   do { (graph', _, _) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph
                          (mapSingleton entry (Dm.empty)) -- initFact gs))

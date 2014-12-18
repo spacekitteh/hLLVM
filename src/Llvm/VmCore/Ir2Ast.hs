@@ -16,7 +16,9 @@ import qualified Llvm.VmCore.Ir as I
 import Llvm.VmCore.Converter 
 import Llvm.VmCore.LabelMapM
 
-instance Converter I.LabelId (LabelMapM A.LabelId) where
+type MyLabelMapM = LabelMapM H.SimpleUniqueMonad
+
+instance Converter I.LabelId (MyLabelMapM A.LabelId) where
   convert (I.LabelString l) = Md.liftM A.LabelString (labelIdFor l)
   convert (I.LabelQuoteString l) = Md.liftM A.LabelQuoteString (labelIdFor l)
   convert (I.LabelNumber l) = do { A.Lstring s <- labelIdFor l
@@ -30,32 +32,32 @@ instance Converter I.LabelId (LabelMapM A.LabelId) where
   
 
 
-instance Converter I.PercentLabel (LabelMapM A.PercentLabel) where
+instance Converter I.PercentLabel (MyLabelMapM A.PercentLabel) where
     convert (I.PercentLabel l) = convert l >>= return . A.PercentLabel
                                
-instance Converter I.TargetLabel (LabelMapM A.TargetLabel) where
+instance Converter I.TargetLabel (MyLabelMapM A.TargetLabel) where
     convert (I.TargetLabel tl) = convert tl >>= return . A.TargetLabel
 
 
-instance Converter I.BlockLabel (LabelMapM A.BlockLabel) where
+instance Converter I.BlockLabel (MyLabelMapM A.BlockLabel) where
     convert (I.BlockLabel b) = convert b >>= return . A.ExplicitBlockLabel
   
-instance Converter I.TypedConst (LabelMapM A.TypedConst) where
+instance Converter I.TypedConst (MyLabelMapM A.TypedConst) where
     convert (I.TypedConst t c) = convert c >>= return . (A.TypedConst t)
     convert I.TypedConstNull = return A.TypedConstNull
 
 
-instance Converter I.TypedValue (LabelMapM A.TypedValue) where
+instance Converter I.TypedValue (MyLabelMapM A.TypedValue) where
     convert (I.TypedValue t v) = convert v >>= return . (A.TypedValue t)
 
-instance Converter I.TypedPointer (LabelMapM A.TypedPointer) where
+instance Converter I.TypedPointer (MyLabelMapM A.TypedPointer) where
     convert (I.TypedPointer t v) = convert v >>= return . (A.TypedPointer t)
 
-instance Converter I.Pointer (LabelMapM A.Pointer) where
+instance Converter I.Pointer (MyLabelMapM A.Pointer) where
     convert (I.Pointer v) = convert v >>= return . A.Pointer 
 
 
-instance Converter I.ComplexConstant (LabelMapM A.ComplexConstant) where
+instance Converter I.ComplexConstant (MyLabelMapM A.ComplexConstant) where
     convert (I.Cstruct b fs) = Md.liftM (A.Cstruct b) (mapM convert fs)
     convert (I.Cvector fs) = mapM convert fs >>= return . A.Cvector
     convert (I.Carray fs) = mapM convert fs >>= return . A.Carray
@@ -63,7 +65,7 @@ instance Converter I.ComplexConstant (LabelMapM A.ComplexConstant) where
 
 
 
-instance Converter v1 (LabelMapM v2) => Converter (I.BinExpr v1) (LabelMapM (A.BinExpr v2)) where   
+instance Converter v1 (MyLabelMapM v2) => Converter (I.BinExpr v1) (MyLabelMapM (A.BinExpr v2)) where   
     convert e = let (u1, u2) = operandOfBinExpr e
                     t = typeOfBinExpr e
                 in 
@@ -100,75 +102,75 @@ instance Converter v1 (LabelMapM v2) => Converter (I.BinExpr v1) (LabelMapM (A.B
                                              
 
 {-
-instance Converter v1 (LabelMapM v2) => Converter (I.Bitwise v1) (LabelMapM (A.Bitwise v2)) where
+instance Converter v1 (MyLabelMapM v2) => Converter (I.Bitwise v1) (MyLabelMapM (A.Bitwise v2)) where
     convert (I.Bitwise op cs t u1 u2) = do { u1' <- convert u1
                                                          ; u2' <- convert u2
                                                          ; return $ A.Bitwise op cs t u1' u2'
                                                          }
 -}
                                     
-instance Converter v1 (LabelMapM v2) => Converter (I.Conversion v1) (LabelMapM (A.Conversion v2)) where    
+instance Converter v1 (MyLabelMapM v2) => Converter (I.Conversion v1) (MyLabelMapM (A.Conversion v2)) where    
     convert (I.Conversion op u t) = convert u >>= \u' -> return $ A.Conversion op u' t
                                                   
 
-instance Converter v1 (LabelMapM v2) => Converter (I.GetElemPtr v1) (LabelMapM (A.GetElemPtr v2)) where
+instance Converter v1 (MyLabelMapM v2) => Converter (I.GetElemPtr v1) (MyLabelMapM (A.GetElemPtr v2)) where
     convert (I.GetElemPtr b u us) = do { u' <- convert u
                                                      ; us' <- mapM convert (fmap u1 us)
                                                      ; return $ A.GetElemPtr b u' us'
                                                      }
       where u1 x = x
                                 
-instance (Converter v1 (LabelMapM v2)) => Converter (I.Select v1) (LabelMapM (A.Select v2)) where
+instance (Converter v1 (MyLabelMapM v2)) => Converter (I.Select v1) (MyLabelMapM (A.Select v2)) where
     convert (I.Select u1 u2 u3) = do { u1' <- convert u1
                                                           ; u2' <- convert u2
                                                           ; u3' <- convert u3
                                                           ; return $ A.Select u1' u2' u3'
                                                           } 
                               
-instance Converter v1 (LabelMapM v2) => Converter (I.Icmp v1) (LabelMapM (A.Icmp v2)) where
+instance Converter v1 (MyLabelMapM v2) => Converter (I.Icmp v1) (MyLabelMapM (A.Icmp v2)) where
     convert (I.Icmp op t u1 u2) = do { u1' <- convert u1
                                                    ; u2' <- convert u2
                                                    ; return $ A.Icmp op t u1' u2'
                                                    } 
                               
-instance Converter v1 (LabelMapM v2) => Converter (I.Fcmp v1) (LabelMapM (A.Fcmp v2)) where
+instance Converter v1 (MyLabelMapM v2) => Converter (I.Fcmp v1) (MyLabelMapM (A.Fcmp v2)) where
     convert (I.Fcmp op t u1 u2) = do { u1' <- convert u1
                                                    ; u2' <- convert u2
                                                    ; return $ A.Fcmp op t u1' u2'
                                                    }
                               
-instance Converter v1 (LabelMapM v2) => Converter (I.ShuffleVector v1) (LabelMapM (A.ShuffleVector v2)) where 
+instance Converter v1 (MyLabelMapM v2) => Converter (I.ShuffleVector v1) (MyLabelMapM (A.ShuffleVector v2)) where 
     convert (I.ShuffleVector u1 u2 u3) = do { u1' <- convert u1
                                                                  ; u2' <- convert u2
                                                                  ; u3' <- convert u3
                                                                  ; return $ A.ShuffleVector u1' u2' u3'
                                                                  }
                                      
-instance Converter v1 (LabelMapM v2) => Converter (I.ExtractValue v1) (LabelMapM (A.ExtractValue v2)) where
+instance Converter v1 (MyLabelMapM v2) => Converter (I.ExtractValue v1) (MyLabelMapM (A.ExtractValue v2)) where
     convert (I.ExtractValue u s) = convert u >>= \u' -> return $ A.ExtractValue u' s
   
 
-instance Converter v1 (LabelMapM v2) => Converter (I.InsertValue v1) (LabelMapM (A.InsertValue v2)) where  
+instance Converter v1 (MyLabelMapM v2) => Converter (I.InsertValue v1) (MyLabelMapM (A.InsertValue v2)) where  
     convert (I.InsertValue u1 u2 s) = do { u1' <- convert u1
                                                        ; u2' <- convert u2
                                                        ; return $ A.InsertValue u1' u2' s
                                                        }
                                   
-instance Converter v1 (LabelMapM v2) => Converter (I.ExtractElem v1) (LabelMapM (A.ExtractElem v2)) where
+instance Converter v1 (MyLabelMapM v2) => Converter (I.ExtractElem v1) (MyLabelMapM (A.ExtractElem v2)) where
     convert (I.ExtractElem u1 u2) = do { u1' <- convert u1
                                                      ; u2' <- convert u2
                                                      ; return $ A.ExtractElem u1' u2'
                                                      }
                                 
 
-instance Converter v1 (LabelMapM v2) => Converter (I.InsertElem v1) (LabelMapM (A.InsertElem v2)) where 
+instance Converter v1 (MyLabelMapM v2) => Converter (I.InsertElem v1) (MyLabelMapM (A.InsertElem v2)) where 
     convert (I.InsertElem u1 u2 u3) = do { u1' <- convert u1
                                                               ; u2' <- convert u2
                                                               ; u3' <- convert u3
                                                               ; return $ A.InsertElem u1' u2' u3'
                                                               }
 
-instance Converter I.Const (LabelMapM A.Const) where
+instance Converter I.Const (MyLabelMapM A.Const) where
     convert x = 
         case x of
           I.Ccp a -> return $ A.Ccp a
@@ -192,13 +194,13 @@ instance Converter I.Const (LabelMapM A.Const) where
           I.CiE a -> Md.liftM A.CiE (convert a)
           I.CmC a -> Md.liftM A.CmC (convert a)
 
-instance Converter I.MdVar (LabelMapM A.MdVar) where
+instance Converter I.MdVar (MyLabelMapM A.MdVar) where
     convert (I.MdVar s) = return $ A.MdVar s
 
-instance Converter I.MdNode (LabelMapM A.MdNode) where
+instance Converter I.MdNode (MyLabelMapM A.MdNode) where
     convert (I.MdNode s) = return $ A.MdNode s
 
-instance Converter I.MetaConst (LabelMapM A.MetaConst) where
+instance Converter I.MetaConst (MyLabelMapM A.MetaConst) where
     convert (I.MdConst c) = convert c >>= return . A.MdConst
     convert (I.MdString s) = return $ A.MdString s
     convert (I.McMn n) = convert n >>= return . A.McMn
@@ -206,7 +208,7 @@ instance Converter I.MetaConst (LabelMapM A.MetaConst) where
     convert (I.MdRef i) = return $ A.MdRef i
 
 
-instance Converter I.Expr (LabelMapM A.Expr) where
+instance Converter I.Expr (MyLabelMapM A.Expr) where
     convert (I.EgEp c) = Md.liftM A.EgEp (convert c)
 --    convert (I.Ea a) =  Md.liftM A.Ea (convert a)
     convert (I.EiC a) = Md.liftM A.EiC (convert a)
@@ -221,7 +223,7 @@ instance Converter I.Expr (LabelMapM A.Expr) where
                        
 
 
-instance Converter I.MemOp (LabelMapM A.MemOp) where
+instance Converter I.MemOp (MyLabelMapM A.MemOp) where
     convert (I.Allocate mar t mtv ma) = maybeM convert mtv >>= \x -> return $ A.Allocate mar t x ma
     convert (I.Free tv) = convert tv >>= return . A.Free
     convert (I.Load atom tv aa) = convert tv >>= \tv' -> return $ A.Load atom tv' aa
@@ -242,11 +244,11 @@ instance Converter I.MemOp (LabelMapM A.MemOp) where
 
 
 
-instance Converter I.FunName (LabelMapM A.FunName) where
+instance Converter I.FunName (MyLabelMapM A.FunName) where
     convert (I.FunNameGlobal g) = return $ A.FunNameGlobal g
     convert (I.FunNameString s) = return $ A.FunNameString s
 
-instance Converter I.Value (LabelMapM A.Value) where
+instance Converter I.Value (MyLabelMapM A.Value) where
     convert (I.VgOl a) = return $ A.VgOl a
     convert (I.Ve a) = Md.liftM A.Ve (convert a)
     convert (I.Vc a) = Md.liftM A.Vc (convert a)
@@ -254,7 +256,7 @@ instance Converter I.Value (LabelMapM A.Value) where
     convert (I.Deref _) = error "I.Deref should be removed in optimization"
       
    
-instance Converter I.CallSite (LabelMapM A.CallSite) where
+instance Converter I.CallSite (MyLabelMapM A.CallSite) where
     convert  (I.CallFun cc pa t fn aps fa) = do { fn' <- convert fn
                                                 ; aps' <- mapM convert aps
                                                 ; return $ A.CallFun cc pa t fn' aps' fa
@@ -267,21 +269,21 @@ instance Converter I.CallSite (LabelMapM A.CallSite) where
                                                ; return $ A.CallConversion pa t cv' as' fa
                                                } 
                                         
-instance Converter I.Clause (LabelMapM A.Clause) where
+instance Converter I.Clause (MyLabelMapM A.Clause) where
     convert (I.Catch tv) = convert tv >>= \tv' -> return $ A.Catch tv'
     convert (I.Filter tc) = convert tc >>= \tc' -> return $ A.Filter tc'
     convert (I.Cco tc) = convert tc >>= return . A.Cco
 
-instance Converter (I.Type, I.GlobalOrLocalId) (LabelMapM (A.Type, A.GlobalOrLocalId)) where
+instance Converter (I.Type, I.GlobalOrLocalId) (MyLabelMapM (A.Type, A.GlobalOrLocalId)) where
     convert (t, g) = return (t, g)
 
-instance Converter I.PersFn (LabelMapM A.PersFn) where
+instance Converter I.PersFn (MyLabelMapM A.PersFn) where
     convert (I.PersFnId s) = return $ A.PersFnId $ s
     convert (I.PersFnCast c) = convert c >>= return . A.PersFnCast 
     convert (I.PersFnUndef) = return $ A.PersFnUndef
 
 
-instance Converter I.Rhs (LabelMapM A.Rhs) where
+instance Converter I.Rhs (MyLabelMapM A.Rhs) where
     convert (I.RmO c) = convert c >>= return . A.RmO
     convert (I.Re e) = convert e >>= return . A.Re
     convert (I.Call b cs) = Md.liftM (A.Call b) (convert cs)
@@ -299,31 +301,31 @@ instance Converter I.Rhs (LabelMapM A.Rhs) where
     convert (I.RiV a) = Md.liftM A.RiV (convert a)
     
 
-instance Converter I.ActualParam (LabelMapM A.ActualParam) where
+instance Converter I.ActualParam (MyLabelMapM A.ActualParam) where
     convert (I.ActualParam t pa1 ma v pa2) = convert v >>= \v' -> return $ A.ActualParam t pa1 ma v' pa2
                     
-instance Converter I.Aliasee (LabelMapM A.Aliasee) where
+instance Converter I.Aliasee (MyLabelMapM A.Aliasee) where
     convert (I.AtV tv) = convert tv >>= return . A.AtV 
     convert (I.Ac a) = convert a >>= \a' -> return $ A.Ac a'
     convert (I.AgEp a) = Md.liftM A.AgEp (convert a)
 
 
-instance Converter I.FunctionPrototype (LabelMapM A.FunctionPrototype) where
+instance Converter I.FunctionPrototype (MyLabelMapM A.FunctionPrototype) where
     convert (I.FunctionPrototype f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11) = 
         return $ A.FunctionPrototype f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
 
 
-instance Converter I.PhiInst (LabelMapM A.PhiInst) where
+instance Converter I.PhiInst (MyLabelMapM A.PhiInst) where
     convert (I.PhiInst mg t branches) = do { branches' <- mapM (pairM convert convert) branches
                                            ; return $ A.PhiInst mg t branches'
                                            }
 
-instance Converter I.ComputingInst (LabelMapM A.ComputingInst) where
+instance Converter I.ComputingInst (MyLabelMapM A.ComputingInst) where
     convert (I.ComputingInst mg rhs) = do { rhs' <- convert rhs
                                           ; return $ A.ComputingInst mg rhs'
                                           }
 
-instance Converter I.TerminatorInst (LabelMapM A.TerminatorInst) where
+instance Converter I.TerminatorInst (MyLabelMapM A.TerminatorInst) where
     convert (I.Return tvs) = (mapM convert tvs) >>= return . A.Return
     convert (I.Br t) = Md.liftM A.Br (convert t)
     convert (I.Cbr cnd t f) = do { cnd' <- convert cnd
@@ -350,19 +352,19 @@ instance Converter I.TerminatorInst (LabelMapM A.TerminatorInst) where
     convert I.Unwind = return A.Unwind
 
 
-instance Converter I.Dbg (LabelMapM A.Dbg) where
+instance Converter I.Dbg (MyLabelMapM A.Dbg) where
     convert (I.Dbg mv mc) = do { mv' <- convert mv
                                ; mc' <- convert mc
                                ; return $ A.Dbg mv' mc'
                                }
 
-instance Converter I.ComputingInstWithDbg (LabelMapM A.ComputingInstWithDbg) where
+instance Converter I.ComputingInstWithDbg (MyLabelMapM A.ComputingInstWithDbg) where
     convert (I.ComputingInstWithDbg ins dbgs) = do { ins' <- convert ins
                                                    ; dbgs' <- mapM convert dbgs
                                                    ; return $ A.ComputingInstWithDbg ins' dbgs'
                                                    } 
 
-instance Converter I.TerminatorInstWithDbg (LabelMapM A.TerminatorInstWithDbg) where
+instance Converter I.TerminatorInstWithDbg (MyLabelMapM A.TerminatorInstWithDbg) where
     convert (I.TerminatorInstWithDbg term dbgs) = do { term' <- convert term
                                                      ; dbgs' <- mapM convert dbgs
                                                      ; return $ A.TerminatorInstWithDbg term' dbgs'
@@ -374,8 +376,8 @@ getLabelId :: A.BlockLabel -> A.Lstring
 getLabelId A.ImplicitBlockLabel  = error "ImplicitBlockLabel should be normalized"
 getLabelId (A.ExplicitBlockLabel l) = A.labelIdToLstring l
               
-convertNode :: I.Node e x -> LabelMapM (M.Map A.Lstring A.Block, Maybe Pblock) 
-               -> LabelMapM (M.Map A.Lstring A.Block, Maybe Pblock)
+convertNode :: I.Node e x -> MyLabelMapM (M.Map A.Lstring A.Block, Maybe Pblock) 
+               -> MyLabelMapM (M.Map A.Lstring A.Block, Maybe Pblock)
 convertNode (I.Nlabel a) p = do { (bs, Nothing) <- p  
                                 ; a' <- convert a 
                                 ; return (bs, Just (a', [], []))
@@ -397,18 +399,14 @@ convertNode (I.Tinst a) p = do { (bs, pb) <- p
                                                                Nothing)
                                }
 
-graphToBlocks :: H.Graph I.Node H.C H.C -> LabelMapM (M.Map A.Lstring A.Block)
+graphToBlocks :: H.Graph I.Node H.C H.C -> MyLabelMapM (M.Map A.Lstring A.Block)
 graphToBlocks g = do { (bs, Nothing) <- H.foldGraphNodes convertNode g (return (M.empty, Nothing))
                      ; return bs
                      }
 
-run :: IdLabelMap -> LabelMapM a -> M a
-run m (LabelMapM f) = do { (_, a') <- f m 
-                         ; return a'
-                         }
 
 
-toplevel2Ast :: I.Toplevel -> LabelMapM A.Toplevel
+toplevel2Ast :: I.Toplevel -> MyLabelMapM A.Toplevel
 toplevel2Ast (I.ToplevelTarget k q) = return $ A.ToplevelTarget k q
 toplevel2Ast (I.ToplevelAlias g v l a) = convert a >>= return . (A.ToplevelAlias g v l)
 toplevel2Ast (I.ToplevelDbgInit s i) = return $ A.ToplevelDbgInit s i
@@ -419,7 +417,6 @@ toplevel2Ast (I.ToplevelNamedMd m ns) = do { m' <- convert m
                                            }
 toplevel2Ast (I.ToplevelDeclare f) = convert f >>= return . A.ToplevelDeclare
 
-
 toplevel2Ast (I.ToplevelDefine f _ g) = 
   do { bm <- graphToBlocks g
      ; f' <- convert f
@@ -427,7 +424,6 @@ toplevel2Ast (I.ToplevelDefine f _ g) =
      ; let bs'' = reverse (foldl (\a b -> maybe a (\e -> e:a) (M.lookup b bm)) [] bs')
      ; return $ A.ToplevelDefine f' bs''
      }
-
 
 toplevel2Ast (I.ToplevelGlobal a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = 
   do { a9' <- maybeM convert a9
@@ -439,5 +435,7 @@ toplevel2Ast (I.ToplevelDepLibs qs) = return $ A.ToplevelDepLibs qs
 toplevel2Ast (I.ToplevelUnamedType i t) = return $ A.ToplevelUnamedType i t
 toplevel2Ast (I.ToplevelModuleAsm q) = return $ A.ToplevelModuleAsm q
 
-irToAst :: IdLabelMap -> I.Module -> M A.Module
-irToAst m (I.Module ts) = run m $ Md.liftM A.Module (mapM toplevel2Ast ts)
+irToAst :: IdLabelMap -> I.Module -> H.SimpleUniqueMonad A.Module
+irToAst m (I.Module ts) = do { x <- runLabelMapM m $ Md.liftM A.Module (mapM toplevel2Ast ts)
+                             ; return $ snd x
+                             }
