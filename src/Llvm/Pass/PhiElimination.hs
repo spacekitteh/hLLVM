@@ -7,6 +7,7 @@ module Llvm.Pass.PhiElimination (phiElimination) where
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
+import Llvm.VmCore.LabelMapM (M)
 import Llvm.VmCore.CoreIrWriter()
 
 import Llvm.Pass.Rewriter
@@ -67,7 +68,7 @@ removePhi (PhiInst lhs t ins) live = if liveOperands == ins then
      isAlive x s | trace ("isAlive is called with " ++ show x ++ "  " ++ show s) False = undefined
      isAlive x s | trace ("isAlive result is " ++ show (labelOf x `mapMember` s)) False = undefined
 #endif                                                                                          
-     isAlive x s = (labelOf x) `mapMember` s
+     isAlive x s = (hooplLabelOf x) `mapMember` s
      liveOperands = foldl (\p -> \x@(_, PercentLabel li) -> 
                             if isAlive li live then x:p else p) [] (reverse ins)
 

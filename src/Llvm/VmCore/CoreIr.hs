@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.VmCore.CoreIr
        ( module Llvm.VmCore.CoreIr
        , module Llvm.VmCore.AtomicEntity
@@ -16,18 +14,24 @@ data LabelId = LabelString Label
              | LabelQuoteNumber Label
              deriving (Eq, Ord, Show)
                       
-labelOf :: LabelId -> Label                      
-labelOf (LabelString x) = x
-labelOf (LabelQuoteString x) = x
-labelOf (LabelNumber x) = x
-labelOf (LabelQuoteNumber x) = x
+hooplLabelOf :: LabelId -> Label
+hooplLabelOf (LabelString x) = x
+hooplLabelOf (LabelQuoteString x) = x
+hooplLabelOf (LabelNumber x) = x
+hooplLabelOf (LabelQuoteNumber x) = x
 
 data BlockLabel = BlockLabel LabelId deriving (Eq, Ord, Show)
 data PercentLabel = PercentLabel LabelId deriving (Eq, Ord, Show)
 data TargetLabel = TargetLabel PercentLabel deriving (Eq,Ord,Show)
  
                                                      
-data NoWrap = Nsw | Nuw | Nsuw deriving (Eq,Ord,Show)
+data NoWrap = 
+  -- | No Signed Wrap
+  Nsw 
+  -- | No Unsigned Wrap
+  | Nuw 
+  -- | No Signed and Unsigned Wrap
+  | Nsuw deriving (Eq,Ord,Show)
 
 data Exact = Exact deriving (Eq,Ord,Show)
 

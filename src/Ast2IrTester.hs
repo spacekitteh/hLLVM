@@ -10,7 +10,7 @@ import Llvm.VmCore.Ir2Ast
 import Llvm.VmCore.IrWriter
 import qualified Llvm.VmCore.Ast as A
 import qualified Llvm.VmCore.Ir as I
-import Llvm.VmCore.LabelMap
+import Llvm.VmCore.LabelMapM
 import qualified Compiler.Hoopl as H
 
 

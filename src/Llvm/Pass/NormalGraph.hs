@@ -1,9 +1,7 @@
-{-# OPTIONS_GHC -Wall -fno-warn-incomplete-patterns #-}
-{-# LANGUAGE ScopedTypeVariables, GADTs #-}
-
 module Llvm.Pass.NormalGraph where
-import Compiler.Hoopl
+import Compiler.Hoopl (Graph,C,analyzeAndRewriteFwd,MaybeC(..),mapInsert,mapEmpty,LabelMap)
 import Llvm.VmCore.Ir
+import Llvm.VmCore.LabelMapM (M)
 import Llvm.VmCore.CoreIrWriter()
 import Llvm.Pass.PhiElimination
 import Llvm.Pass.Dominator

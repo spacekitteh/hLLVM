@@ -14,7 +14,7 @@ import Llvm.VmCore.AstCanonicalization
 import qualified Compiler.Hoopl as H
 import System.Environment (getArgs)
 import System.Console.CmdArgs
-import Llvm.VmCore.LabelMap
+import Llvm.VmCore.LabelMapM
 
 
 testIr2Ast :: IdLabelMap -> I.Module -> A.Module

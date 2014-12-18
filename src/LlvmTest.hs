@@ -74,6 +74,7 @@ mode = cmdArgsMode $ modes [parser, ast2ir, ir2ast, pass, astcanonic, phielim] &
 
 main :: IO ()
 main = do { sel <- cmdArgsRun mode
+          ; putStr $ show sel
           ; case sel of
             Parser ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
@@ -130,6 +131,7 @@ main = do { sel <- cmdArgsRun mode
                                       ; hClose inh
                                       ; closeFileOrStdout ox outh
                                       }
+            _ -> error $ "unexpected option " ++ show sel
           }
 
 

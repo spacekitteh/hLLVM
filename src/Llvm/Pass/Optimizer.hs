@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE RankNTypes #-}
 module Llvm.Pass.Optimizer where
 
 import Llvm.VmCore.Ir
+import Llvm.VmCore.LabelMapM 
 import qualified Compiler.Hoopl as H 
 import qualified Data.Set as Ds
 

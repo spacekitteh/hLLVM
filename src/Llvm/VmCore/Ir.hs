@@ -10,8 +10,7 @@ import qualified Compiler.Hoopl as H
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-
-type M = H.CheckingFuelMonad (H.SimpleUniqueMonad)
+{- An intermediate representation that is suitable for Hoopl -}
 
 data Toplevel = ToplevelTarget Ci.TargetKind Ci.QuoteStr
               | ToplevelAlias (Maybe Ci.GlobalId) (Maybe Ci.Visibility) 
@@ -48,10 +47,10 @@ data Node e x where
 
 
 getLabel :: Ci.TargetLabel -> H.Label
-getLabel (Ci.TargetLabel (Ci.PercentLabel l)) = toLabel l
+getLabel (Ci.TargetLabel (Ci.PercentLabel l)) = Ci.toLabel l
 
 instance H.NonLocal Node where
-    entryLabel (Nlabel (Ci.BlockLabel l)) = toLabel l
+    entryLabel (Nlabel (Ci.BlockLabel l)) = Ci.toLabel l
     successors (Tinst (Ci.TerminatorInstWithDbg inst l)) = succ inst
       where
         succ (Ci.Unreachable) = []
@@ -64,7 +63,7 @@ instance H.NonLocal Node where
         succ (Ci.Resume _) = []
 
 
-globalIdOfModule :: Module -> S.Set (Type, GlobalId)
+globalIdOfModule :: Module -> S.Set (Ci.Type, Ci.GlobalId)
 globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty tl
                                where globalIdOf (ToplevelGlobal lhs _ _ _ _ _ _ t _ _ _) = maybe S.empty (\x -> S.singleton (t, x)) lhs
                                      globalIdOf _ = S.empty

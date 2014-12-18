@@ -5,19 +5,22 @@ module Llvm.VmCore.Ast
 
 import Llvm.VmCore.AtomicEntity
 
+
+-- | quotation does not change a label value
+-- | it's still unclear when a quoted verion is used  
+-- | we keep the original format to make llvm-as happy 
 data LabelId = LabelString Lstring
              | LabelQuoteString Lstring
              | LabelNumber Integer
              | LabelQuoteNumber Integer
              deriving (Eq,Ord,Show)
-                      
-labelIdToString :: LabelId -> Lstring
-labelIdToString (LabelString s) = s
-labelIdToString (LabelQuoteString s) = s
-labelIdToString (LabelNumber n) = Lstring $ show n
-labelIdToString (LabelQuoteNumber n) = Lstring $ show n
-                        
-                   
+
+labelIdToLstring :: LabelId -> Lstring
+labelIdToLstring (LabelString s) = s
+labelIdToLstring (LabelQuoteString s) = s
+labelIdToLstring (LabelNumber n) = Lstring $ show n
+labelIdToLstring (LabelQuoteNumber n) = Lstring $ show n
+
 data BlockLabel = ExplicitBlockLabel LabelId 
                 | ImplicitBlockLabel 
                 deriving (Eq, Ord, Show)
@@ -40,16 +43,16 @@ data Icmp v = Icmp IcmpOp Type v v deriving (Eq,Ord,Show)
 data Fcmp v = Fcmp FcmpOp Type v v deriving (Eq,Ord,Show)
 
 
--- | Vector Operations
+-- | Vector Operations <http://llvm.org/releases/3.0/docs/LangRef.html#vectorops>
 data ExtractElem v = ExtractElem v v deriving (Eq,Ord,Show)
 data InsertElem v = InsertElem v v v deriving (Eq,Ord,Show)
 data ShuffleVector v = ShuffleVector v v v deriving (Eq,Ord,Show)
 
--- | Aggregate Operations
+-- | Aggregate Operations <http://llvm.org/releases/3.0/docs/LangRef.html#aggregateops>
 data ExtractValue v = ExtractValue v [String] deriving (Eq,Ord,Show)
 data InsertValue v = InsertValue v v [String] deriving (Eq,Ord,Show)
 
--- | Conversion Operations
+-- | Conversion Operations <http://llvm.org/releases/3.0/docs/LangRef.html#convertops>
 data Conversion v = Conversion ConvertOp v Type deriving (Eq,Ord,Show)
 
 -- | Complex Constants <http://llvm.org/releases/3.0/docs/LangRef.html#complexconstants>  
@@ -101,6 +104,7 @@ data Expr = EgEp (GetElemPtr TypedValue)
           | Es (Select TypedValue)
           deriving (Eq,Ord,Show)
                    
+-- | Memory Access and Addressing Operations <http://llvm.org/releases/3.0/docs/LangRef.html#memoryops>
 {-   (element type, element number, align) -}
 data MemOp = Allocate MemArea Type (Maybe TypedValue) (Maybe Align)
            | Free TypedValue

@@ -1,8 +1,7 @@
-{-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE RankNTypes #-}
 module Llvm.Pass.PassManager where
 
 import Llvm.VmCore.Ir
+import Llvm.VmCore.LabelMapM (M)
 import Llvm.Pass.Mem2Reg
 import Llvm.Pass.Liveness
 import qualified Data.Set as Ds

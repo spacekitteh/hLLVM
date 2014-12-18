@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall -fno-warn-incomplete-patterns #-}
 {-# LANGUAGE ScopedTypeVariables, GADTs #-}
 
 module Llvm.Pass.Liveness (dce) where
@@ -9,6 +8,7 @@ import qualified Data.List as L
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
+import Llvm.VmCore.LabelMapM (M)
 import Llvm.Pass.Uda
 import Llvm.VmCore.AsmWriter
 import Llvm.VmCore.CoreIrWriter()

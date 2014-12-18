@@ -179,6 +179,7 @@ data SimpleConstant = CpInt String
 data Atomicity = Atomic { volatile::Bool, singlethread::Bool, fence::Maybe FenceOrder }
                | NonAtomic { volatile::Bool }
                deriving (Eq,Ord,Show)
+                        
 
 data MemArea = OnStack | InHeap deriving (Eq,Ord,Show)
 

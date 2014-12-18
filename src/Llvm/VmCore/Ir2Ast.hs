@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE RankNTypes, ScopedTypeVariables, GADTs, EmptyDataDecls, PatternGuards, TypeFamilies, NamedFieldPuns #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -14,7 +14,7 @@ import Llvm.VmCore.CoreIr
 import qualified Llvm.VmCore.Ast as A
 import qualified Llvm.VmCore.Ir as I
 import Llvm.VmCore.Converter 
-import Llvm.VmCore.LabelMap
+import Llvm.VmCore.LabelMapM
 
 instance Converter I.LabelId (LabelMapM A.LabelId) where
   convert (I.LabelString l) = Md.liftM A.LabelString (labelIdFor l)
@@ -372,7 +372,7 @@ type Pblock = (A.BlockLabel, [A.PhiInst], [A.ComputingInstWithDbg])
 
 getLabelId :: A.BlockLabel -> A.Lstring 
 getLabelId A.ImplicitBlockLabel  = error "ImplicitBlockLabel should be normalized"
-getLabelId (A.ExplicitBlockLabel l) = A.labelIdToString l
+getLabelId (A.ExplicitBlockLabel l) = A.labelIdToLstring l
               
 convertNode :: I.Node e x -> LabelMapM (M.Map A.Lstring A.Block, Maybe Pblock) 
                -> LabelMapM (M.Map A.Lstring A.Block, Maybe Pblock)
@@ -402,7 +402,7 @@ graphToBlocks g = do { (bs, Nothing) <- H.foldGraphNodes convertNode g (return (
                      ; return bs
                      }
 
-run :: IdLabelMap -> LabelMapM a -> I.M a
+run :: IdLabelMap -> LabelMapM a -> M a
 run m (LabelMapM f) = do { (_, a') <- f m 
                          ; return a'
                          }
@@ -439,7 +439,5 @@ toplevel2Ast (I.ToplevelDepLibs qs) = return $ A.ToplevelDepLibs qs
 toplevel2Ast (I.ToplevelUnamedType i t) = return $ A.ToplevelUnamedType i t
 toplevel2Ast (I.ToplevelModuleAsm q) = return $ A.ToplevelModuleAsm q
 
-
-
-irToAst :: IdLabelMap -> I.Module -> I.M A.Module
+irToAst :: IdLabelMap -> I.Module -> M A.Module
 irToAst m (I.Module ts) = run m $ Md.liftM A.Module (mapM toplevel2Ast ts)

@@ -1,6 +1,4 @@
-{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables, GADTs, EmptyDataDecls, PatternGuards, TypeFamilies, NamedFieldPuns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -14,14 +12,13 @@ import qualified Data.Map as M
 import qualified Llvm.VmCore.Ast as A
 import qualified Llvm.VmCore.Ir as I
 import Llvm.VmCore.Converter 
-import Llvm.VmCore.LabelMap
+import Llvm.VmCore.LabelMapM 
 
 instance Converter (A.LabelId) (LabelMapM I.LabelId) where
-  convert (A.LabelString s) = Md.liftM I.LabelString (labelFor s)
-  convert (A.LabelQuoteString s) = Md.liftM I.LabelQuoteString (labelFor s)
-  convert (A.LabelNumber n) = Md.liftM I.LabelNumber (labelFor $ A.Lstring $ show n)
-  convert (A.LabelQuoteNumber n) = Md.liftM I.LabelQuoteNumber (labelFor $ A.Lstring $ show n)
-
+  convert l@(A.LabelString _) = Md.liftM I.LabelString (labelFor $ A.labelIdToLstring l)
+  convert l@(A.LabelQuoteString _) = Md.liftM I.LabelQuoteString (labelFor $ A.labelIdToLstring l)
+  convert l@(A.LabelNumber _) = Md.liftM I.LabelNumber (labelFor $ A.labelIdToLstring l)
+  convert l@(A.LabelQuoteNumber _) = Md.liftM I.LabelQuoteNumber (labelFor $ A.labelIdToLstring l)
 
 instance Converter A.PercentLabel (LabelMapM I.PercentLabel) where
     convert (A.PercentLabel l) = convert l >>= return . I.PercentLabel
@@ -29,9 +26,8 @@ instance Converter A.PercentLabel (LabelMapM I.PercentLabel) where
 instance Converter A.TargetLabel (LabelMapM I.TargetLabel) where
     convert (A.TargetLabel tl) = convert tl >>= return . I.TargetLabel
 
-
 instance Converter A.BlockLabel (LabelMapM I.BlockLabel) where
-    convert A.ImplicitBlockLabel = error "ImplicitBlockLabel should be normalized"
+    convert A.ImplicitBlockLabel = error "ImplicitBlockLabel should be normalized, and should not be leaked to Ast2Ir."
     convert (A.ExplicitBlockLabel b) = convert b >>= return . I.BlockLabel
   
 instance Converter A.TypedConst (LabelMapM I.TypedConst) where
@@ -371,7 +367,7 @@ toBlock (A.Block { A.lbl = f, A.phi = phi, A.comp = ms, A.term = l }) =
      }
 
 toFirst :: A.BlockLabel -> LabelMapM (I.Node H.C H.O)
-toFirst x = convert (mapBlockLabel x) >>= return . I.Nlabel
+toFirst x = convert x >>= return . I.Nlabel
 
 toPhi :: A.PhiInst -> LabelMapM (I.Node H.O H.O)
 toPhi phi = convert phi >>= return . I.Pinst
@@ -386,13 +382,12 @@ toLast inst = convert inst >>= return . I.Tinst
 getEntryAndAlist :: [A.Block] -> LabelMapM (H.Label, [A.Lstring])
 getEntryAndAlist [] = error "Parsed procedures should not be empty"
 getEntryAndAlist bs = 
-  do { l <- convert $ mapBlockLabel $ A.lbl $ head bs
+  do { l <- convert $ A.lbl $ head bs
      ; let l' = case l of
               I.BlockLabel x -> I.toLabel x
-     ; let ord = map (\b -> case mapBlockLabel $ A.lbl b of 
+     ; let ord = map (\b -> case A.lbl b of 
                              A.ImplicitBlockLabel -> error "irrefutable implicitblock should be normalized first" -- A.labelIdToString x
-                             A.ExplicitBlockLabel x -> A.labelIdToString x
-                     ) bs
+                             A.ExplicitBlockLabel x -> A.labelIdToLstring x) bs
      ; return (l', ord)
      }
 
@@ -410,11 +405,13 @@ getBody :: forall n. H.Graph n H.C H.C -> LabelMapM (H.Graph n H.C H.C)
 getBody graph = LabelMapM f
   where f m = return (m, graph)
 
-run :: LabelMapM a -> I.M (IdLabelMap, a)
+{-
+run :: LabelMapM a -> M (IdLabelMap, a)
 run (LabelMapM f) = 
   do { x <- f (IdLabelMap { a2h = M.empty, h2a = M.empty, alist = M.empty})
      ; return x
      }
+-}
 
 blockToGraph :: A.FunctionPrototype -> [A.Block] -> LabelMapM (H.Label, H.Graph I.Node H.C H.C)
 blockToGraph fn blocks = 
@@ -451,5 +448,5 @@ toplevel2Ir (A.ToplevelDepLibs qs) = return $ I.ToplevelDepLibs qs
 toplevel2Ir (A.ToplevelUnamedType i t) = return $ I.ToplevelUnamedType i t
 toplevel2Ir (A.ToplevelModuleAsm q) = return $ I.ToplevelModuleAsm q
                                       
-astToIr :: A.Module -> I.M (IdLabelMap, I.Module)
-astToIr (A.Module ts) = run $ Md.liftM I.Module (mapM toplevel2Ir ts)
+astToIr :: A.Module -> M (IdLabelMap, I.Module)
+astToIr (A.Module ts) = runLabelMapM $ Md.liftM I.Module (mapM toplevel2Ir ts)

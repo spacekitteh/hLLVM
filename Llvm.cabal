@@ -38,7 +38,7 @@ Library
                      Llvm.VmCore.Ir2Ast,
                      Llvm.VmCore.Ir,
                      Llvm.VmCore.IrWriter,
-                     Llvm.VmCore.LabelMap,
+                     Llvm.VmCore.LabelMapM,
                      Llvm.AsmParser.Basic,
                      Llvm.AsmParser.Block,
                      Llvm.AsmParser.Const,
