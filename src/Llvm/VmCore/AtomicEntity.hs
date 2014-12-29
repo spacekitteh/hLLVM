@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.VmCore.AtomicEntity where
 
 data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt 
@@ -104,7 +103,7 @@ data QuoteStr = QuoteStr String deriving (Eq,Ord,Show)
 data PlainStr = PlainStr String deriving (Eq,Ord,Show)
 data Align = Align Integer deriving (Eq,Ord,Show)
 data Gc = Gc QuoteStr deriving (Eq,Ord,Show)
-data TargetKind = Triple | Datalayout deriving (Eq,Ord,Show)
+-- data TargetKind = Triple | Datalayout deriving (Eq,Ord,Show)
 data GlobalType = GlobalType String deriving (Eq,Ord,Show)
 data AddrSpace = AddrSpace Integer deriving (Eq,Ord,Show)
 
@@ -189,7 +188,11 @@ isVoidType (Tprimitive TpVoid) = True
 isVoidType (Tfunction t _ _) = isVoidType t
 isVoidType (Tpointer t _) = isVoidType t
 isVoidType _ = False
-
+ 
+data Packing = Packed                
+             | Unpacked
+             deriving (Eq, Ord, Show)
+                      
 data Type = Tprimitive TypePrimitive
           | Tmetadata
           | Topaque 
@@ -199,7 +202,7 @@ data Type = Tprimitive TypePrimitive
           | TupRef Integer
           | Tarray Integer Type
           | Tvector Integer Type
-          | Tstruct Bool [Type]
+          | Tstruct Packing [Type]
           | Tpointer Type (Maybe AddrSpace)
           | Tfunction Type TypeParamList [FunAttr]
           -- | deref a type will strip off Tpointer, this is a syntatical

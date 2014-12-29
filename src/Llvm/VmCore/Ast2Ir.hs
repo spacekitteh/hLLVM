@@ -425,7 +425,8 @@ blockToGraph fn blocks =
      }
                                             
 toplevel2Ir :: A.Toplevel -> MyLabelMapM I.Toplevel
-toplevel2Ir (A.ToplevelTarget k q) = return $ I.ToplevelTarget k q
+toplevel2Ir (A.ToplevelTriple q) = return $ I.ToplevelTriple q
+toplevel2Ir (A.ToplevelDataLayout q) = return $ I.ToplevelDataLayout q
 toplevel2Ir (A.ToplevelAlias g v l a) = convert a >>= return . (I.ToplevelAlias g v l)
 toplevel2Ir (A.ToplevelDbgInit s i) = return $ I.ToplevelDbgInit s i
 toplevel2Ir (A.ToplevelStandaloneMd s tv) = convert tv >>= return . (I.ToplevelStandaloneMd s)

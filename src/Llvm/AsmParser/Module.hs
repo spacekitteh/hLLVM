@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.AsmParser.Module where
 import Llvm.VmCore.Ast
 import Llvm.AsmParser.Basic
@@ -6,6 +5,7 @@ import Llvm.AsmParser.Type
 import Llvm.AsmParser.Block
 import Llvm.AsmParser.Const
 import Llvm.AsmParser.Rhs
+import Llvm.AsmParser.DataLayout
 
 
 pModule :: P Module
@@ -114,10 +114,9 @@ pToplevelTypeDef = do { lhsOpt <- opt pLhsType
 
 pToplevelTarget :: P Toplevel
 pToplevelTarget = do { reserved "target"
-                     ; k <- pTargetKind
-                     ; _ <- chartok '='
-                     ; s <- pQuoteStr
-                     ; return $ ToplevelTarget k (QuoteStr s)
+                     ; choice [ reserved "triple" >> chartok '=' >> pQuoteStr >>= \s -> return $ ToplevelTriple (QuoteStr s)
+                              , reserved "datalayout" >> chartok '=' >> lexeme (between (char '"') (char '"') pDataLayout) >>= \ls -> return $ ToplevelDataLayout ls 
+                              ]
                      }
 
 pToplevelDepLibs :: P Toplevel

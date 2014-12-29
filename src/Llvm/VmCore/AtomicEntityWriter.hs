@@ -127,10 +127,11 @@ instance AsmWriter PlainStr where
 instance AsmWriter Section where
   toLlvm (Section s) = "section " ++ (toLlvm s)
 
+{-
 instance AsmWriter TargetKind where
   toLlvm Triple = "triple"
   toLlvm Datalayout = "datalayout"
-
+-}
 
 instance AsmWriter Align where
     toLlvm (Align s) = "align " ++ (show s)
@@ -227,9 +228,13 @@ instance AsmWriter Type where
     TupRef i -> '\\':show i
     Tarray i t -> "[" ++ show i ++ " x " ++ toLlvm t ++ "]"
     Tvector i t -> "<" ++ show i ++ " x " ++ toLlvm t ++ ">"
-    Tstruct b ts -> (if b then "<{" else "{") ++ 
+    Tstruct b ts -> (case b of 
+                        Packed -> "<{"  
+                        Unpacked -> "{") ++ 
                     listToLlvm "" ts ", " "" ++ 
-                    (if b then "}>" else "}")
+                    (case b of
+                        Packed -> "}>" 
+                        Unpacked -> "}")
     Tpointer t addr -> toLlvm t ++ sepOptToLlvm " " addr ++ "*"
     Tfunction t fp atts -> toLlvm t ++ " " ++ toLlvm fp ++ listToLlvm " " atts ", " ""
     

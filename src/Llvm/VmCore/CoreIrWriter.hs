@@ -4,7 +4,7 @@ import Data.List
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.AsmWriter
 import Llvm.VmCore.AtomicEntityWriter
-
+import Llvm.VmCore.DataLayoutWriter
 
 instance AsmWriter Label where
   toLlvm l = (show l) 

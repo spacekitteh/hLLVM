@@ -24,8 +24,8 @@ pType =
                  ; t <- pType
                  ; return (f n t)
                  }
-   struct   = liftM (Tstruct False) (braces (sepBy pType comma))
-   pstruct  = angles $ liftM (Tstruct True) (braces (sepBy pType comma))
+   struct   = liftM (Tstruct Unpacked) (braces (sepBy pType comma))
+   pstruct  = angles $ liftM (Tstruct Packed) (braces (sepBy pType comma))
    pTypeName = do { x <- pLocalId 
                   ; case x of 
                       LocalIdNum n -> return $ Tno n 

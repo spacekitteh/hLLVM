@@ -1,10 +1,11 @@
 module Llvm.VmCore.CoreIr
        ( module Llvm.VmCore.CoreIr
        , module Llvm.VmCore.AtomicEntity
+       , module Llvm.VmCore.DataLayout
        , Label
        ) where
 import Llvm.VmCore.AtomicEntity
-
+import Llvm.VmCore.DataLayout
 import Compiler.Hoopl (Label)
 
 

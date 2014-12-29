@@ -407,7 +407,8 @@ graphToBlocks g = do { (bs, Nothing) <- H.foldGraphNodes convertNode g (return (
 
 
 toplevel2Ast :: I.Toplevel -> MyLabelMapM A.Toplevel
-toplevel2Ast (I.ToplevelTarget k q) = return $ A.ToplevelTarget k q
+toplevel2Ast (I.ToplevelTriple q) = return $ A.ToplevelTriple q
+toplevel2Ast (I.ToplevelDataLayout q) = return $ A.ToplevelDataLayout q
 toplevel2Ast (I.ToplevelAlias g v l a) = convert a >>= return . (A.ToplevelAlias g v l)
 toplevel2Ast (I.ToplevelDbgInit s i) = return $ A.ToplevelDbgInit s i
 toplevel2Ast (I.ToplevelStandaloneMd s tv) = convert tv >>= return . (A.ToplevelStandaloneMd s)

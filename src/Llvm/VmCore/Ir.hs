@@ -12,7 +12,8 @@ import qualified Data.Set as S
 
 {- An intermediate representation that is suitable for Hoopl -}
 
-data Toplevel = ToplevelTarget Ci.TargetKind Ci.QuoteStr
+data Toplevel = ToplevelTriple Ci.QuoteStr
+              | ToplevelDataLayout Ci.DataLayout
               | ToplevelAlias (Maybe Ci.GlobalId) (Maybe Ci.Visibility) 
                 (Maybe Ci.Linkage) Ci.Aliasee
               | ToplevelDbgInit String Integer

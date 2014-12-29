@@ -4,6 +4,7 @@ module Llvm.VmCore.Ast
        ) where
 
 import Llvm.VmCore.AtomicEntity
+import Llvm.VmCore.DataLayout
 
 
 -- | quotation does not change a label value
@@ -236,7 +237,8 @@ data FunctionPrototype = FunctionPrototype
                        deriving (Eq,Ord,Show)
 
 
-data Toplevel = ToplevelTarget TargetKind QuoteStr
+data Toplevel = ToplevelTriple QuoteStr
+              | ToplevelDataLayout DataLayout
               | ToplevelAlias (Maybe GlobalId) (Maybe Visibility) 
                 (Maybe Linkage) Aliasee
               | ToplevelDbgInit String Integer

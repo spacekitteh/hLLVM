@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.AsmParser.Basic
     ( module Text.Parsec
     , module Llvm.AsmParser.Basic
@@ -14,16 +13,19 @@ import qualified Text.Parsec.Token as T
 import Text.Parsec.Language
 import Text.Parsec.Perm
 import Data.Char
+import Data.Functor.Identity (Identity)
 
 -- dummy state
-data DummyState = DummyState
+-- data DummyState = DummyState
 
+type DummyState = ()
 
 type P a = Parsec String DummyState a
 
 initState :: DummyState
-initState = DummyState 
+initState = () -- DummyState 
 
+lexer :: T.GenTokenParser String u Data.Functor.Identity.Identity
 lexer = T.makeTokenParser 
         (emptyDef 
          { T.commentLine = ";"
@@ -92,6 +94,9 @@ complete p = do { whiteSpace; x <- p; eof; return x }
 -------------------------------------------------------------------------------
 comma :: P String
 comma = T.comma lexer
+
+colon :: P String
+colon = T.colon lexer
 
 braces :: P a  -> P a
 braces = T.braces lexer 
@@ -395,10 +400,11 @@ pSection :: P Section
 pSection =  reserved "section" >> liftM (Section . QuoteStr) pQuoteStr
 
 
+{-
 pTargetKind :: P TargetKind
 pTargetKind = (reserved "triple" >> return Triple)
               <|> (reserved "datalayout" >> return Datalayout)
-
+-}
 
 pAddrSpace :: P AddrSpace
 pAddrSpace = reserved "addrspace" >> liftM AddrSpace (parens decimal)

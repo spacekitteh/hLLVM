@@ -4,6 +4,7 @@ import Data.List
 import Llvm.VmCore.Ast
 import Llvm.VmCore.AsmWriter
 import Llvm.VmCore.AtomicEntityWriter
+import Llvm.VmCore.DataLayoutWriter
 
 
 instance AsmWriter LabelId where
@@ -459,7 +460,8 @@ instance AsmWriter Block where
                                     " " ++  toLlvm end
 
 instance AsmWriter Toplevel where 
-  toLlvm (ToplevelTarget k s) = "target " ++ toLlvm k ++ "=" ++ toLlvm s
+  toLlvm (ToplevelTriple s) = "target triple " ++ "=" ++ toLlvm s
+  toLlvm (ToplevelDataLayout s) = "target datalayout " ++ "=" ++ toLlvm s
   toLlvm (ToplevelAlias lhs vis link aliasee) = optSepToLlvm lhs "=" ++ optSepToLlvm vis " " ++
                                         "alias " ++ optSepToLlvm link " " ++ 
                                         toLlvm aliasee
