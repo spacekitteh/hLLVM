@@ -142,9 +142,6 @@ instance AsmWriter Gc where
 instance AsmWriter GlobalType where
     toLlvm (GlobalType s) = s
 
-instance AsmWriter AddrSpace where
-    toLlvm (AddrSpace n) = "addrspace(" ++ show n ++ ")"
-
 
 instance AsmWriter TypePrimitive where
   toLlvm a = case a of 
@@ -215,7 +212,9 @@ instance AsmWriter AtomicOp where
     toLlvm Aumax = "umax"
     toLlvm Aumin = "umin"                   
     
-    
+instance AsmWriter AddrSpace where    
+  toLlvm (AddrSpace n) = "addrspace(" ++ show n ++ ")"
+  toLlvm AddrSpaceUnspecified = ""
     
 instance AsmWriter Type where
   toLlvm a = case a of 
@@ -235,7 +234,7 @@ instance AsmWriter Type where
                     (case b of
                         Packed -> "}>" 
                         Unpacked -> "}")
-    Tpointer t addr -> toLlvm t ++ sepOptToLlvm " " addr ++ "*"
+    Tpointer t addr -> toLlvm t ++ toLlvm addr ++ "*"
     Tfunction t fp atts -> toLlvm t ++ " " ++ toLlvm fp ++ listToLlvm " " atts ", " ""
     
     

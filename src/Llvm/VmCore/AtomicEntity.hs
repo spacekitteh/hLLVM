@@ -103,10 +103,10 @@ data QuoteStr = QuoteStr String deriving (Eq,Ord,Show)
 data PlainStr = PlainStr String deriving (Eq,Ord,Show)
 data Align = Align Integer deriving (Eq,Ord,Show)
 data Gc = Gc QuoteStr deriving (Eq,Ord,Show)
--- data TargetKind = Triple | Datalayout deriving (Eq,Ord,Show)
 data GlobalType = GlobalType String deriving (Eq,Ord,Show)
-data AddrSpace = AddrSpace Integer deriving (Eq,Ord,Show)
-
+data AddrSpace = AddrSpace Integer 
+               | AddrSpaceUnspecified deriving (Eq,Ord,Show)
+                                            
 
 
 data TypePrimitive = TpI Integer
@@ -203,7 +203,7 @@ data Type = Tprimitive TypePrimitive
           | Tarray Integer Type
           | Tvector Integer Type
           | Tstruct Packing [Type]
-          | Tpointer Type (Maybe AddrSpace)
+          | Tpointer Type AddrSpace
           | Tfunction Type TypeParamList [FunAttr]
           -- | deref a type will strip off Tpointer, this is a syntatical
           -- | representation that should be evaluated later.

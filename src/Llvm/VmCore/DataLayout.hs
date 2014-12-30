@@ -1,5 +1,7 @@
 module Llvm.VmCore.DataLayout where
 
+import qualified Data.Map as M
+
 data Endianess = LittleEndian
                | BigEndian deriving (Eq, Ord, Show)
 
@@ -9,11 +11,12 @@ data LayoutAddrSpace = LayoutAddrSpace Integer
 data StackAlign = StackAlign Integer
                 | StackAlignUnspecified deriving (Eq, Ord, Show)
 
-data Size = Size Integer deriving (Eq, Ord, Show)
+data SizeInBit = SizeInBit Integer deriving (Eq, Ord, Show)
+data AlignInBit = AlignInBit Integer deriving (Eq, Ord, Show)
 
-data AbiAlign = AbiAlign Integer deriving (Eq, Ord, Show)
+data AbiAlign = AbiAlign AlignInBit deriving (Eq, Ord, Show)
 
-data PrefAlign = PrefAlign Integer deriving (Eq, Ord, Show)
+data PrefAlign = PrefAlign AlignInBit deriving (Eq, Ord, Show)
 
 data Mangling = ManglingE
               | ManglingM
@@ -22,12 +25,54 @@ data Mangling = ManglingE
                 
 data LayoutSpec = DlE Endianess
                 | DlS StackAlign
-                | DlP LayoutAddrSpace Size AbiAlign (Maybe PrefAlign)
-                | DlI Size AbiAlign (Maybe PrefAlign)
-                | DlF Size AbiAlign (Maybe PrefAlign)
-                | DlV Size AbiAlign (Maybe PrefAlign) 
-                | DlA Size AbiAlign (Maybe PrefAlign)
+                | DlP LayoutAddrSpace SizeInBit AbiAlign (Maybe PrefAlign)
+                | DlI SizeInBit AbiAlign (Maybe PrefAlign)
+                | DlF SizeInBit AbiAlign (Maybe PrefAlign)
+                | DlV SizeInBit AbiAlign (Maybe PrefAlign) 
+                | DlA SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlM Mangling
-                | DlN Size Size Size deriving (Eq, Ord, Show)
+                | DlN SizeInBit SizeInBit SizeInBit deriving (Eq, Ord, Show)
                 
 data DataLayout = DataLayout [LayoutSpec] deriving (Eq, Ord, Show)
+
+
+data DataLayoutInfo = DataLayoutInfo 
+                      { endianess :: Endianess
+                      , stackAlign :: StackAlign
+                      , pointers :: M.Map LayoutAddrSpace (SizeInBit, AbiAlign, Maybe PrefAlign)
+                      , ints :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign) 
+                      , floats :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign) 
+                      , vectors :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign)
+                      , aggregates :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign)
+                      , nativeInt :: (SizeInBit, SizeInBit, SizeInBit)
+                      } deriving (Eq, Ord, Show)
+                                 
+                                 
+data AlignType = AlignAbi | AlignPref deriving (Eq, Ord, Show)
+
+selectAlignment :: AlignType -> AbiAlign -> Maybe PrefAlign -> AlignInBit
+selectAlignment at (AbiAlign aba) pa = case at of
+  AlignAbi -> aba
+  AlignPref -> maybe aba (\(PrefAlign n) -> n) pa
+                                 
+
+getDataLayoutInfo :: DataLayout -> DataLayoutInfo                                 
+getDataLayoutInfo (DataLayout ls) = let dv = DataLayoutInfo { endianess = LittleEndian
+                                                            , stackAlign = StackAlignUnspecified
+                                                            , pointers = M.empty -- (LayoutAddrSpaceUnspecified, SizeInBit 0, AbiAlign 0, Nothing)
+                                                            , ints = M.empty
+                                                            , floats = M.empty
+                                                            , vectors = M.empty
+                                                            , aggregates = M.empty
+                                                            , nativeInt = (SizeInBit 0,SizeInBit 0,SizeInBit 0)
+                                                            }
+                                    in foldl (\p v -> case v of
+                                                 DlE x -> p { endianess = x}
+                                                 DlS x -> p { stackAlign = x}
+                                                 DlP la s aa pa -> p { pointers = M.insert la (s, aa, pa) (pointers p) }
+                                                 DlI s aa pa -> p { ints = M.insert s (aa, pa) (ints p) }
+                                                 DlF s aa pa -> p { floats = M.insert s (aa, pa) (floats p) }
+                                                 DlV s aa pa -> p { vectors = M.insert s (aa, pa) (vectors p) }
+                                                 DlA s aa pa -> p { aggregates = M.insert s (aa, pa) (aggregates p) }
+                                                 DlN s1 s2 s3 -> p { nativeInt = (s1, s2, s3) }
+                                             ) dv ls
