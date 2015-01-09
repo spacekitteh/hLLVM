@@ -25,17 +25,17 @@ pConst = choice [ liftM Ccp pSimpleConstant
          
 pTypedConst :: P TypedConst
 pTypedConst = do { t <- pType
-         ; case t of 
-             Tprimitive TpNull -> return TypedConstNull
-             _ -> liftM (TypedConst t) pConst 
-         }
+                 ; case t of 
+                   Tprimitive TpNull -> return TypedConstNull
+                   _ -> liftM (TypedConst t) pConst 
+                 }
 
 pTypedConst1 :: P TypedConst
 pTypedConst1 = do { t <- pType
-          ; case t of 
-            Tprimitive TpNull -> return TypedConstNull
-            _ -> (choice [pConst, liftM CmL pLocalId] >>= return . (TypedConst t))
-          }
+                  ; case t of 
+                    Tprimitive TpNull -> return TypedConstNull
+                    _ -> (choice [pConst, liftM CmL pLocalId] >>= return . (TypedConst t))
+                  }
 
 
 pSimpleConstant :: P SimpleConstant
@@ -60,7 +60,7 @@ pIntOrFloat :: P SimpleConstant
 pIntOrFloat = lexeme (choice [try k, try u, try s, intOrFloat])
  where
    k = do { hd <- string "0x"
-          ; t <- option "" (choice [ string "K", string "M"])
+          ; t <- option "" (choice [ string "K", string "M", string "H"])
           ; cs <- many1 hexDigit
           ; return $ CpFloat (hd ++ t ++ cs)
           }
@@ -89,10 +89,10 @@ pIntOrFloat = lexeme (choice [try k, try u, try s, intOrFloat])
 
 pComplexConstant :: P ComplexConstant
 pComplexConstant = choice [ pConstStruct
-                         , (try pConstVector)
-                         , pPackedStructConst
-                         , pConstArray
-                         ]
+                          , (try pConstVector)
+                          , pPackedStructConst
+                          , pConstArray
+                          ]
 
 pConstStruct :: P ComplexConstant
 pConstStruct = liftM (Cstruct False) (braces (sepBy pTypedConst comma))
@@ -115,13 +115,24 @@ pConstArray = liftM Carray (brackets (sepBy pTypedConst comma))
 pBlockAddr :: P Const
 pBlockAddr = reserved "blockaddress" >> parens (pTuple2 pGlobalId pPercentLabel) >>= return . (uncurry CblockAddress)
                 
-pConstBinaryOperation :: P (BinExpr Const)
-pConstBinaryOperation = do { op <- pBinaryOperator
-                           ; l <- many pCarry
-                           ; (tc1, tc2) <- parens (pTuple pTypedConst)
-                           ; return $ BinExpr op l (getType tc1 tc2) (getConst tc1) (getConst tc2)
-                           }
+pConstIbinaryOperation :: P (IbinExpr Const)
+pConstIbinaryOperation = do { op <- pIbinaryOperator
+                            ; l <- many pCarry
+                            ; (tc1, tc2) <- parens (pTuple pTypedConst)
+                            ; return $ IbinExpr op l (getType tc1 tc2) (getConst tc1) (getConst tc2)
+                            }
                   
+
+pConstFbinaryOperation :: P (FbinExpr Const)
+pConstFbinaryOperation = do { op <- pFbinaryOperator
+                            ; l <- pFastMathFlags
+                            ; (tc1, tc2) <- parens (pTuple pTypedConst)
+                            ; return $ FbinExpr op l (getType tc1 tc2) (getConst tc1) (getConst tc2)
+                            }
+                         
+pConstBinaryOperation :: P (BinExpr Const)                         
+pConstBinaryOperation = choice [liftM Ie pConstIbinaryOperation, liftM Fe pConstFbinaryOperation]
+
               
 getType :: TypedConst -> TypedConst -> Type
 getType (TypedConst t1 _) (TypedConst t2 _) = if t1 == t2 then t1 
@@ -185,7 +196,7 @@ pConstConversion = do { op <- pConvertOp
                    
 pConstGetElemPtr :: P (GetElemPtr TypedConst)
 pConstGetElemPtr = do { reserved "getelementptr"
-                      ; ib <- option False (reserved "inbounds" >> return True)
+                      ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
                       ; ignore (chartok '(')
                       ; tc1 <- pTypedConst
                       ; idx <- option [] (do { ignore comma

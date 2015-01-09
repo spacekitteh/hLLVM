@@ -7,16 +7,21 @@ import Llvm.VmCore.DataLayout
 pLayoutSpec :: P LayoutSpec
 pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                      , char 'E' >> return (DlE BigEndian)
-                     , char 'S' >> option (DlS StackAlignUnspecified) (liftM (DlS . StackAlign) integer) 
+                     , try (char 's' >> do { n <- integer
+                                      ; aa <- colon >> integer
+                                      ; pa <- colon >> integer
+                                      ; return ((DlS . StackAlign . AlignInBit) n)
+                                      })
+                     , char 's' >> colon >> liftM (DlS . StackAlign . AlignInBit) integer
                      , char 'p' >> do { as <- option (LayoutAddrSpaceUnspecified) (liftM LayoutAddrSpace integer)
-                                      ; s <- colon >> liftM Size integer
-                                      ; aa <- colon >> liftM AbiAlign integer
+                                      ; s <- colon >> liftM SizeInBit integer
+                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit) integer
                                       ; pa <- prefAlign
                                       ; return (DlP as s aa pa) 
                                       }
                      , dlIVF
-                     , char 'a' >> do { s <- liftM Size integer
-                                      ; aa <- colon >> liftM AbiAlign integer
+                     , char 'a' >> do { s <- opt (liftM SizeInBit integer)
+                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit) integer
                                       ; pa <- prefAlign
                                       ; return (DlA s aa pa)
                                       }
@@ -25,19 +30,18 @@ pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                                                               , char 'o' >> return ManglingO
                                                               , char 'w' >> return ManglingW
                                                               ])
-                     , char 'n' >> do { s1 <- liftM Size integer
-                                      ; s2 <- colon >> liftM Size integer
-                                      ; s3 <- colon >> liftM Size integer
-                                      ; return (DlN s1 s2 s3)
+                     , char 'n' >> do { ls <- sepBy1 integer colon
+                                      ; return (DlN (fmap SizeInBit ls))
                                       }
+                     , char 'S' >> liftM ((DlS . StackAlign . AlignInBit)) integer
                      ]
-  where prefAlign = option Nothing (colon >> liftM (Just . PrefAlign) integer)
+  where prefAlign = option Nothing (colon >> liftM (Just . PrefAlign . AlignInBit) integer)
         dlIVF = do { df <- choice [ char 'i' >> return DlI
                                   , char 'v' >> return DlV
                                   , char 'f' >> return DlF
                                   ]
-                   ; s <- liftM Size integer
-                   ; abi <- colon >> liftM AbiAlign integer
+                   ; s <- liftM SizeInBit integer
+                   ; abi <- colon >> liftM (AbiAlign . AlignInBit) integer
                    ; pa <- prefAlign
                    ; return (df s abi pa)
                    }

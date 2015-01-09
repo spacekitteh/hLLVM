@@ -30,27 +30,47 @@ lexer = T.makeTokenParser
         (emptyDef 
          { T.commentLine = ";"
          , T.reservedNames = 
-             [ "begin", "end", "true", "false", "declare", "define", "global", "constant", "private", "linker_private"
-             , "linker_private_weak", "linker_private_weak_def_auto", "internal", "available_externally", "linkonce"
-             , "linkonce_odr", "weak", "weak_odr", "appending", "dllimport", "dllexport", "common", "default", "hidden"
-             , "protected", "extern_weak", "external", "thread_local", "zeroinitializer", "undef", "null", "to", "tail"
+             [ "begin", "end", "true", "false", "declare", "define", "global", "constant"
+             , "dllimport", "dllexport"
+             , "extern_weak", "external", "thread_local", "zeroinitializer", "undef", "null", "to", "tail"
              , "target", "triple", "deplibs", "datalayout", "volatile", "nuw", "nsw", "exact", "inbounds", "align"
-             , "addrspace", "section", "alias", "module", "asm", "sideeffect", "alignstack", "gc", "ccc", "cc", "fastcc"
+             , "addrspace", "section", "alias", "module", "asm", "sideeffect", "gc", "ccc", "cc", "fastcc"
              , "coldcc", "x86_stdcallcc", "x86_fastcallcc", "x86_thiscallcc", "arm_apcscc", "arm_aapcscc", "arm_aapcs_vfpcc"
              , "msp430_intrcc", "cc", "c", "signext", "zeroext", "inreg", "sret", "nounwind", "noreturn", "noalias"
-             , "nocapture", "byval", "nest", "readnone", "readonly", "inlinehint", "noinline", "alwaysinline", "optsize"
-             , "ssp", "sspreq", "noredzone", "noimplicitfloat", "naked", "type", "opaque", "eq", "ne", "slt", "sgt"
+             , "nocapture", "byval", "nest", "type", "opaque", "eq", "ne", "slt", "sgt"
              , "sle", "sge", "ult", "ugt", "ule", "uge", "oeq", "one", "olt", "ogt", "ole", "oge", "ord", "uno", "ueq"
              , "une", "x", "blockaddress"
              , "add",  "fadd", "sub",  "fsub", "mul",  "fmul", "udiv", "sdiv", "fdiv", "urem", "srem", "frem"
              , "shl",  "lshr", "ashr", "and",  "or",   "xor", "icmp", "fcmp", "phi", "call", "trunc"
              , "zext", "sext", "fptrunc", "fpext", "uitofp", "sitofp", "fptoui", "fptosi", "inttoptr", "ptrtoint"
-             , "bitcast", "select", "va_arg", "ret", "br", "switch", "indirectbr", "invoke", "unwind", "unreachable"
+             , "bitcast", "addrspacecast", "select", "va_arg", "ret", "br", "switch", "indirectbr"
+             , "invoke", "unwind", "unreachable"
              , "alloca", "malloc", "load", "store", "getelementptr", "extractelement", "insertelement", "shufflevector"
              , "getresult", "extractvalue", "insertvalue", "free", "address_safety", "nonlazybind", "landingpad", "cleanup"
-             , "catch", "filter", "personality", "half", "unnamed_addr", "uwtable", "singlethread", "acquire"
+             , "catch", "filter", "personality", "half", "unnamed_addr", "singlethread", "acquire"
              , "release", "acq_rel", "seq_cst", "unordered", "monotonic", "atomic"
              , "atomicrmw", "xchg", "nand", "max", "min", "umax", "umin", "x86_mmx"
+             , "call", "tail", "musttail"
+             -- Linkage Types                                                             
+             , "private", "internal", "available_externally", "linkonce", "weak", "common", "appending", "extern_weak"
+             , "linkonce_odr", "weak_odr", "external"
+             -- Calling Conventions
+             , "ccc", "fastcc", "coldcc", "cc", "webkit_jscc", "anyregcc", "preserve_mostcc", "preserve_allcc"
+             , "spir_kernel", "spir_func", "intel_ocl_bicc", "x86_stdcallcc", "x86_fastcallcc", "x86_thiscallcc"
+             , "arm_apcscc", "arm_aapcscc", "arm_aapcs_vfpcc", "msp430_intrcc", "ptx_kernel", "ptx_device"
+             -- Visibility Styles                                                                             
+             , "default", "hidden", "protected"
+             -- Parameter Attributes                                                             
+             , "zeroext", "signext", "inreg", "byval", "inalloca", "sret", "noalias", "nocapture", "nest", "returned"
+             , "nonnull", "dereferenceable"
+             -- Function Attributes
+             , "alignstack", "alwaysinline", "builtin", "cold", "inlinehint", "jumptable", "minsize", "naked", "nobuiltin"
+             , "noduplicate", "noimplicitfloat", "noinline", "nonlazybind", "noredzone", "noreturn", "nounwind", "optnone"
+             , "optsize", "readnone", "readonly", "returns_twice", "sanitize_address", "sanitize_memory", "sanitize_thread"
+             , "ssp", "sspreq", "sspstrong", "uwtable"
+             -- Fast math flags
+             , "nnan", "ninf", "nsz", "arcp", "fast"
+             , "inteldialect"
              , "<<label>>"
              ]
          })
@@ -132,8 +152,10 @@ pGlobalId = lexeme (char '@' >> choice [ liftM GlobalIdNum decimal
                                        , liftM (GlobalIdQuoteStr . Lstring) pQuoteStr
                                        ])
 
-   
-            
+pDollarId :: P DollarId
+pDollarId = lexeme (char '$' >> liftM DollarId (choice[pId, pQuoteStr]))
+
+
 pMdVar :: P MdVar
 pMdVar = lexeme $ do { ignore (char '!')
                      ; n <- (satisfy isAlpha)
@@ -189,6 +211,8 @@ pLabelNumber = do { x <- many1 (satisfy isDigit)
                   ; return $ LabelNumber i
                   }
              
+pAddrNaming :: P AddrNaming
+pAddrNaming = option NamedAddr (reserved "unnamed_addr" >> return UnnamedAddr)
           
 pPercentLabel :: P PercentLabel
 pPercentLabel = lexeme (char '%' >> liftM PercentLabel pLabelId)
@@ -215,10 +239,17 @@ pParamAttr = choice [ reserved "zeroext" >> return ZeroExt
                     , reserved "signext" >> return SignExt
                     , reserved "inreg" >> return InReg
                     , reserved "byval" >> return ByVal
+                    , reserved "inalloca" >> return InAlloca
                     , reserved "sret" >> return SRet
                     , reserved "noalias" >> return NoAlias
                     , reserved "nocapture" >> return NoCapture
                     , reserved "nest" >> return Nest
+                    , reserved "returned" >> return Returned
+                    , reserved "nonnull" >> return NonNull
+                    , reserved "dereferenceable" >> liftM Dereferenceable (parens decimal)
+                    , reserved "readonly" >> return PaReadOnly
+                    , reserved "readnone" >> return PaReadNone
+                    , reserved "align" >> liftM PaAlign decimal
                     ]
 
 pConvertOp :: P ConvertOp
@@ -234,6 +265,7 @@ pConvertOp = choice [ reserved "trunc" >> return Trunc
                     , reserved "ptrtoint" >> return PtrToInt
                     , reserved "inttoptr" >> return IntToPtr
                     , reserved "bitcast" >> return Bitcast
+                    , reserved "addrspacecast" >> return AddrSpaceCast
                     ]
 
 pCallConv :: P CallConv
@@ -242,13 +274,22 @@ pCallConv = choice [ try (reserved "ccc") >> return Ccc
                    , reserved "cc" >> liftM Cc intStrToken
                    , reserved "fastcc" >> return FastCc
                    , reserved "coldcc" >> return ColdCc
-                   , reserved "x86_stdcallcc" >> return X86StdCall
-                   , reserved "x86_fastcallcc" >> return X86FastCall
-                   , reserved "x86_thiscallcc" >> return X86ThisCall
-                   , reserved "arm_apcscc" >> return ArmApcs
-                   , reserved "arm_aapcscc" >> return ArmAapcs
-                   , reserved "arm_aapcs_vfpcc" >> return ArmAapcsVfp
-                   , reserved "msp430_intrcc" >> return Msp430Intr
+                   , reserved "webkit_jscc" >> return WebkitJsCc
+                   , reserved "anyregcc" >> return AnyRegCc
+                   , reserved "preserve_mostcc" >> return PreserveMostCc
+                   , reserved "preserve_allcc" >> return PreserveAllCc
+                   , reserved "spir_kernel" >> return SpirKernel
+                   , reserved "spir_func" >> return SpirFunc
+                   , reserved "intel_ocl_bicc" >> return IntelOclBiCc
+                   , reserved "x86_stdcallcc" >> return X86StdCallCc
+                   , reserved "x86_fastcallcc" >> return X86FastCallCc
+                   , reserved "x86_thiscallcc" >> return X86ThisCallCc
+                   , reserved "arm_apcscc" >> return ArmApcsCc
+                   , reserved "arm_aapcscc" >> return ArmAapcsCc
+                   , reserved "arm_aapcs_vfpcc" >> return ArmAapcsVfpCc
+                   , reserved "msp430_intrcc" >> return Msp430IntrCc
+                   , reserved "ptx_kernel" >> return PtxKernel
+                   , reserved "ptx_device" >> return PtxDevice
                    ]
 
 
@@ -259,22 +300,20 @@ pVisibility = (reserved "default" >> return Default)
 
 
 pLinkage :: P Linkage
-pLinkage = choice [ reserved "private" >> return Private
-                  , reserved "linker_private_weak_def_auto" >> return LinkerPrivateWeakDefAuto
-                  , reserved "linker_private_weak" >> return LinkerPrivateWeak
-                  , reserved "linker_private" >> return LinkerPrivate
+pLinkage = choice [ reserved "linker_private_weak_def_auto" >> return LinkagePrivate
+                  , reserved "linker_private_weak" >> return LinkagePrivate
+                  , reserved "private" >> return LinkagePrivate
+                  , reserved "linker_private" >> return LinkagePrivate
                   , reserved "internal" >> return Internal
                   , reserved "external" >> return External
                   , reserved "available_externally" >> return AvailableExternally
                   , reserved "linkonce" >> return Linkonce
-                  , reserved "weak" >> return Weak
+                  , reserved "weak" >> return LinkageWeak
                   , reserved "common" >> return Common
                   , reserved "appending" >> return Appending
                   , reserved "extern_weak" >> return ExternWeak
                   , reserved "linkonce_odr" >> return LinkonceOdr
                   , reserved "weak_odr" >> return WeakOdr
-                  , reserved "dllimport" >> return DllImport
-                  , reserved "dllexport" >> return DllExport
                   ]
 
 
@@ -287,26 +326,30 @@ optCommaSep p = opt (try (comma >> p))
 
 
 
-pBinaryOperator :: P BinaryOperator
-pBinaryOperator = choice [ reserved "add" >> return Add
-                         , reserved "fadd" >> return Fadd
-                         , reserved "sub" >> return Sub
-                         , reserved "fsub" >> return Fsub
-                         , reserved "mul" >> return Mul
-                         , reserved "fmul" >> return Fmul
-                         , reserved "udiv" >> return Udiv
-                         , reserved "sdiv" >> return Sdiv
-                         , reserved "fdiv" >> return Fdiv
-                         , reserved "urem" >> return Urem
-                         , reserved "srem" >> return Srem
-                         , reserved "frem" >> return Frem
-                         , reserved "shl" >> return Shl
-                         , reserved "lshr" >> return Lshr
-                         , reserved "ashr" >> return Ashr
-                         , reserved "and" >> return And
-                         , reserved "or" >> return Or
-                         , reserved "xor" >> return Xor
-                         ]
+pIbinaryOperator :: P IbinaryOperator
+pIbinaryOperator = choice [ reserved "add" >> return Add
+                          , reserved "sub" >> return Sub
+                          , reserved "mul" >> return Mul
+                          , reserved "udiv" >> return Udiv
+                          , reserved "sdiv" >> return Sdiv
+                          , reserved "urem" >> return Urem
+                          , reserved "srem" >> return Srem
+                          , reserved "shl" >> return Shl
+                          , reserved "lshr" >> return Lshr
+                          , reserved "ashr" >> return Ashr
+                          , reserved "and" >> return And
+                          , reserved "or" >> return Or
+                          , reserved "xor" >> return Xor
+                          ]
+
+pFbinaryOperator :: P FbinaryOperator
+pFbinaryOperator = choice [ reserved "fadd" >> return Fadd
+                          , reserved "fsub" >> return Fsub
+                          , reserved "fmul" >> return Fmul
+                          , reserved "fdiv" >> return Fdiv
+                          , reserved "frem" >> return Frem
+                          ]
+
 
 pIcmpOp :: P IcmpOp
 pIcmpOp = choice [ reserved "eq" >> return IcmpEq
@@ -343,47 +386,70 @@ pFcmpOp = choice [ reserved "oeq" >> return FcmpOeq
 
 
 pAliasLinkage :: P Linkage
-pAliasLinkage = choice [ reserved "external" >> return External
+pAliasLinkage = choice [ reserved "private" >> return LinkagePrivate
                        , reserved "internal" >> return Internal
-                       , reserved "weak" >> return Weak
+                       , reserved "available_externally" >> return AvailableExternally
+                       , reserved "linkonce" >> return Linkonce
+                       , reserved "weak" >> return LinkageWeak
+                       , reserved "common" >> return Common
+                       , reserved "appending" >> return Appending
+                       , reserved "extern_weak" >> return ExternWeak
+                       , reserved "linkonce_odr" >> return LinkonceOdr
                        , reserved "weak_odr" >> return WeakOdr
-                       , reserved "private" >> return Private
-                       , reserved "linker_private" >> return LinkerPrivate
-                       , reserved "linker_private_weak" >> return LinkerPrivateWeak
-                       , reserved "linker_private_weak_def_auto" >> 
-                                  return LinkerPrivateWeakDefAuto
+                       , reserved "external" >> return External
                        ]
 
-pExternalLinkage :: P Linkage
-pExternalLinkage = choice [ reserved "external" >> return External
-                          , reserved "extern_weak" >> return ExternWeak
-                          , reserved "dllimport" >> return DllImport
-                          ]
+pDllStorageClass :: P DllStorage
+pDllStorageClass = choice [ reserved "dllimport" >> return DllImport
+                          , reserved "dllexport" >> return DllExport
+                          ] 
+pThreadLocalStorageClass :: P ThreadLocalStorage                   
+pThreadLocalStorageClass = reserved "thread_local" >> option TlsNone (parens (choice [ reserved "localdynamic" >> return TlsLocalDynamic
+                                                                                     , reserved "initialexec" >> return TlsInitialExec
+                                                                                     , reserved "localexec" >> return TlsLocalExec
+                                                                                     ]
+                                                                             ))
 
-allLinkage :: P Linkage
+pTailCalling :: P TailCalling
+pTailCalling = choice [ reserved "tail" >> return TailCall
+                      , reserved "musttail" >> return MustTailCall
+                      ]
+{-
+allLinkage :: P Either Linkage DllStorage
 allLinkage = pExternalLinkage <|> pLinkage
-
+-}
 
 pFunAttr :: P FunAttr
-pFunAttr =  choice [ reserved "alignstack" >> liftM AlignStack (parens decimal)
-                   , reserved "address_safety" >> return AddressSafety
-                   , reserved "alwaysinline" >> return AlwaysInline
-                   , reserved "nonlazybind" >> return NonLazyBind
-                   , reserved "inlinehint" >> return InlineHint
-                   , reserved "naked" >> return Naked
-                   , reserved "noimplicitfloat" >> return NoImplicitFloat
-                   , reserved "noinline" >> return NoInline
-                   , reserved "noredzone" >> return NoRedZone
-                   , reserved "noreturn" >> return NoReturn
-                   , reserved "nounwind" >> return NoUnwind
-                   , reserved "optsize" >> return OptSize
-                   , reserved "readnone" >> return ReadNone
-                   , reserved "readonly" >> return ReadOnly
-                   , reserved "returns_twice" >> return ReturnsTwice
-                   , reserved "ssp" >> return Ssp
-                   , reserved "sspreq" >> return SspReq
-                   , reserved "uwtable" >> return UwTable
-                   , reserved "unnamed_addr" >> return UnnamedAddr
+pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens decimal)
+                   , reserved "alwaysinline" >> return FaAlwaysInline
+                   , reserved "builtin" >> return FaBuiltin
+                   , reserved "cold" >> return FaCold
+                   , reserved "inlinehint" >> return FaInlineHint
+                   , reserved "jumptable" >> return FaJumpTable
+                   , reserved "minsize" >> return FaMinSize
+                   , reserved "naked" >> return FaNaked
+                   , reserved "nobuiltin" >> return FaNoBuiltin
+                   , reserved "noduplicate" >> return FaNoDuplicate
+                   , reserved "noimplicitfloat" >> return FaNoImplicitFloat
+                   , reserved "noinline" >> return FaNoInline
+                   , reserved "nonlazybind" >> return FaNonLazyBind
+                   , reserved "noredzone" >> return FaNoRedZone
+                   , reserved "noreturn" >> return FaNoReturn
+                   , reserved "nounwind" >> return FaNoUnwind
+                   , reserved "optnone" >> return FaOptNone
+                   , reserved "optsize" >> return FaOptSize
+                   , reserved "readnone" >> return FaReadNone
+                   , reserved "readonly" >> return FaReadOnly
+                   , reserved "returns_twice" >> return FaReturnsTwice
+                   , reserved "sanitize_address" >> return FaSanitizeAddress
+                   , reserved "sanitize_memory" >> return FaSanitizeMemory
+                   , reserved "sanitize_thread" >> return FaSanitizeThread
+                   , reserved "ssp" >> return FaSsp
+                   , reserved "sspreq" >> return FaSspReq
+                   , reserved "sspstrong" >> return FaSspStrong
+                   , reserved "uwtable" >> return FaUwTable
+                   , reserved "align" >> liftM FaAlign integer
+                   , liftM QuoteStr pQuoteStr >>= \s1 -> opt (symbol "=" >> liftM QuoteStr pQuoteStr) >>= \s2 -> return (FaPair s1 s2)
                    ]
 
 pCarry :: P TrapFlag
@@ -395,16 +461,29 @@ pCarry = choice [ reserved "nuw" >> return Nuw
 pAlign :: P Align
 pAlign = reserved "align" >> liftM Align decimal
 
+pComdat :: P Comdat
+pComdat = reserved "comdat" >> liftM Comdat (opt pDollarId)
+
+pNontemporal :: P Nontemporal
+pNontemporal =  char '!' >> reserved "nontemporal" >> char '!' >> liftM Nontemporal decimal 
+
+pInvariantLoad :: P InvariantLoad
+pInvariantLoad = char '!' >> reserved "invariant.load" >> char '!' >> liftM InvariantLoad decimal
+
+pNonnull :: P Nonnull
+pNonnull = char '!' >> reserved "nonnull" >> char '!' >> liftM Nonnull decimal
 
 pSection :: P Section
 pSection =  reserved "section" >> liftM (Section . QuoteStr) pQuoteStr
 
 
-{-
-pTargetKind :: P TargetKind
-pTargetKind = (reserved "triple" >> return Triple)
-              <|> (reserved "datalayout" >> return Datalayout)
--}
+pSelectionKind :: P SelectionKind
+pSelectionKind = choice [ reserved "any" >> return Any
+                        , reserved "exactmatch" >> return ExactMatch
+                        , reserved "largest" >> return Largest
+                        , reserved "noduplicates" >> return NoDuplicates
+                        , reserved "samesize" >> return SameSize
+                        ]
 
 pAddrSpace :: P AddrSpace
 pAddrSpace = reserved "addrspace" >> liftM AddrSpace (parens decimal)
@@ -438,6 +517,11 @@ pAtomicOp = choice [ reserved "xchg" >> return Axchg
                    , reserved "umin" >> return Aumin
                    ]
 
+pFunAttrCollection :: P FunAttrCollection          
+pFunAttrCollection = choice [ char '#' >> liftM FunAttrGroup decimal
+                            , liftM FunAttrList (many pFunAttr)
+                            ]
+
 
 
 pTuple2 :: P a -> P b -> P (a, b)
@@ -468,4 +552,13 @@ uncurry3 f (a1, b1, c1) = f a1 b1 c1
     
                           
                           
-                          
+pFastMathFlag :: P FastMathFlag
+pFastMathFlag = choice [ reserved "nnan" >> return Fmfnnan
+                       , reserved "ninf" >> return Fmfninf
+                       , reserved "nsz" >> return Fmfnsz
+                       , reserved "arcp" >> return Fmfarcp
+                       , reserved "fast" >> return Fmffast
+                       ]
+                
+pFastMathFlags :: P FastMathFlags                
+pFastMathFlags = liftM FastMathFlags (many pFastMathFlag)

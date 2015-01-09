@@ -5,14 +5,14 @@ import Llvm.AsmParser.Basic
 import Llvm.AsmParser.Const
 import Llvm.AsmParser.Type
 import Llvm.AsmParser.Rhs
-import Llvm.VmCore.AsmWriter
-import Llvm.VmCore.AstWriter
+--import Llvm.VmCore.AsmWriter
+--import Llvm.VmCore.AstWriter
 
 pTerminatorInst :: P TerminatorInst
-pTerminatorInst = choice [ pRet                         
+pTerminatorInst = choice [ pRet
                          , pBr
                          , pSwitch
-                         , reserved "indirectbr" >> liftM (uncurry IndirectBr) 
+                         , reserved "indirectbr" >> liftM (uncurry IndirectBr)
                            (pTuple2 pTypedValue (brackets (sepBy pTargetLabel comma)))
                          , reserved "unreachable" >> return Unreachable
                          , reserved "resume" >> liftM Resume pTypedValue]
@@ -24,7 +24,7 @@ pRet = do { reserved "ret"
           ; case t of
               Tprimitive TpVoid -> return (Return [])
               _    -> do { v <- pValue
-                        ; option (Return $ [TypedValue t v]) 
+                        ; option (Return $ [TypedValue t v])
                           (do { ls <- many (try (comma >> pTypedValue))
                               ; return (Return ((TypedValue t v):ls))
                               }
@@ -56,11 +56,12 @@ data Instruction = Comp ComputingInst
 
 data InstructionWithDbg = InstructionWithDbg Instruction [Dbg]
 
+{-
 instance AsmWriter Instruction where
     toLlvm (Comp x) = toLlvm x
     toLlvm (Term x) = toLlvm x
     toLlvm (Phi x) = toLlvm x
-
+-}
 
 pInstruction :: P Instruction
 pInstruction = do { lhs <- opt (do { x <- pGlobalOrLocalId
@@ -69,7 +70,7 @@ pInstruction = do { lhs <- opt (do { x <- pGlobalOrLocalId
                                    })
                   ; choice [ try $ liftM Term $ pInvoke lhs
                            , liftM Comp $ pComputingInst lhs
-                           , liftM Term pTerminatorInst 
+                           , liftM Term pTerminatorInst
                            , liftM Phi $ pPhiInst lhs
                            ]
                   }
@@ -85,9 +86,9 @@ pInstructionWithDbg  = do { ins <- pInstruction
                           ; l <- many (comma >> pDbg)
                           ; return $ InstructionWithDbg ins l
                           }
-                           
-              
-              
+
+
+
 pComputingInst ::  Maybe GlobalOrLocalId -> P ComputingInst
 pComputingInst lhs = do { (b, rhs) <- pRhs
                         ; lhs' <- if b then getLhs lhs

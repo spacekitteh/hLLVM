@@ -2,13 +2,13 @@ module Llvm.VmCore.DataLayout where
 
 import qualified Data.Map as M
 
-data Endianess = LittleEndian
-               | BigEndian deriving (Eq, Ord, Show)
+data Endianness = LittleEndian
+                | BigEndian deriving (Eq, Ord, Show)
 
 data LayoutAddrSpace = LayoutAddrSpace Integer
                      | LayoutAddrSpaceUnspecified deriving (Eq, Ord, Show)
                                                            
-data StackAlign = StackAlign Integer
+data StackAlign = StackAlign AlignInBit
                 | StackAlignUnspecified deriving (Eq, Ord, Show)
 
 data SizeInBit = SizeInBit Integer deriving (Eq, Ord, Show)
@@ -23,28 +23,28 @@ data Mangling = ManglingE
               | ManglingO
               | ManglingW deriving (Eq, Ord, Show)
                 
-data LayoutSpec = DlE Endianess
+data LayoutSpec = DlE Endianness
                 | DlS StackAlign
                 | DlP LayoutAddrSpace SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlI SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlF SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlV SizeInBit AbiAlign (Maybe PrefAlign) 
-                | DlA SizeInBit AbiAlign (Maybe PrefAlign)
+                | DlA (Maybe SizeInBit) AbiAlign (Maybe PrefAlign)
                 | DlM Mangling
-                | DlN SizeInBit SizeInBit SizeInBit deriving (Eq, Ord, Show)
+                | DlN [SizeInBit] deriving (Eq, Ord, Show)
                 
 data DataLayout = DataLayout [LayoutSpec] deriving (Eq, Ord, Show)
 
 
 data DataLayoutInfo = DataLayoutInfo 
-                      { endianess :: Endianess
+                      { endianess :: Endianness
                       , stackAlign :: StackAlign
                       , pointers :: M.Map LayoutAddrSpace (SizeInBit, AbiAlign, Maybe PrefAlign)
                       , ints :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign) 
                       , floats :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign) 
                       , vectors :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign)
-                      , aggregates :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign)
-                      , nativeInt :: (SizeInBit, SizeInBit, SizeInBit)
+                      , aggregates :: M.Map (Maybe SizeInBit) (AbiAlign, Maybe PrefAlign)
+                      , nativeInt :: [SizeInBit]
                       } deriving (Eq, Ord, Show)
                                  
                                  
@@ -64,7 +64,7 @@ getDataLayoutInfo (DataLayout ls) = let dv = DataLayoutInfo { endianess = Little
                                                             , floats = M.empty
                                                             , vectors = M.empty
                                                             , aggregates = M.empty
-                                                            , nativeInt = (SizeInBit 0,SizeInBit 0,SizeInBit 0)
+                                                            , nativeInt = []
                                                             }
                                     in foldl (\p v -> case v of
                                                  DlE x -> p { endianess = x}
@@ -74,5 +74,5 @@ getDataLayoutInfo (DataLayout ls) = let dv = DataLayoutInfo { endianess = Little
                                                  DlF s aa pa -> p { floats = M.insert s (aa, pa) (floats p) }
                                                  DlV s aa pa -> p { vectors = M.insert s (aa, pa) (vectors p) }
                                                  DlA s aa pa -> p { aggregates = M.insert s (aa, pa) (aggregates p) }
-                                                 DlN s1 s2 s3 -> p { nativeInt = (s1, s2, s3) }
+                                                 DlN l -> p { nativeInt = l }
                                              ) dv ls

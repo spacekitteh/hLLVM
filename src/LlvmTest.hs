@@ -13,7 +13,7 @@ import qualified Compiler.Hoopl as H
 import Llvm.VmCore.AstCanonicalization
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
-
+import Llvm.VmCore.AstWriter
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -56,7 +56,7 @@ astcanonic = AstCanonic { input = def &= typ "<INPUT>" &= argPos 0
 pass = Pass { input = def &= typ "<INPUT>" &= argPos 0
             , output = outFlags Nothing
             , fuel = def &= typ "FUEL" &= help "The fuel used to run the pass"
-            , step = def &= typ "STEP" &= help "Supported steps : mem2reg, dce. Multiple passes are supported"
+            , step = def &= typ "STEP" &= help "Supported steps : mem2reg, dce. Multiple passes are supported by specifying multiple --step s, e.g., --step=mem2reg --step=dce"
             } &= help "Test Optimization pass"
          
 

@@ -47,12 +47,14 @@ uDofRhs (LandingPad _ _ f _ cl) = (uDofPersFn f) `mappend` (mconcat $ map uDofCl
 
 uDofMemOp :: MemOp -> UDA
 uDofMemOp (Allocate _ _ s _) = maybe mempty uDofTypedValue s
-uDofMemOp (Free v) = uDofTypedValue v
-uDofMemOp (Load _ ptr _) = uDofTypedPointer ptr
-uDofMemOp (Store _ v a _) = (uDofTypedValue v) `mappend` (uDofTypedPointer a)
+-- uDofMemOp (Free v) = uDofTypedValue v
+uDofMemOp (Load _ ptr _ _ _ _) = uDofTypedPointer ptr
+uDofMemOp (LoadAtomic _ _ ptr _) = uDofTypedPointer ptr
+uDofMemOp (Store _ v a _ _) = (uDofTypedValue v) `mappend` (uDofTypedPointer a)
+uDofMemOp (StoreAtomic _ _ v a _) = (uDofTypedValue v) `mappend` (uDofTypedPointer a)
 uDofMemOp (Fence _ _) = mempty
-uDofMemOp (CmpXchg _ ptr v1 v2 _ _) = (uDofTypedPointer ptr) 
-                                      `mappend` (mconcat $ map uDofTypedValue [v1, v2])
+uDofMemOp (CmpXchg _ _ ptr v1 v2 _ _ _) = (uDofTypedPointer ptr) 
+                                          `mappend` (mconcat $ map uDofTypedValue [v1, v2])
 uDofMemOp (AtomicRmw _ _ ptr v1 _ _) = (uDofTypedPointer ptr) `mappend` (uDofTypedValue v1)
 
 
@@ -128,7 +130,7 @@ uDofFunName (FunNameString _) = mempty
 uDofCallSite :: CallSite -> UDA
 uDofCallSite (CallFun _ _ _ fn params _) = (uDofFunName fn) `mappend` (mconcat $ map uDofActualParam params)
                                            
-uDofCallSite (CallAsm _ _ _ _ _ params _) = mconcat $ map uDofActualParam params
+uDofCallSite (CallAsm _ _ _ _ _ _ params _) = mconcat $ map uDofActualParam params
 uDofCallSite (CallConversion _ _ c params _) = let s = uDofConversion uDofTypedConst c
                                                in s `mappend` (mconcat $ map uDofActualParam params)
 

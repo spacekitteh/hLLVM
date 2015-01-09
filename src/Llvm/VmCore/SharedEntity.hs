@@ -1,4 +1,5 @@
-module Llvm.VmCore.AtomicEntity where
+{-# LANGUAGE EmptyDataDecls #-}
+module Llvm.VmCore.SharedEntity where
 
 data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt 
             | IcmpUle | IcmpSgt | IcmpSge | IcmpSlt | IcmpSle
@@ -13,87 +14,126 @@ data FcmpOp = FcmpTrue | FcmpFalse
                      
 data ConvertOp = Trunc | Zext | Sext | FpTrunc | FpExt | FpToUi 
                | FpToSi | UiToFp | SiToFp | PtrToInt | IntToPtr
-               | Bitcast
+               | Bitcast | AddrSpaceCast
                  deriving (Eq,Ord,Show)
 
+-- | Linkage Types <http://llvm.org/releases/3.5.0/docs/LangRef.html#linkage-types>
 data Linkage = 
-    -- | private <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_private>
-    Private
-    -- | linker_private <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_linker_private>
-    | LinkerPrivate
-    -- | linker_private_weak <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_linker_private_weak>
-    | LinkerPrivateWeak
-    -- | linker_private_weak_def_auto <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_linker_private_weak_def_auto>
-    | LinkerPrivateWeakDefAuto
-    -- | internal <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_internal>
-    | Internal    
-    -- | available_externally <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_available_externally>
-    | AvailableExternally
-    -- | link_once <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_linkonce>
-    | Linkonce
-    -- | common <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_common>
-    | Common
-    -- | weak <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_weak>
-    | Weak    
-    -- | appending <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_appending>
-    | Appending
-    -- | extern_weak <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_extern_weak>
-    | ExternWeak
-    -- | linkonce_odr <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_linkonce_odr>
-    | LinkonceOdr
-    -- | weak_odr <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_weak_odr>
-    | WeakOdr
-    -- | external <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_external>
-    | External
-    -- | dllimport <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_dllimport>
-    | DllImport
-    -- | dllexport <http://llvm.org/releases/3.0/docs/LangRef.html#linkage_dllexport>
-    | DllExport
-      deriving (Eq,Ord,Show)
+  LinkagePrivate
+  | Internal    
+  | AvailableExternally
+  | Linkonce
+  | Common
+  | LinkageWeak
+  | Appending
+  | ExternWeak
+  | LinkonceOdr
+  | WeakOdr
+  | External
+  deriving (Eq,Ord,Show)
+               
+-- | Calling Conventions <http://llvm.org/releases/3.5.0/docs/LangRef.html#calling-conventions>
+data CallConv = Ccc 
+              | FastCc 
+              | ColdCc 
+              | Cc String
+              | WebkitJsCc
+              | AnyRegCc
+              | PreserveMostCc
+              | PreserveAllCc
+                -- | the following calling conventions are not documented
+              | SpirKernel
+              | SpirFunc
+              | IntelOclBiCc
+              | X86StdCallCc
+              | X86FastCallCc
+              | X86ThisCallCc
+              | ArmApcsCc
+              | ArmAapcsCc
+              | ArmAapcsVfpCc
+              | Msp430IntrCc
+              | PtxKernel
+              | PtxDevice
+              deriving (Eq,Ord,Show)
 
--- | Visibility Styles <http://llvm.org/releases/3.0/docs/LangRef.html#visibility>
+-- | Visibility Styles <http://llvm.org/releases/3.5.0/docs/LangRef.html#visibility-styles>
 data Visibility = Default | Hidden | Protected
                   deriving (Eq,Ord,Show)
-                
--- | Calling Convenctions <http://llvm.org/releases/3.0/docs/LangRef.html#callingconv>    
-data CallConv = Ccc | FastCc | ColdCc | Cc String
-              | X86StdCall | X86FastCall | X86ThisCall
-              | ArmApcs | ArmAapcs | ArmAapcsVfp
-              | Msp430Intr 
-                deriving (Eq,Ord,Show)
 
 
+-- | DLL Storage Classes <http://llvm.org/releases/3.5.0/docs/LangRef.html#dll-storage-classes>              
+data DllStorage = DllImport
+                | DllExport deriving (Eq, Ord, Show)
+                                     
+-- | Thread Local Storage Models <http://llvm.org/releases/3.5.0/docs/LangRef.html#thread-local-storage-models>
+data ThreadLocalStorage = TlsLocalDynamic
+                        | TlsInitialExec
+                        | TlsLocalExec
+                        | TlsNone
+                        deriving (Eq, Ord, Show)
 
--- | Parameter Attributes <http://llvm.org/releases/3.0/docs/LangRef.html#paramattrs>
-data ParamAttr = ZeroExt | SignExt
-               | InReg | ByVal | SRet
-               | NoAlias | NoCapture
+-- | Parameter Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#parameter-attributes>
+data ParamAttr = ZeroExt 
+               | SignExt
+               | InReg 
+               | ByVal 
+               | InAlloca
+               | SRet
+               | NoAlias 
+               | NoCapture
                | Nest 
+               | Returned
+               | NonNull
+               | Dereferenceable Integer
+               | PaReadOnly
+               | PaReadNone
+               | PaAlign Integer
                  deriving (Eq,Ord,Show)
 
--- | Function Attributes <http://llvm.org/releases/3.0/docs/LangRef.html#fnattrs>
-data FunAttr = AddressSafety
-             | AlignStack Integer
-             | AlwaysInline
-             | NonLazyBind
-             | InlineHint
-             | Naked
-             | NoImplicitFloat
-             | NoInline
-             | NoRedZone
-             | NoReturn
-             | NoUnwind
-             | OptSize
-             | ReadNone
-             | ReadOnly
-             | ReturnsTwice
-             | Ssp
-             | SspReq
-             | UwTable
-             | UnnamedAddr
+data FunAttrCollection = FunAttrList [FunAttr]
+                       | FunAttrGroup Integer
+                       deriving (Eq, Ord, Show)
+                         
+-- | Function Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#function-attributes>
+data FunAttr = FaAlignStack Integer
+             | FaAlwaysInline
+             | FaBuiltin
+             | FaCold
+             | FaInlineHint
+             | FaJumpTable
+             | FaMinSize
+             | FaNaked
+             | FaNoBuiltin
+             | FaNoDuplicate
+             | FaNoImplicitFloat
+             | FaNoInline
+             | FaNonLazyBind
+             | FaNoRedZone
+             | FaNoReturn
+             | FaNoUnwind
+             | FaOptNone
+             | FaOptSize
+             | FaReadNone
+             | FaReadOnly
+             | FaReturnsTwice
+             | FaSanitizeAddress
+             | FaSanitizeMemory
+             | FaSanitizeThread
+             | FaSsp
+             | FaSspReq
+             | FaSspStrong
+             | FaUwTable
+             | FaPair QuoteStr (Maybe QuoteStr)
+             | FaAlign Integer
              deriving (Eq,Ord,Show)
 
 
+data SelectionKind = Any
+                   | ExactMatch
+                   | Largest
+                   | NoDuplicates
+                   | SameSize
+                   deriving (Eq, Ord, Show)
 
 
 data Section = Section QuoteStr deriving (Eq,Ord,Show)
@@ -108,6 +148,8 @@ data AddrSpace = AddrSpace Integer
                | AddrSpaceUnspecified deriving (Eq,Ord,Show)
                                             
 
+data AddrNaming = UnnamedAddr
+                | NamedAddr deriving (Eq, Ord, Show)
 
 data TypePrimitive = TpI Integer
                    | TpF Integer 
@@ -130,6 +172,9 @@ data LocalId = LocalIdNum Integer
              | LocalIdQuoteStr Lstring
              deriving (Eq,Ord,Show)
                       
+data DollarId = DollarId String deriving (Eq, Ord, Show)                      
+
+data Comdat = Comdat (Maybe DollarId) deriving (Eq, Ord, Show)
                       
 localIdToLstring :: LocalId -> Lstring                      
 localIdToLstring (LocalIdNum s) = Lstring $ show s
@@ -146,6 +191,7 @@ globalIdToLstring (GlobalIdNum s) = Lstring $ show s
 globalIdToLstring (GlobalIdAlphaNum s) = s
 globalIdToLstring (GlobalIdQuoteStr s) = s
 
+-- | Atomic Memory Ordering Constraints <http://llvm.org/releases/3.5.0/docs/LangRef.html#atomic-memory-ordering-constraints>
 data FenceOrder = Acquire | Release | AcqRel | SeqCst 
                 | Unordered | Monotonic
                   deriving (Eq,Ord,Show)
@@ -175,13 +221,29 @@ data SimpleConstant = CpInt String
                     | CpStr String
                     deriving (Eq, Ord, Show)
                              
-data Atomicity = Atomic { volatile::Bool, singlethread::Bool, fence::Maybe FenceOrder }
-               | NonAtomic { volatile::Bool }
-               deriving (Eq,Ord,Show)
-                        
+data Atomicity = Atomicity (IsOrIsNot SingleThread) FenceOrder
+               deriving (Eq, Ord, Show)
+
+data Nontemporal = Nontemporal Integer                        
+                 deriving (Eq, Ord, Show)
+                          
+data InvariantLoad = InvariantLoad Integer
+                   deriving (Eq, Ord, Show)
+                            
+data Nonnull = Nonnull Integer               
+             deriving (Eq, Ord, Show)
+                             
+data Volatile = Volatile deriving (Eq, Ord, Show)
+
+data SingleThread = SingleThread deriving (Eq, Ord, Show)
 
 data MemArea = OnStack | InHeap deriving (Eq,Ord,Show)
-
+data InAllocaAttr = InAllocaAttr
+                  deriving (Eq, Ord, Show)
+  
+data TailCalling = NonTailCall
+                 | TailCall
+                 | MustTailCall deriving (Eq, Ord, Show)
 
 isVoidType :: Type -> Bool
 isVoidType (Tprimitive TpVoid) = True
@@ -227,3 +289,26 @@ data FormalParamList = FormalParamList [FormalParam]
                                                
 data TypeParamList = TypeParamList [Type] Bool deriving (Eq,Ord,Show)
 
+data Weak = Weak deriving (Eq, Ord, Show)
+
+
+data IsOrIsNot a = Is a
+                 | IsNot a
+                 deriving (Eq, Ord, Show)
+                          
+data InBounds = InBounds deriving (Eq, Ord, Show)
+
+data FastMathFlag = Fmfnnan
+                  | Fmfninf
+                  | Fmfnsz
+                  | Fmfarcp
+                  | Fmffast
+                  deriving (Eq, Ord, Show)
+
+data FastMathFlags = FastMathFlags [FastMathFlag] deriving (Eq, Ord, Show)
+
+data ExternallyInitialized = ExternallyInitialized deriving (Eq, Ord, Show)
+
+data AsmDialect = AsmDialectAtt
+                | AsmDialectIntel
+                deriving (Eq, Ord, Show)

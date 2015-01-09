@@ -1,10 +1,9 @@
-HsLlvm -- Haskell implementation of LLVM
+HsLlvm -- Haskell implementation of LLVM-3.5
 
 
 Goal: 
 ==========================================
-- Port all LLVM optimizations
-- Provide functionalities to generate and maniuplate LLVM code
+- Provide functionalities to generate and maniuplate LLVM code in pure Haskell
 
 
 Build:

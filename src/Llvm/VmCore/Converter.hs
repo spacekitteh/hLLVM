@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
-module Llvm.VmCore.Converter 
+module Llvm.VmCore.Converter
        ( Converter
        , convert
        , maybeM

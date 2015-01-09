@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -Wall -fno-warn-name-shadowing #-}
 {-# LANGUAGE Safe #-}
 
 module Llvm.Pass.Dominator

@@ -33,33 +33,46 @@ fs f ls = let ls' = map (\x -> (fromMaybe x (f x))) ls
           in if ls == ls' then Nothing else Just ls'
 
 
-rwBinExpr :: MaybeChange a -> MaybeChange (BinExpr a)
-rwBinExpr f e = let (v1, v2) = operandOfBinExpr e
-                    t = typeOfBinExpr e
-                in do { (v1', v2') <- f2 f (v1, v2)
-                      ; return $ newBinExpr t v1' v2'
-                      }
-                    where newBinExpr t v1 v2 = 
-                           case e of 
-                             Add nw _ _ _ -> Add nw t v1 v2
-                             Sub nw _ _ _ -> Sub nw t v1 v2
-                             Mul nw _ _ _ -> Mul nw t v1 v2
-                             Udiv nw _ _ _ -> Udiv nw t v1 v2
-                             Sdiv nw _ _ _ -> Sdiv nw t v1 v2
-                             Urem _ _ _ -> Urem t v1 v2
-                             Srem _ _ _ -> Srem t v1 v2
-                             Fadd _ _ _ -> Fadd t v1 v2
-                             Fsub _ _ _ -> Fsub t v1 v2
-                             Fmul _ _ _ -> Fmul t v1 v2
-                             Fdiv _ _ _ -> Fdiv t v1 v2
-                             Frem _ _ _ -> Frem t v1 v2
-                             Shl nw _ _ _ -> Shl nw t v1 v2
-                             Lshr nw _ _ _ -> Lshr nw t v1 v2
-                             Ashr nw _ _ _ -> Ashr nw t v1 v2
-                             And _ _ _ -> And t v1 v2
-                             Or _ _ _ -> Or t v1 v2
-                             Xor _ _ _ -> Xor t v1 v2
+rwIbinExpr :: MaybeChange a -> MaybeChange (IbinExpr a)
+rwIbinExpr f e = let (v1, v2) = operandOfIbinExpr e
+                     t = typeOfIbinExpr e
+                 in do { (v1', v2') <- f2 f (v1, v2)
+                       ; return $ newBinExpr t v1' v2'
+                       }
+  where newBinExpr t v1 v2 = 
+          case e of 
+            Add nw _ _ _ -> Add nw t v1 v2
+            Sub nw _ _ _ -> Sub nw t v1 v2
+            Mul nw _ _ _ -> Mul nw t v1 v2
+            Udiv nw _ _ _ -> Udiv nw t v1 v2
+            Sdiv nw _ _ _ -> Sdiv nw t v1 v2
+            Urem _ _ _ -> Urem t v1 v2
+            Srem _ _ _ -> Srem t v1 v2
+            Shl nw _ _ _ -> Shl nw t v1 v2
+            Lshr nw _ _ _ -> Lshr nw t v1 v2
+            Ashr nw _ _ _ -> Ashr nw t v1 v2
+            And _ _ _ -> And t v1 v2
+            Or _ _ _ -> Or t v1 v2
+            Xor _ _ _ -> Xor t v1 v2
                            
+
+rwFbinExpr :: MaybeChange a -> MaybeChange (FbinExpr a)
+rwFbinExpr f e = let (v1, v2) = operandOfFbinExpr e
+                     t = typeOfFbinExpr e
+                 in do { (v1', v2') <- f2 f (v1, v2)
+                       ; return $ newBinExpr t v1' v2'
+                       }
+  where newBinExpr t v1 v2 = 
+          case e of 
+            Fadd fg _ _ _ -> Fadd fg t v1 v2
+            Fsub fg _ _ _ -> Fsub fg t v1 v2
+            Fmul fg _ _ _ -> Fmul fg t v1 v2
+            Fdiv fg _ _ _ -> Fdiv fg t v1 v2
+            Frem fg _ _ _ -> Frem fg t v1 v2
+
+rwBinExpr :: MaybeChange a -> MaybeChange (BinExpr a)
+rwBinExpr f (Ie e) = liftM Ie (rwIbinExpr f e)
+rwBinExpr f (Fe e) = liftM Fe (rwFbinExpr f e)
 
 
 rwConversion :: MaybeChange a -> MaybeChange (Conversion a)
@@ -105,16 +118,22 @@ rwMemOp :: MaybeChange Value -> MaybeChange Rhs
 rwMemOp f (RmO (Allocate m t ms ma)) = do { ms' <- maybeM (tv2v f) ms
                                           ; return $ RmO $ Allocate m t ms' ma
                                           }
-rwMemOp f (RmO (Load _ (TypedPointer (Tpointer t _) ptr) _)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
-                                                                  ; return $ Re $ Ev tv
-                                                                  }
-rwMemOp f (RmO (Free tv)) = (tv2v f) tv >>= return . RmO . Free 
-rwMemOp f (RmO (Store a tv1 tv2 ma)) = do { tv1' <- (tv2v f) tv1
-                                          ; return $ RmO $ Store a tv1' tv2 ma
-                                          }
-rwMemOp f (RmO (CmpXchg b ptr v1 v2 b2 fe)) = do { (v1', v2') <- f2 (tv2v f) (v1, v2)
-                                                 ; return $ RmO $ CmpXchg b ptr v1' v2' b2 fe
-                                                 }
+rwMemOp f (RmO (Load _ (TypedPointer (Tpointer t _) ptr) _ _ _ _)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
+                                                                        ; return $ Re $ Ev tv
+                                                                        }
+rwMemOp f (RmO (LoadAtomic _ _ (TypedPointer (Tpointer t _) ptr) _)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
+                                                                          ; return $ Re $ Ev tv
+                                                                          }
+-- rwMemOp f (RmO (Free tv)) = (tv2v f) tv >>= return . RmO . Free 
+rwMemOp f (RmO (Store a tv1 tv2 ma nt)) = do { tv1' <- (tv2v f) tv1
+                                             ; return $ RmO $ Store a tv1' tv2 ma nt
+                                             }
+rwMemOp f (RmO (StoreAtomic at a tv1 tv2 ma)) = do { tv1' <- (tv2v f) tv1
+                                                   ; return $ RmO $ StoreAtomic at a tv1' tv2 ma
+                                                   }                                          
+rwMemOp f (RmO (CmpXchg wk b ptr v1 v2 b2 fe ff)) = do { (v1', v2') <- f2 (tv2v f) (v1, v2)
+                                                       ; return $ RmO $ CmpXchg wk b ptr v1' v2' b2 fe ff
+                                                       }
 rwMemOp f (RmO (AtomicRmw b ao ptr v1 b2 fe)) = do { v1' <- (tv2v f) v1
                                                    ; return $ RmO $ AtomicRmw b ao ptr v1' b2 fe
                                                    }
@@ -129,18 +148,18 @@ rwExtractValue f (ExtractValue tv1 s) = f tv1 >>= \tv1' -> return $ ExtractValue
 
 rwInsertValue :: MaybeChange a -> MaybeChange (InsertValue a)
 rwInsertValue f (InsertValue tv1 tv2 s) = do { (tv1', tv2') <- f2 f (tv1, tv2)
-                                              ; return $ InsertValue tv1' tv2' s
-                                              }
-
+                                             ; return $ InsertValue tv1' tv2' s
+                                             }
+                                          
 rwExtractElem :: MaybeChange a -> MaybeChange (ExtractElem a)
 rwExtractElem f (ExtractElem tv1 tv2) = do { (tv1', tv2') <- f2 f (tv1, tv2)
-                                            ; return $ ExtractElem tv1' tv2'
-                                            }
+                                           ; return $ ExtractElem tv1' tv2'
+                                           }
 
 rwInsertElem :: MaybeChange a -> MaybeChange (InsertElem a)
 rwInsertElem f (InsertElem tv1 tv2 tv3) = do { (tv1', tv2', tv3') <- f3 f (tv1, tv2, tv3)
-                                              ; return $ InsertElem tv1' tv2' tv3'
-                                              }
+                                             ; return $ InsertElem tv1' tv2' tv3'
+                                             }
 rwRhs :: MaybeChange Value -> MaybeChange Rhs
 rwRhs f (RmO a) = rwMemOp f (RmO a) 
 rwRhs _ (Call _ _) = Nothing
@@ -158,8 +177,8 @@ rwComputingInst :: MaybeChange Value -> MaybeChange ComputingInst
 rwComputingInst f (ComputingInst lhs rhs) = rwRhs f rhs >>= return . (ComputingInst lhs)
 
 rwComputingInstWithDbg :: MaybeChange Value -> MaybeChange ComputingInstWithDbg
-rwComputingInstWithDbg f (ComputingInstWithDbg cinst dbgs) = rwComputingInst f cinst >>= 
-                                                              \cinst' -> return $ ComputingInstWithDbg cinst' dbgs
+rwComputingInstWithDbg f (ComputingInstWithDbg cinst dbgs) = 
+  rwComputingInst f cinst >>= \cinst' -> return $ ComputingInstWithDbg cinst' dbgs
                                                                         
 rwCinst :: MaybeChange Value -> MaybeChange (Node e x)
 rwCinst f (Cinst c) = rwComputingInstWithDbg f c >>= return . Cinst
@@ -173,28 +192,27 @@ rwTerminatorInst f (Return ls) = do { ls' <- fs (tv2v f) ls
 rwTerminatorInst f (Cbr v tl fl) = do { v' <- f v
                                       ; return $ Cbr v' tl fl
                                       }
-rwTerminatorInst _ _  = Nothing                           
+rwTerminatorInst _ _  = Nothing                   
 -- rwTerminatorInst f e = error ("unhandled case " ++ (show e))
                        
 
 rwTerminatorInstWithDbg :: MaybeChange Value -> MaybeChange TerminatorInstWithDbg
-rwTerminatorInstWithDbg f (TerminatorInstWithDbg cinst dbgs) = rwTerminatorInst f cinst >>= 
-                                                               \cinst' -> return $ TerminatorInstWithDbg cinst' dbgs
+rwTerminatorInstWithDbg f (TerminatorInstWithDbg cinst dbgs) = 
+  rwTerminatorInst f cinst >>= \cinst' -> return $ TerminatorInstWithDbg cinst' dbgs
                                                                         
 rwTinst :: MaybeChange Value -> MaybeChange (Node e x)
 rwTinst f (Tinst c) = rwTerminatorInstWithDbg f c >>= return . Tinst
 rwTinst _ _ = Nothing
-
 
 rwNode :: MaybeChange Value -> MaybeChange (Node e x)
 rwNode f n@(Cinst _) = rwCinst f n
 rwNode f n@(Tinst _) = rwTinst f n
 rwNode _ _  = Nothing
 
-nodeToG :: Node e x -> H.Graph Node e x
-nodeToG n@(Nlabel _) = H.mkFirst n
-nodeToG n@(Pinst _) = H.mkMiddle n
-nodeToG n@(Cinst _) = H.mkMiddle n
-nodeToG n@(Tinst _) = H.mkLast n
+nodeToGraph :: Node e x -> H.Graph Node e x
+nodeToGraph n@(Nlabel _) = H.mkFirst n
+nodeToGraph n@(Pinst _) = H.mkMiddle n
+nodeToGraph n@(Cinst _) = H.mkMiddle n
+nodeToGraph n@(Tinst _) = H.mkLast n
 
 

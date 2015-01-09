@@ -54,9 +54,11 @@ rnToplevel x = x
 
 
 rnDefFunctionPrototype :: FunctionPrototype -> MS FunctionPrototype
-rnDefFunctionPrototype (FunctionPrototype link vis cconv fas t g fp fa sec align gc) = 
+rnDefFunctionPrototype (FunctionPrototype link vis cconv fas t g fp fnd fa sec cmd align gc prefix prologue) = 
   do { fp' <- rnDefFormalParamList fp
-     ; return $ FunctionPrototype link vis cconv fas t g fp' fa sec align gc
+     ; prefix' <- rnPrefix prefix
+     ; prologue' <- rnPrologue prologue
+     ; return $ FunctionPrototype link vis cconv fas t g fp' fnd fa sec cmd align gc prefix' prologue'
      }
   
   
@@ -237,23 +239,26 @@ rnRhs lhs = case lhs of
               LandingPad rt ft ix cl c -> return (True, lhs)
               
 rnMemOp :: MemOp -> MS (Bool, MemOp)
-rnMemOp (Allocate m t tv a) = do { tv' <- maybeM rnTypedValue tv
-                                 ; return (True, Allocate m t tv' a)
-                                 }
-rnMemOp (Free tv) = S.liftM (\x -> (False, Free x)) (rnTypedValue tv)
-rnMemOp (Load a tp ma) = S.liftM (\x -> (True, Load a x ma)) (rnTypedPointer tp)
-rnMemOp (Store a tv tp ma) = S.liftM2 (\x y -> (False, Store a x y ma))
-                             (rnTypedValue tv) (rnTypedPointer tp)
+rnMemOp (Alloca m t tv a) = do { tv' <- maybeM rnTypedValue tv
+                               ; return (True, Alloca m t tv' a)
+                               }
+-- rnMemOp (Free tv) = S.liftM (\x -> (False, Free x)) (rnTypedValue tv)
+rnMemOp (Load a tp ma nt inv nl) = S.liftM (\x -> (True, Load a x ma nt inv nl)) (rnTypedPointer tp)
+rnMemOp (LoadAtomic at a tp ma) = S.liftM (\x -> (True, LoadAtomic at a x ma)) (rnTypedPointer tp)
+rnMemOp (Store a tv tp ma nt) = S.liftM2 (\x y -> (False, Store a x y ma nt))
+                                (rnTypedValue tv) (rnTypedPointer tp)
+rnMemOp (StoreAtomic at a tv tp ma) = S.liftM2 (\x y -> (False, StoreAtomic at a x y ma))
+                                      (rnTypedValue tv) (rnTypedPointer tp)
 rnMemOp (Fence b f) = return (False, Fence b f)
-rnMemOp (CmpXchg b1 tp tv1 tv2 b2 mf) = S.liftM3 (\x y z -> 
-                                                   (False, CmpXchg b1 x y z b2 mf))
-                                      (rnTypedPointer tp)
-                                      (rnTypedValue tv1)
-                                      (rnTypedValue tv2)
-rnMemOp (AtomicRmw b1 ao tp tv b2 mf) = S.liftM2 (\x y ->
-                                                   (False, AtomicRmw b1 ao x y b2 mf))
-                                        (rnTypedPointer tp)
-                                        (rnTypedValue tv)
+rnMemOp (CmpXchg wk b1 tp tv1 tv2 b2 mf ff) = 
+  S.liftM3 (\x y z -> (False, CmpXchg wk b1 x y z b2 mf ff))
+  (rnTypedPointer tp)
+  (rnTypedValue tv1)
+  (rnTypedValue tv2)
+rnMemOp (AtomicRmw b1 ao tp tv b2 mf) = 
+  S.liftM2 (\x y -> (False, AtomicRmw b1 ao x y b2 mf))
+  (rnTypedPointer tp)
+  (rnTypedValue tv)
 
 rnTypedPointer :: TypedPointer -> MS TypedPointer
 rnTypedPointer (TypedPointer t p) = S.liftM (TypedPointer t) (rnPointer p)
@@ -283,8 +288,15 @@ rnIcmp f (Icmp o t v1 v2) = S.liftM2 (Icmp o t) (f v1) (f v2)
 rnFcmp :: (a -> MS a) -> Fcmp a -> MS (Fcmp a)
 rnFcmp f (Fcmp o t v1 v2) = S.liftM2 (Fcmp o t) (f v1) (f v2)
 
+rnIbinExpr :: (a -> MS a) -> IbinExpr a -> MS (IbinExpr a)
+rnIbinExpr f (IbinExpr o tf t v1 v2) = S.liftM2 (IbinExpr o tf t) (f v1) (f v2)
+
+rnFbinExpr :: (a -> MS a) -> FbinExpr a -> MS (FbinExpr a)
+rnFbinExpr f (FbinExpr o tf t v1 v2) = S.liftM2 (FbinExpr o tf t) (f v1) (f v2)
+
 rnBinExpr :: (a -> MS a) -> BinExpr a -> MS (BinExpr a)
-rnBinExpr f (BinExpr o tf t v1 v2) = S.liftM2 (BinExpr o tf t) (f v1) (f v2)
+rnBinExpr f (Ie x) = S.liftM Ie (rnIbinExpr f x)
+rnBinExpr f (Fe x) = S.liftM Fe (rnFbinExpr f x)
 
 rnConversion :: (a -> MS a) -> Conversion a -> MS (Conversion a)
 rnConversion f (Conversion o v t) = S.liftM (\x -> Conversion o x t) (f v)
@@ -303,9 +315,10 @@ rnCallSite (CallFun c pa t fn aps fas) = do { fn' <- rnFunName fn
                                             ; x <- mapM rnActualParam aps
                                             ; return (not $ isVoidType t, CallFun c pa t fn' x fas)
                                             }
-rnCallSite (CallAsm t b1 b2 qs1 qs2 aps fas) = S.liftM 
-                                               (\x -> (not $ isVoidType t, CallAsm t b1 b2 qs1 qs2 x fas))
-                                               (mapM rnActualParam aps)
+rnCallSite (CallAsm t dia b1 b2 qs1 qs2 aps fas) = 
+  S.liftM 
+  (\x -> (not $ isVoidType t, CallAsm t dia b1 b2 qs1 qs2 x fas))
+  (mapM rnActualParam aps)
 rnCallSite (CallConversion pas t c aps fas) = S.liftM
                                               (\x -> (not $ isVoidType t, CallConversion pas t c x fas))
                                               (mapM rnActualParam aps)
@@ -398,8 +411,17 @@ rnConst x = return x
 rnComplexConstant :: ComplexConstant -> MS ComplexConstant
 rnComplexConstant (Cstruct b l) = S.liftM (Cstruct b) (S.mapM rnTypedConst l)
 rnComplexConstant (Carray l) = S.liftM Carray (S.mapM rnTypedConst l)
-rnComplexConstant (Cvector l) = S.liftM Cvector (S.mapM rnTypedConst l)                                  
+rnComplexConstant (Cvector l) = S.liftM Cvector (S.mapM rnTypedConst l)
                                   
 rnTypedConst :: TypedConst -> MS TypedConst                                  
 rnTypedConst (TypedConst t c) = S.liftM (TypedConst t) (rnConst c)
 rnTypedConst TypedConstNull = return $ TypedConstNull
+
+
+rnPrefix :: Maybe Prefix -> MS (Maybe Prefix)
+rnPrefix (Just (Prefix n)) = S.liftM (Just . Prefix) (rnTypedConst n)
+rnPrefix _ = return Nothing
+
+rnPrologue :: Maybe Prologue -> MS (Maybe Prologue)
+rnPrologue (Just (Prologue n)) = S.liftM (Just . Prologue) (rnTypedConst n)
+rnPrologue _ = return Nothing

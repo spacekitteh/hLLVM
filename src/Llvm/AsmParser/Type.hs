@@ -5,14 +5,15 @@ import Llvm.AsmParser.Basic
 
 pType :: P Type
 pType =
-    do { t <- choice [ array
-                    , try vector
-                    , struct
-                    , pstruct
-                    , liftM Tprimitive pPrimType
-                    , pTypeName
-                    , upref
-                    , pOther ]
+    do { t <- choice [ try (liftM Tprimitive pPrimType)
+                     , pTypeName
+                     , upref
+                     , array
+                     , try pstruct
+                     , vector
+                     , struct
+                     , pOther 
+                     ]
        ; post t
        }
  where
@@ -25,20 +26,24 @@ pType =
                  ; return (f n t)
                  }
    struct   = liftM (Tstruct Unpacked) (braces (sepBy pType comma))
-   pstruct  = angles $ liftM (Tstruct Packed) (braces (sepBy pType comma))
-   pTypeName = do { x <- pLocalId 
-                  ; case x of 
-                      LocalIdNum n -> return $ Tno n 
-                      LocalIdAlphaNum s -> return $ Tname s
-                      LocalIdQuoteStr s -> return $ TquoteName s
-                  }
+   pstruct  = do { symbol "<{"
+                 ; v <- sepBy pType comma
+                 ; symbol "}>"
+                 ; return (Tstruct Packed v)
+                 }
    pOther = choice [ reserved "opaque" >> return Topaque
                    , reserved "metadata" >> return Tmetadata
                    ]
 
+pTypeName = do { x <- pLocalId 
+               ; case x of 
+                 LocalIdNum n -> return $ Tno n 
+                 LocalIdAlphaNum s -> return $ Tname s
+                 LocalIdQuoteStr s -> return $ TquoteName s
+               }
 
-pStar :: P (Maybe AddrSpace)
-pStar = opt pAddrSpace >>= \x -> chartok '*' >> return x
+pStar :: P AddrSpace
+pStar = option AddrSpaceUnspecified pAddrSpace >>= \x -> chartok '*' >> return x
 
 post :: Type -> P Type
 post t = do { pt <- option t (pStar >>= \x -> post (Tpointer t x))
@@ -120,3 +125,13 @@ pFormalParamList = do { chartok '('
                    ; ar2 <- many pParamAttr
                    ; return $ FormalParam at  ar1 an lv' ar2
                    }
+
+pSelTy :: P Type
+pSelTy = choice [ reserved "i1" >> return (Tprimitive $ TpI 1)
+                , angles $ do { n <- decimal
+                              ; chartok 'x'
+                              ; reserved "i1"
+                              ; return $ Tvector n (Tprimitive $ TpI 1)
+                              }
+                , pTypeName
+                ]

@@ -10,7 +10,7 @@ import Llvm.VmCore.Ir
 import qualified Data.Map as Dm
 import qualified Data.Set as Ds
 import Control.Monad
-import Llvm.Pass.Rewriter
+import Llvm.Pass.Rewriter (rwNode,nodeToGraph)
 import Prelude hiding(lookup)
 #ifdef DEBUG
 import Debug.Trace
@@ -71,14 +71,15 @@ cinstft' _ _ f = f
 
   
 memOp :: Maybe GlobalOrLocalId -> MemOp -> Mem2RegFact -> Fact O Mem2RegFact  
-memOp (Just (GolL lhs)) (Allocate OnStack _ Nothing _) f = insert (Mem $ localIdToLstring lhs) Top f
-memOp _ (Store _ (TypedValue _ v1) (TypedPointer _ (Pointer (VgOl (GolL ptr)))) _) f = 
+memOp (Just (GolL lhs)) (Allocate _ _ Nothing _) f = insert (Mem $ localIdToLstring lhs) Top f
+memOp _ (Store _ (TypedValue _ v1) (TypedPointer _ (Pointer (VgOl (GolL ptr)))) _ _) f = 
     let x = Mem $ localIdToLstring ptr
-    in
-    if (x `Dm.member` f) then 
-        insert x (PElem v1) f
-    else
-        f
+    in if (x `Dm.member` f) then insert x (PElem v1) f
+       else f
+memOp _ (StoreAtomic _ _ (TypedValue _ v1) (TypedPointer _ (Pointer (VgOl (GolL ptr)))) _) f = 
+    let x = Mem $ localIdToLstring ptr
+    in if (x `Dm.member` f) then insert x (PElem v1) f
+       else f
 memOp _ _ f = f
 
 
@@ -94,8 +95,9 @@ insert x v1 f = Dm.insert x v1 f
 mem2Reg :: forall m . FuelMonad m => FwdRewrite m Node Mem2RegFact
 mem2Reg = mkFRewrite cp
     where
+      -- each node is rewritten to a one node graph. 
       cp :: Node e x -> Mem2RegFact -> m (Maybe (Graph Node e x))
-      cp node f = return $ liftM nodeToG $ rwNode (lookup f) node
+      cp node f = return $ liftM nodeToGraph $ rwNode (lookup f) node
 
       lookup :: Mem2RegFact -> Value -> Maybe Value
       lookup f x = do { x' <- case x of

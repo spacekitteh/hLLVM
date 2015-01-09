@@ -23,74 +23,88 @@ pPointer = choice [liftM Pointer pValue]
            
 
 pAllocate :: P MemOp
-pAllocate = do { ma <- choice [ reserved "alloca" >> return OnStack
-                             , reserved "malloc" >> return InHeap ]
+pAllocate = do { reserved "alloca"
+               ; ina <- option (IsNot InAllocaAttr) (reserved "inalloca" >> return (Is InAllocaAttr))
                ; t <- pType 
                ; n <- opt (comma >> pTypedValue)
                ; a <- opt (comma >> pAlign)
-               ; return $ Allocate ma t n a
+               ; return $ Alloca ina t n a
                }
-            
+{-            
 pFree :: P MemOp
 pFree = liftM Free (reserved "free" >> pTypedValue)
-
+-}
 
 pLoad :: P MemOp
 pLoad = do { reserved "load"
            ; at <- option False (reserved "atomic" >> return True)
-           ; b <- option False (reserved "volatile" >> return True)
+           ; b <- option (IsNot Volatile) (reserved "volatile" >> return (Is Volatile))
            ; tv <- pTypedPointer
-           ; st <- option False (reserved "singlethread" >> return True)
-           ; ord <- opt pFenceOrder
-           ; a <- optCommaSep pAlign
-           ; let atom = if at then Atomic b st ord
-                        else NonAtomic b
-           ; return $ Load atom tv a
+           ; if at then
+               do { st <- option (IsNot SingleThread) (reserved "singlethread" >> return (Is SingleThread))
+                  ; ord <- pFenceOrder
+                  ; a <- optCommaSep pAlign
+                  ; return $ LoadAtomic (Atomicity st ord) b tv a
+                  }
+             else
+               do { a <- optCommaSep pAlign
+                  ; nt <- optCommaSep pNontemporal
+                  ; inv <- optCommaSep pInvariantLoad
+                  ; nn <- optCommaSep pNonnull
+                  ; return $ Load b tv a nt inv nn
+                  }
            }
         
 pStore :: P MemOp
 pStore = do { reserved "store"
             ; at <- option False (reserved "atomic" >> return True)
-            ; b <- option False (reserved "volatile" >> return True)
+            ; b <- option (IsNot Volatile) (reserved "volatile" >> return (Is Volatile))
             ; tv <- pTypedValue
             ; ignore comma
             ; ptr <- pTypedPointer
-            ; st <- option False (reserved "singlethread" >> return True)
-            ; ord <- opt pFenceOrder
-            ; a <- optCommaSep pAlign
-            ; let atom = if at then Atomic b st ord
-                         else NonAtomic b
-            ; return $ Store atom tv ptr a
+            ; if at then 
+                do { st <- option (IsNot SingleThread) (reserved "singlethread" >> return (Is SingleThread))
+                   ; ord <- pFenceOrder
+                   ; a <- optCommaSep pAlign
+                   ; return $ StoreAtomic (Atomicity st ord) b tv ptr a 
+                   }
+              else
+                do { a <- optCommaSep pAlign
+                   ; nt <- optCommaSep pNontemporal
+                   ; return $ Store b tv ptr a nt
+                   }
             }
          
          
 pFence :: P MemOp
 pFence = do { reserved "fence"
-            ; st <- option False (reserved "singlethread" >> return True)
+            ; st <- option (IsNot SingleThread) (reserved "singlethread" >> return (Is SingleThread))
             ; ordering <- pFenceOrder
             ; return $ Fence st ordering
             }
    
 pCmpXchg :: P MemOp
 pCmpXchg = do { reserved "cmpxchg"
-              ; v <- option False (reserved "volatile" >> return True)
+              ; wk <- option (IsNot Weak) (reserved "weak" >> return (Is Weak))
+              ; v <- option (IsNot Volatile) (reserved "volatile" >> return (Is Volatile))
               ; p <- pTypedPointer
               ; ignore comma
               ; (c, n) <- pTuple pTypedValue
-              ; st <- option False (reserved "singlethread" >> return True)
-              ; ord <- opt pFenceOrder
-              ; return $ CmpXchg v p c n st ord
+              ; st <- option (IsNot SingleThread) (reserved "singlethread" >> return (Is SingleThread))
+              ; sord <- pFenceOrder
+              ; ford <- pFenceOrder
+              ; return $ CmpXchg wk v p c n st sord ford
               }
            
 pAtomicRmw :: P MemOp
 pAtomicRmw = do { reserved "atomicrmw"
-                ; v <- option False (reserved "volatile" >> return True)
+                ; v <- option (IsNot Volatile) (reserved "volatile" >> return (Is Volatile))
                 ; op <- pAtomicOp
                 ; p <- pTypedPointer
                 ; ignore comma
                 ; vl <- pTypedValue
-                ; st <- option False (reserved "singlethread" >> return True)
-                ; ord <- opt pFenceOrder
+                ; st <- option (IsNot SingleThread) (reserved "singlethread" >> return (Is SingleThread))
+                ; ord <- pFenceOrder
                 ; return $ AtomicRmw v op p vl st ord
                 }    
 
@@ -99,7 +113,6 @@ pAtomicRmw = do { reserved "atomicrmw"
 
 pMemOp :: P (Bool, MemOp)
 pMemOp = choice [ pAllocate >>= \x -> return (True, x)
-                , pFree >>= \x -> return (False, x)
                 , pLoad >>= \x -> return (True, x)
                 , pStore >>= \x -> return (False, x)
                 , pFence >>= \x -> return (False, x)
@@ -117,14 +130,25 @@ pExpr = choice [ liftM Eb pBinaryOperation
                , liftM EgEp pGetElemPtr
                ]
 
-pBinaryOperation :: P (BinExpr Value)
-pBinaryOperation = do { op <- pBinaryOperator
-                      ; l <- many pCarry
-                      ; t <- pType
-                      ; (v1, v2) <- pTuple pValue
-                      ; return $ BinExpr op l t v1 v2
-                      }
-                      
+pIbinaryOperation :: P (IbinExpr Value)
+pIbinaryOperation = do { op <- pIbinaryOperator
+                       ; l <- many pCarry
+                       ; t <- pType
+                       ; (v1, v2) <- pTuple pValue
+                       ; return $ IbinExpr op l t v1 v2
+                       }
+
+pFbinaryOperation :: P (FbinExpr Value)
+pFbinaryOperation = do { op <- pFbinaryOperator
+                       ; l <- pFastMathFlags 
+                       ; t <- pType
+                       ; (v1, v2) <- pTuple pValue
+                       ; return $ FbinExpr op l t v1 v2
+                       }
+                    
+pBinaryOperation :: P (BinExpr Value)                    
+pBinaryOperation = choice [ liftM Ie pIbinaryOperation, liftM Fe pFbinaryOperation]
+
               
 pIcmp :: P (Icmp Value)
 pIcmp = do { reserved "icmp"
@@ -147,8 +171,11 @@ pFcmp = do { reserved "fcmp"
                         
 pSelect :: P (Select TypedValue)
 pSelect = do { reserved "select"
-             ; (tv1, tv2, tv3) <- pTriple pTypedValue
-             ; return $ Select tv1 tv2 tv3
+             ; t <- pSelTy
+             ; v <- pValue
+             ; ignore comma
+             ; (tv2, tv3) <- pTuple pTypedValue
+             ; return $ Select (TypedValue t v) tv2 tv3
              }
 
 
@@ -164,7 +191,7 @@ pConversion = do { op <- pConvertOp
                    
 pGetElemPtr :: P (GetElemPtr TypedValue)
 pGetElemPtr = do { reserved "getelementptr"
-                 ; ib <- option False (reserved "inbounds" >> return True)
+                 ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
                  ; tc1 <- pTypedValue
                  ; idx <- many (try (comma >> pTypedValue))
                  ; return $ GetElemPtr ib tc1 idx
@@ -207,10 +234,10 @@ pCallFun = do { cc <- opt pCallConv
               ; atts0 <- many pParamAttr
               ; t <- pType
               ; i <- choice [ liftM FunNameString (choice [symbol "null", symbol "undef"])
-                           , liftM FunNameGlobal pGlobalOrLocalId
-                           ]
+                            , liftM FunNameGlobal pGlobalOrLocalId
+                            ]
               ; params <- parens (sepBy pActualParam comma)
-              ; atts1 <- many pFunAttr
+              ; atts1 <- pFunAttrCollection
               ; return (not $ isVoidType t, CallFun cc atts0 t i params atts1)
               }
 
@@ -219,10 +246,11 @@ pCallAsm = do { t <- pType
               ; reserved "asm"
               ; se <- option False (reserved "sideeffect" >> return True)
               ; as <- option False (reserved "alignstack" >> return True)
+              ; dialect <- option AsmDialectAtt (reserved "inteldialect" >> return AsmDialectIntel)
               ; (s1, s2) <- pTuple pQuoteStr
               ; params <- parens (sepBy pActualParam comma)
-              ; atts1 <- many pFunAttr
-              ; return (not $ isVoidType t, CallAsm t se as (QuoteStr s1) (QuoteStr s2) params atts1)
+              ; atts1 <- pFunAttrCollection
+              ; return (not $ isVoidType t, CallAsm t se as dialect (QuoteStr s1) (QuoteStr s2) params atts1)
               }
 
 pCallConversion :: P (Bool, CallSite)
@@ -230,7 +258,7 @@ pCallConversion = do { a <- many pParamAttr
                   ; t <- pType
                   ; convert <- pConstConversion
                   ; params <- parens (sepBy pActualParam comma)
-                  ; atts1 <- many pFunAttr
+                  ; atts1 <- pFunAttrCollection
                   ; return (not $ isVoidType t, CallConversion a t convert params atts1)
                   }
                
@@ -241,7 +269,7 @@ pCallSite = choice [ try pCallFun
                    ]
          
 pCall :: P (Bool, Rhs)     
-pCall = do { tl <- option False (reserved "tail" >> return True)
+pCall = do { tl <- option NonTailCall pTailCalling -- False (reserved "tail" >> return True)
            ; reserved "call"
            ; (b, callSite) <- pCallSite
            ; return (b, Call tl callSite)
@@ -284,6 +312,7 @@ pPersFn = choice [ liftM PersFnId pGlobalOrLocalId
                       ; return $ PersFnCast (Conversion op (ot,ix) dt)
                       }
                  , reserved "undef" >> return PersFnUndef
+                 , reserved "null" >> return PersFnNull
                  ]
           
 pLandingPad :: P Rhs

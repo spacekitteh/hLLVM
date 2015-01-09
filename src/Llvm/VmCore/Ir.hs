@@ -14,8 +14,7 @@ import qualified Data.Set as S
 
 data Toplevel = ToplevelTriple Ci.QuoteStr
               | ToplevelDataLayout Ci.DataLayout
-              | ToplevelAlias (Maybe Ci.GlobalId) (Maybe Ci.Visibility) 
-                (Maybe Ci.Linkage) Ci.Aliasee
+              | ToplevelAlias Ci.GlobalId (Maybe Ci.Visibility) (Maybe Ci.DllStorage) (Maybe Ci.ThreadLocalStorage) AddrNaming (Maybe Ci.Linkage) Ci.Aliasee
               | ToplevelDbgInit String Integer
               | ToplevelStandaloneMd String Ci.TypedValue
               | ToplevelNamedMd Ci.MdVar [Ci.MdNode]
@@ -24,22 +23,28 @@ data Toplevel = ToplevelTriple Ci.QuoteStr
               | ToplevelGlobal { toplevelGlobalLhs :: Maybe Ci.GlobalId
                                , toplevelGlobalLinkage :: Maybe Ci.Linkage
                                , toplevelGlobalVisibility :: Maybe Ci.Visibility
-                               , toplevelGlobalThreadLocation :: Bool
-                               , toplevelGlobalUnamedAddr :: Bool
+                               , toplevelGlobalDllStorage :: Maybe Ci.DllStorage
+                               , toplevelGlobalThreadLocation :: Maybe Ci.ThreadLocalStorage
+                               , toplevelGlobalUnamedAddr :: AddrNaming
                                , toplevelGlobalAddrSpace :: Maybe Ci.AddrSpace
+                               , toplevelGlobalExternallyInitialized :: IsOrIsNot Ci.ExternallyInitialized
                                , toplevelGlobalGlobalType :: Ci.GlobalType
                                , toplevelGlobalType :: Ci.Type
                                , toplevelGlobalConst :: Maybe Ci.Const
                                , toplevelGlobalSection :: Maybe Ci.Section
+                               , toplevelGlobalComdat :: Maybe Ci.Comdat
                                , toplevelGlobalAlign :: Maybe Ci.Align
                                }
               | ToplevelTypeDef Ci.LocalId Ci.Type
               | ToplevelDepLibs [Ci.QuoteStr]
               | ToplevelUnamedType Integer Ci.Type
               | ToplevelModuleAsm Ci.QuoteStr
-                       
+              | ToplevelAttribute Integer [FunAttr]
+              | ToplevelComdat Ci.DollarId Ci.SelectionKind
+                
 data Module = Module [Toplevel] 
 
+-- each instruction represents a node
 data Node e x where
     Nlabel :: Ci.BlockLabel -> Node H.C H.O
     Pinst  :: Ci.PhiInst -> Node H.O H.O
@@ -66,5 +71,5 @@ instance H.NonLocal Node where
 
 globalIdOfModule :: Module -> S.Set (Ci.Type, Ci.GlobalId)
 globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty tl
-                               where globalIdOf (ToplevelGlobal lhs _ _ _ _ _ _ t _ _ _) = maybe S.empty (\x -> S.singleton (t, x)) lhs
+                               where globalIdOf (ToplevelGlobal lhs _ _ _ _ _ _ _ _ t _ _ _ _) = maybe S.empty (\x -> S.singleton (t, x)) lhs
                                      globalIdOf _ = S.empty

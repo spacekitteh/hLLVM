@@ -46,4 +46,4 @@ testParser fileName inh = do { inpStr <- hGetContents inh
                                        
                           
 writeOut :: AsmWriter a => a -> Handle -> IO ()
-writeOut m outh = hPutStr outh (toLlvm m)
+writeOut m outh = hPutStr outh (render $ toLlvm m)

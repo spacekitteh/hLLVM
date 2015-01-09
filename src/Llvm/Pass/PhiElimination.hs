@@ -61,7 +61,7 @@ removePhi (PhiInst lhs t ins) live = if liveOperands == ins then
                                      else if liveOperands == [] then
                                             return $ Just emptyGraph
                                           else 
-                                            return $ Just $ nodeToG $ Pinst $ PhiInst lhs t liveOperands
+                                            return $ Just $ nodeToGraph $ Pinst $ PhiInst lhs t liveOperands
    where 
 #ifdef DEBUG     
      isAlive x s | trace ("isAlive is called with " ++ show x ++ "  " ++ show s) False = undefined

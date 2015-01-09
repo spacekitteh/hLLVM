@@ -1,18 +1,18 @@
 module Llvm.VmCore.CoreIr
        ( module Llvm.VmCore.CoreIr
-       , module Llvm.VmCore.AtomicEntity
+       , module Llvm.VmCore.SharedEntity
        , module Llvm.VmCore.DataLayout
        , Label
        ) where
-import Llvm.VmCore.AtomicEntity
+import Llvm.VmCore.SharedEntity
 import Llvm.VmCore.DataLayout
 import Compiler.Hoopl (Label)
 
-
+-- | We have to keep the original label kinds to map Hoopl labels back to labels that llvm-as likes
 data LabelId = LabelString Label
              | LabelQuoteString Label
              | LabelNumber Label
-             | LabelQuoteNumber Label
+             | LabelQuoteNumber Label  
              deriving (Eq, Ord, Show)
                       
 hooplLabelOf :: LabelId -> Label
@@ -36,95 +36,122 @@ data NoWrap =
 
 data Exact = Exact deriving (Eq,Ord,Show)
 
-data BinExpr v = Add (Maybe NoWrap) Type v v 
-               | Sub (Maybe NoWrap) Type v v
-               | Mul (Maybe NoWrap) Type v v
-               | Udiv (Maybe Exact) Type v v
-               | Sdiv (Maybe Exact) Type v v
-               | Urem Type v v
-               | Srem Type v v
-               | Fadd Type v v
-               | Fsub Type v v
-               | Fmul Type v v
-               | Fdiv Type v v
-               | Frem Type v v
-               | Shl (Maybe NoWrap) Type v v
-               | Lshr (Maybe Exact) Type v v
-               | Ashr (Maybe Exact) Type v v
-               | And Type v v
-               | Or Type v v
-               | Xor Type v v
-                 deriving (Eq,Ord,Show)
+data IbinExpr v = Add (Maybe NoWrap) Type v v 
+                | Sub (Maybe NoWrap) Type v v
+                | Mul (Maybe NoWrap) Type v v
+                | Udiv (Maybe Exact) Type v v
+                | Sdiv (Maybe Exact) Type v v
+                | Urem Type v v
+                | Srem Type v v
+                | Shl (Maybe NoWrap) Type v v
+                | Lshr (Maybe Exact) Type v v
+                | Ashr (Maybe Exact) Type v v
+                | And Type v v
+                | Or Type v v
+                | Xor Type v v
+                deriving (Eq,Ord,Show)
 
+operandOfIbinExpr :: IbinExpr v -> (v, v)
+operandOfIbinExpr e = case e of
+  Add _ _ v1 v2 -> (v1, v2)
+  Sub _ _ v1 v2 -> (v1, v2)
+  Mul _ _ v1 v2 -> (v1, v2)
+  Udiv _ _ v1 v2 -> (v1, v2)
+  Sdiv _ _ v1 v2 -> (v1, v2)
+  Urem _ v1 v2 -> (v1, v2)
+  Srem _ v1 v2 -> (v1, v2)
+  Shl _ _ v1 v2 -> (v1, v2)
+  Lshr _ _ v1 v2 -> (v1, v2)
+  Ashr _ _ v1 v2 -> (v1, v2)
+  And  _ v1 v2 -> (v1, v2)
+  Or  _ v1 v2 -> (v1, v2)
+  Xor _ v1 v2 -> (v1, v2)
 
-operandOfBinExpr :: BinExpr v -> (v, v)
-operandOfBinExpr e = case e of
-                  Add _ _ v1 v2 -> (v1, v2)
-                  Sub _ _ v1 v2 -> (v1, v2)
-                  Mul _ _ v1 v2 -> (v1, v2)
-                  Udiv _ _ v1 v2 -> (v1, v2)
-                  Sdiv _ _ v1 v2 -> (v1, v2)
-                  Urem _ v1 v2 -> (v1, v2)
-                  Srem _ v1 v2 -> (v1, v2)
-                  Fadd _ v1 v2 -> (v1, v2)
-                  Fsub _ v1 v2 -> (v1, v2)
-                  Fmul _ v1 v2 -> (v1, v2)
-                  Fdiv _ v1 v2 -> (v1, v2)
-                  Frem _ v1 v2 -> (v1, v2)
-                  Shl _ _ v1 v2 -> (v1, v2)
-                  Lshr _ _ v1 v2 -> (v1, v2)
-                  Ashr _ _ v1 v2 -> (v1, v2)
-                  And  _ v1 v2 -> (v1, v2)
-                  Or  _ v1 v2 -> (v1, v2)
-                  Xor _ v1 v2 -> (v1, v2)
+data FbinExpr v = Fadd FastMathFlags Type v v
+                | Fsub FastMathFlags Type v v
+                | Fmul FastMathFlags Type v v
+                | Fdiv FastMathFlags Type v v
+                | Frem FastMathFlags Type v v
+                deriving (Eq,Ord,Show)
+
+data BinExpr v = Ie (IbinExpr v)
+               | Fe (FbinExpr v)
+               deriving (Eq, Ord, Show)
+
+operandOfFbinExpr :: FbinExpr v -> (v, v)
+operandOfFbinExpr e = case e of
+  Fadd _ _ v1 v2 -> (v1, v2)
+  Fsub _ _ v1 v2 -> (v1, v2)
+  Fmul _ _ v1 v2 -> (v1, v2)
+  Fdiv _ _ v1 v2 -> (v1, v2)
+  Frem _ _ v1 v2 -> (v1, v2)
+                  
+operandOfBinExpr :: BinExpr v -> (v, v)                    
+operandOfBinExpr (Ie x) = operandOfIbinExpr x
+operandOfBinExpr (Fe x) = operandOfFbinExpr x
+
+operatorOfIbinExpr :: IbinExpr v -> String
+operatorOfIbinExpr e = case e of
+  Add _ _ _ _ -> "add"
+  Sub _ _ _ _ -> "sub"
+  Mul _ _ _ _ -> "mul"
+  Udiv _ _ _ _ -> "udiv"
+  Sdiv _ _ _ _ -> "sdiv"
+  Urem _ _ _ -> "urem"
+  Srem _ _ _ -> "srem"
+  Shl _ _ _ _ -> "shl"
+  Lshr _ _ _ _ -> "lshr"
+  Ashr _ _ _ _ -> "ashr"
+  And  _ _ _ -> "and"
+  Or  _ _ _ -> "or"
+  Xor _ _ _ -> "xor"
+                     
+operatorOfFbinExpr :: FbinExpr v -> String
+operatorOfFbinExpr e = case e of
+  Fadd _ _ _ _ -> "fadd"
+  Fsub _ _ _ _ -> "fsub"
+  Fmul _ _ _ _ -> "fmul"
+  Fdiv _ _ _ _ -> "fdiv"
+  Frem _ _ _ _ -> "frem"
+
 
 operatorOfBinExpr :: BinExpr v -> String
-operatorOfBinExpr e = case e of
-                     Add _ _ _ _ -> "add"
-                     Sub _ _ _ _ -> "sub"
-                     Mul _ _ _ _ -> "mul"
-                     Udiv _ _ _ _ -> "udiv"
-                     Sdiv _ _ _ _ -> "sdiv"
-                     Urem _ _ _ -> "urem"
-                     Srem _ _ _ -> "srem"
-                     Fadd _ _ _ -> "fadd"
-                     Fsub _ _ _ -> "fsub"
-                     Fmul _ _ _ -> "fmul"
-                     Fdiv _ _ _ -> "fdiv"
-                     Frem _ _ _ -> "frem"
-                     Shl _ _ _ _ -> "shl"
-                     Lshr _ _ _ _ -> "lshr"
-                     Ashr _ _ _ _ -> "ashr"
-                     And  _ _ _ -> "and"
-                     Or  _ _ _ -> "or"
-                     Xor _ _ _ -> "xor"
+operatorOfBinExpr (Ie e) = operatorOfIbinExpr e
+operatorOfBinExpr (Fe e) = operatorOfFbinExpr e                           
 
+
+typeOfIbinExpr :: IbinExpr v -> Type
+typeOfIbinExpr e = case e of
+  Add _ t _ _ -> t
+  Sub _ t _ _ -> t
+  Mul _ t _ _ -> t
+  Udiv _ t _ _ -> t
+  Sdiv _ t _ _ -> t
+  Urem t _ _ -> t
+  Srem t _ _ -> t
+  Shl _ t _ _ -> t
+  Lshr _ t _ _ -> t
+  Ashr _ t _ _ -> t
+  And  t _ _ -> t
+  Or  t _ _ -> t
+  Xor t _ _ -> t
+              
+typeOfFbinExpr :: FbinExpr v -> Type
+typeOfFbinExpr e = case e of
+  Fadd _ t _ _ -> t
+  Fsub _ t _ _ -> t
+  Fmul _ t _ _ -> t
+  Fdiv _ t _ _ -> t
+  Frem _ t _ _ -> t
 
 typeOfBinExpr :: BinExpr v -> Type
-typeOfBinExpr e = case e of
-              Add _ t _ _ -> t
-              Sub _ t _ _ -> t
-              Mul _ t _ _ -> t
-              Udiv _ t _ _ -> t
-              Sdiv _ t _ _ -> t
-              Urem t _ _ -> t
-              Srem t _ _ -> t
-              Fadd t _ _ -> t
-              Fsub t _ _ -> t
-              Fmul t _ _ -> t
-              Fdiv t _ _ -> t
-              Frem t _ _ -> t
-              Shl _ t _ _ -> t
-              Lshr _ t _ _ -> t
-              Ashr _ t _ _ -> t
-              And  t _ _ -> t
-              Or  t _ _ -> t
-              Xor t _ _ -> t
+typeOfBinExpr (Ie e) = typeOfIbinExpr e
+typeOfBinExpr (Fe e) = typeOfFbinExpr e
 
 
 data Conversion v = Conversion ConvertOp v Type deriving (Eq,Ord,Show)
 -- | getelemptr addr:u1 takenaddr indices:u1
-data GetElemPtr v = GetElemPtr Bool v [v] deriving (Eq,Ord,Show)
+data GetElemPtr v = GetElemPtr (IsOrIsNot InBounds) v [v] deriving (Eq,Ord,Show)
 data Select v = Select v v v deriving (Eq,Ord,Show)
 data Icmp v = Icmp IcmpOp Type v v deriving (Eq,Ord,Show)
 data Fcmp v = Fcmp FcmpOp Type v v deriving (Eq,Ord,Show)
@@ -193,19 +220,19 @@ typeOfExpr x = error ("unexpected parameter " ++ (show x) ++ " is passed to type
 {-   (element type, element number, align) -}
 data MemOp = 
   -- | allocate m t s:u1 align
-  Allocate MemArea Type (Maybe TypedValue) (Maybe Align)
-  -- | free x:u1
-  | Free TypedValue
+  Allocate (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Align)
   -- | load a addr:u1u2 align
-  | Load Atomicity TypedPointer (Maybe Align)
+  | Load (IsOrIsNot Volatile) TypedPointer (Maybe Align) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+  | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Align)
   -- | store v:u1 addr:u1d2 align
-  | Store Atomicity TypedValue TypedPointer (Maybe Align)
-  -- | fence
-  | Fence Bool FenceOrder
+  | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Align) (Maybe Nontemporal)
+  | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Align) 
+  -- | fence 
+  | Fence (IsOrIsNot SingleThread) FenceOrder
   -- | cmpxchg v1:u1u2d2 v2:u1 v3:u1 
-  | CmpXchg Bool TypedPointer TypedValue TypedValue Bool (Maybe FenceOrder) 
+  | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) FenceOrder FenceOrder
   -- | atomicrmw v1:u1u2d2 v2:u1 
-  | AtomicRmw Bool AtomicOp TypedPointer TypedValue Bool (Maybe FenceOrder)
+  | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) FenceOrder
   deriving (Eq,Ord,Show)
                          
 data FunName = 
@@ -219,10 +246,10 @@ data CallSite = CallFun { callSiteConv :: Maybe CallConv
                         , callSiteRetType :: Type
                         , callSiteIdent :: FunName
                         , callSiteActualParams :: [ActualParam]
-                        , callSiteFunAttr :: [FunAttr]
+                        , callSiteFunAttr :: FunAttrCollection -- [FunAttr]
                         }
-              | CallAsm Type Bool Bool QuoteStr QuoteStr [ActualParam] [FunAttr] 
-              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
+              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] FunAttrCollection -- [FunAttr] 
+              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] FunAttrCollection -- [FunAttr]
               deriving (Eq,Ord,Show)
                        
 data Clause = Catch TypedValue -- u1
@@ -238,7 +265,7 @@ data PersFn = PersFnId GlobalOrLocalId -- u1
                            
 data Rhs = RmO MemOp
          | Re Expr
-         | Call Bool CallSite
+         | Call TailCalling CallSite
          | ReE (ExtractElem TypedValue)
          | RiE (InsertElem TypedValue)
          | RsV (ShuffleVector TypedValue)
@@ -295,8 +322,7 @@ data ActualParam = ActualParam { actualParamType :: Type
                                } deriving (Eq,Ord,Show)
                           
                                             
-data Value = 
-             VgOl GlobalOrLocalId 
+data Value = VgOl GlobalOrLocalId 
            | Ve Expr
            | Vc Const
            | InlineAsm { inlineAsmHasSideEffect :: Bool
@@ -329,14 +355,19 @@ data FunctionPrototype = FunctionPrototype
                          , fhRetType :: Type
                          , fhName    :: GlobalId
                          , fhParams  :: FormalParamList
-                         , fhAttr1   :: [FunAttr]
+                         , fhAddrNaming :: Maybe AddrNaming                       
+                         , fhAttr1   :: FunAttrCollection
                          , fhSection :: Maybe Section
+                         , fhComdat :: Maybe Comdat
                          , fhAlign :: Maybe Align
                          , fhGc :: Maybe Gc
-                         } 
+                         , fhPrefix :: Maybe Prefix
+                         , fhPrologue :: Maybe Prologue                        
+                         }            
                        deriving (Eq,Ord,Show)
 
-
+data Prefix = Prefix TypedConst deriving (Eq, Ord, Show)
+data Prologue = Prologue TypedConst deriving (Eq, Ord, Show)                                
 
 getTargetLabel :: TargetLabel -> Label
 getTargetLabel (TargetLabel (PercentLabel l)) = toLabel l

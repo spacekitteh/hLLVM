@@ -22,6 +22,8 @@ toplevel = choice [ try pNamedGlobal
                   , try pToplevelDeclare
                   , try pToplevelDefine
                   , pToplevelModuleAsm
+                  , pToplevelAttributeGroup
+                  , pToplevelComdat
                   , pStandaloneMd
                   ]
 
@@ -30,13 +32,15 @@ toplevel = choice [ try pNamedGlobal
 -- GlobalVar '=' OptionalLinkage OptionalVisibility ... -> global variable
 pNamedGlobal :: P Toplevel
 pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
-                  ; link <- opt (choice [try pExternalLinkage, pLinkage])
+                  ; linkOpt <- opt pLinkage -- (choice [try pExternalLinkage, pLinkage])
                   ; vis <- opt pVisibility
+                  ; dllStorage <- opt pDllStorageClass
+                  ; tlm <- opt pThreadLocalStorageClass
+                  ; na <- option NamedAddr (reserved "unnamed_addr" >> return UnnamedAddr)
                   ; hasAlias <- option False (reserved "alias" >> return True)
-                  ; case (link, hasAlias) of
-                      (Just _, _) -> pGlobal lhsOpt link vis
-                      (Nothing, False) -> pGlobal lhsOpt Nothing vis
-                      (Nothing, True) -> pAlias lhsOpt vis
+                  ; case (lhsOpt, linkOpt, hasAlias) of
+                    (Just lhs, Nothing, True) -> pAlias lhs vis dllStorage tlm na
+                    (_, _, False) -> pGlobal lhsOpt linkOpt vis dllStorage tlm na
                   }
 
 -- ParseAlias:
@@ -48,10 +52,10 @@ pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
 --
 -- Everything through visibility has already been parsed.
 --
-pAlias :: Maybe GlobalId -> Maybe Visibility -> P Toplevel
-pAlias lhs vis = do { link <- option External pAliasLinkage
+pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorage -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
+pAlias lhs vis dll tlm na = do { link <- option External pAliasLinkage
                     ; aliasee <- pAliasee
-                    ; return $ ToplevelAlias lhs vis (Just link) aliasee
+                    ; return $ ToplevelAlias lhs vis dll tlm na (Just link) aliasee
                     }
     where pAliasee = 
             choice [ liftM AtV pTypedValue
@@ -68,29 +72,27 @@ pAlias lhs vis = do { link <- option External pAliasLinkage
 --
 -- Everything through visibility has been parsed already.
 --
-pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> P Toplevel
-pGlobal lhs link vis = do { local_thread <- option False (reserved "thread_local" >> return True)
-                          ; (un,addrOpt) <- permute ((,) <$?> (False, reserved "unnamed_addr" >> return True)
-                                                        <|?> (Nothing, liftM Just pAddrSpace))
-                          --; addrOpt <- opt pAddrSpace
-                          ; globalOpt <- pGlobalType
-                          ; t <- pType
-                          ; c <- if (hasInit link) then
-                                    liftM Just pConst
-                                else
-                                    return Nothing
-                          ; (s, a) <- permute ((,) <$?> (Nothing, try (comma >> liftM Just pSection))
-                                                      <|?> (Nothing, try (comma >> liftM Just pAlign))
-                                             )
-                          ; return $ ToplevelGlobal lhs link vis local_thread un addrOpt 
-                                   globalOpt t c s a
-                          }
-    where hasInit x = case x of 
-                           Just(ExternWeak) -> False
-                           Just(External) -> False
-                           Just(DllImport) -> False
-                           Just(_) -> True
-                           Nothing -> True
+pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> Maybe DllStorage -> Maybe ThreadLocalStorage -> AddrNaming ->  P Toplevel
+pGlobal lhs link vis dll tls na = 
+  do { addrOpt <- opt pAddrSpace
+     ; exti <- option (IsNot ExternallyInitialized) (reserved "externally_initialized" >> return (Is ExternallyInitialized))
+     ; globalOpt <- pGlobalType
+     ; t <- pType
+     ; c <- if (hasInit link) then liftM Just pConst
+            else return Nothing
+     ; (s,cd,a) <- permute ((,,) <$?> (Nothing, try (comma >> liftM Just pSection))
+                            <|?> (Nothing, try (comma >> liftM Just pComdat))
+                            <|?> (Nothing, try (comma >> liftM Just pAlign))
+                           )
+     ; return $ ToplevelGlobal lhs link vis dll tls na addrOpt exti
+       globalOpt t c s cd a
+     }
+  where hasInit x = case x of 
+            Just(ExternWeak) -> False
+            Just(External) -> False
+            -- Just(DllImport) -> False
+            Just(_) -> True
+            Nothing -> True
 
 data LocalIdOrQuoteStr = L LocalId | Q QuoteStr 
                        deriving (Eq,Show)
@@ -126,23 +128,34 @@ pToplevelDepLibs = do { reserved "deplibs"
                       ; return $ ToplevelDepLibs (fmap QuoteStr l)
                       }
 
-          
+                     
 pFunctionPrototype :: P FunctionPrototype
-pFunctionPrototype = do { lopt <- opt allLinkage
+pFunctionPrototype = do { lopt <- opt pLinkage
                         ; vopt <- opt pVisibility
+                        ; dllopt <- opt pDllStorageClass
                         ; copt <- opt pCallConv
                         ; as <- many pParamAttr
                         ; ret <- pType
                         ; name <- pGlobalId
                         ; params <- pFormalParamList
+                        ; unnamed <- opt (reserved "unnamed_addr" >> return UnnamedAddr)
+                        ; attrs <- pFunAttrCollection
                         ; sopt <- opt pSection
+                        ; cdopt <- opt pComdat
                         ; aopt <- opt pAlign
-                        ; attrs <- many pFunAttr
                         ; gopt <- opt (liftM (Gc . QuoteStr) (reserved "gc" >> pQuoteStr))
+                        ; prefixOpt <- opt pPrefix
+                        ; prologueOpt <- opt pPrologue
                         ; return (FunctionPrototype lopt vopt copt 
-                                  as ret name params attrs sopt aopt gopt)
+                                  as ret name params unnamed attrs sopt cdopt aopt gopt 
+                                  prefixOpt prologueOpt)
                         }
-                     
+                                          
+pPrefix :: P Prefix                     
+pPrefix = reserved "prefix" >> liftM Prefix pTypedConst
+
+pPrologue :: P Prologue
+pPrologue = reserved "prologue" >> liftM Prologue pTypedConst
 
 pToplevelDefine :: P Toplevel
 pToplevelDefine = do { reserved "define"
@@ -150,6 +163,15 @@ pToplevelDefine = do { reserved "define"
                      ; bs <- braces pBlocks
                      ; return $ ToplevelDefine fh bs
                      }
+                  
+pToplevelAttributeGroup :: P Toplevel                  
+pToplevelAttributeGroup = do { reserved "attributes" 
+                             ; char '#' 
+                             ; n <- decimal
+                             ; chartok '='
+                             ; l <- braces $ many pFunAttr
+                             ; return $ ToplevelAttribute n l
+                             }
                   
 pToplevelDeclare :: P Toplevel                  
 pToplevelDeclare = liftM ToplevelDeclare 
@@ -163,6 +185,13 @@ pToplevelModuleAsm = do { reserved "module"
                         }
                      
 
+pToplevelComdat :: P Toplevel
+pToplevelComdat = do { l <- pDollarId
+                     ; chartok '='
+                     ; reserved "comdat"
+                     ; s <- pSelectionKind
+                     ; return $ ToplevelComdat l s
+                     }
 
                 
 

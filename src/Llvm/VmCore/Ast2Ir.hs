@@ -16,6 +16,7 @@ import Llvm.VmCore.LabelMapM
 
 type MyLabelMapM = LabelMapM H.SimpleUniqueMonad
 
+-- this is the real difference between Ast and Ir -- Ir uses Unique values as labels while Ast can use any strings as labels
 instance Converter (A.LabelId) (MyLabelMapM I.LabelId) where
   convert l@(A.LabelString _) = Md.liftM I.LabelString (labelFor $ A.labelIdToLstring l)
   convert l@(A.LabelQuoteString _) = Md.liftM I.LabelQuoteString (labelFor $ A.labelIdToLstring l)
@@ -36,56 +37,63 @@ instance Converter A.TypedConst (MyLabelMapM I.TypedConst) where
     convert (A.TypedConst t c) = convert c >>= return . (I.TypedConst t)
     convert A.TypedConstNull = return I.TypedConstNull
 
-
 instance Converter A.TypedValue (MyLabelMapM I.TypedValue) where
     convert (A.TypedValue t v) = convert v >>= return . (I.TypedValue t)
 
 instance Converter A.TypedPointer (MyLabelMapM I.TypedPointer) where
     convert (A.TypedPointer t v) = convert v >>= return . (I.TypedPointer t)
 
-
 instance Converter A.ComplexConstant (MyLabelMapM I.ComplexConstant) where
     convert (A.Cstruct b fs) = Md.liftM (I.Cstruct b) (mapM convert fs)
     convert (A.Cvector fs) = mapM convert fs >>= return . I.Cvector
     convert (A.Carray fs) = mapM convert fs >>= return . I.Carray
-    
+
+instance Converter v1 (MyLabelMapM v2) => Converter (A.IbinExpr v1) (MyLabelMapM (I.IbinExpr v2)) where   
+    convert (A.IbinExpr op cs t u1 u2) = do { u1' <- convert u1
+                                            ; u2' <- convert u2
+                                            ; return $ (convertIop op cs) t u1' u2'
+                                            }
+      where 
+        convertIop op cs = case op of 
+          A.Add -> I.Add (getnowrap cs)
+          A.Sub -> I.Sub (getnowrap cs)
+          A.Mul -> I.Mul (getnowrap cs)
+          A.Udiv -> I.Udiv (getexact cs)
+          A.Sdiv -> I.Sdiv (getexact cs)
+          A.Shl -> I.Shl (getnowrap cs)
+          A.Lshr -> I.Lshr (getexact cs)
+          A.Ashr -> I.Ashr (getexact cs)
+          A.And -> I.And 
+          A.Or -> I.Or
+          A.Xor -> I.Xor
+        getnowrap x = case x of
+          [A.Nsw] -> Just I.Nsw
+          [A.Nuw] -> Just I.Nuw
+          [A.Nsw,A.Nuw] -> Just I.Nsuw
+          [A.Nuw,A.Nsw] -> Just I.Nsuw
+          [] -> Nothing
+          _ -> error ("irrefutable error1 " ++ show cs)
+        getexact x = case x of 
+          [A.Exact] -> Just I.Exact
+          [] -> Nothing
+          _ -> error "irrefutable error2"
+
+instance Converter v1 (MyLabelMapM v2) => Converter (A.FbinExpr v1) (MyLabelMapM (I.FbinExpr v2)) where   
+    convert (A.FbinExpr op cs t u1 u2) = do { u1' <- convert u1
+                                            ; u2' <- convert u2
+                                            ; return $ (convertFop op) cs t u1' u2'
+                                            }
+      where 
+        convertFop op = case op of
+          A.Fadd -> I.Fadd 
+          A.Fsub -> I.Fsub
+          A.Fmul -> I.Fmul
+          A.Fdiv -> I.Fdiv
+          A.Frem -> I.Frem
 
 instance Converter v1 (MyLabelMapM v2) => Converter (A.BinExpr v1) (MyLabelMapM (I.BinExpr v2)) where   
-    convert (A.BinExpr op cs t u1 u2) = do { u1' <- convert u1
-                                           ; u2' <- convert u2
-                                           ; let f = case op of 
-                                                       A.Add -> I.Add (getnowrap cs)
-                                                       A.Sub -> I.Sub (getnowrap cs)
-                                                       A.Mul -> I.Mul (getnowrap cs)
-                                                       A.Udiv -> I.Udiv (getexact cs)
-                                                       A.Sdiv -> I.Sdiv (getexact cs)
-                                                       A.Urem -> I.Urem 
-                                                       A.Srem -> I.Srem 
-                                                       A.Fadd -> I.Fadd 
-                                                       A.Fsub -> I.Fsub
-                                                       A.Fmul -> I.Fmul
-                                                       A.Fdiv -> I.Fdiv
-                                                       A.Frem -> I.Frem
-                                                       A.Shl -> I.Shl (getnowrap cs)
-                                                       A.Lshr -> I.Lshr (getexact cs)
-                                                       A.Ashr -> I.Ashr (getexact cs)
-                                                       A.And -> I.And 
-                                                       A.Or -> I.Or
-                                                       A.Xor -> I.Xor
-                                           ; return $ f t u1' u2'
-                                           }
-                                        where
-                                            getnowrap x = case x of
-                                                             [A.Nsw] -> Just I.Nsw
-                                                             [A.Nuw] -> Just I.Nuw
-                                                             [A.Nsw,A.Nuw] -> Just I.Nsuw
-                                                             [A.Nuw,A.Nsw] -> Just I.Nsuw
-                                                             [] -> Nothing
-                                                             _ -> error ("irrefutable error1 " ++ show cs)
-                                            getexact x = case x of 
-                                                            [A.Exact] -> Just I.Exact
-                                                            [] -> Nothing
-                                                            _ -> error "irrefutable error2"
+    convert (A.Ie e) = Md.liftM I.Ie (convert e)
+    convert (A.Fe e) = Md.liftM I.Fe (convert e)
                                                            
 
 {-
@@ -207,18 +215,24 @@ instance Converter A.Expr (MyLabelMapM I.Expr) where
 
 
 instance Converter A.MemOp (MyLabelMapM I.MemOp) where
-    convert (A.Allocate mar t mtv ma) = maybeM convert mtv >>= \x -> return $ I.Allocate mar t x ma
-    convert (A.Free tv) = convert tv >>= \tv' -> return $ I.Free tv'
-    convert (A.Load atom tv aa) = convert tv >>= \tv' -> return $ I.Load atom tv' aa
-    convert (A.Store atom tv1 tv2 aa) = do { tv1' <- convert tv1
-                                           ; tv2' <- convert tv2
-                                           ; return $ I.Store atom tv1' tv2' aa
-                                           }
-    convert (A.CmpXchg b1 tv1 tv2 tv3 b2 mf) = do { tv1' <- convert tv1
-                                                  ; tv2' <- convert tv2
-                                                  ; tv3' <- convert tv3
-                                                  ; return $ I.CmpXchg b1 tv1' tv2' tv3' b2 mf
-                                                  }
+    convert (A.Alloca mar t mtv ma) = maybeM convert mtv >>= \x -> return $ I.Allocate mar t x ma
+--    convert (A.Free tv) = convert tv >>= \tv' -> return $ I.Free tv'
+    convert (A.Load atom tv aa nonterm inv nonul) = convert tv >>= \tv' -> return $ I.Load atom tv' aa nonterm inv nonul
+    convert (A.LoadAtomic at v tv aa) = convert tv >>= \tv' -> return $ I.LoadAtomic at v tv' aa
+    convert (A.Store atom tv1 tv2 aa nt) = do { tv1' <- convert tv1
+                                              ; tv2' <- convert tv2
+                                              ; return $ I.Store atom tv1' tv2' aa nt
+                                              }
+    convert (A.StoreAtomic atom v tv1 tv2 aa) = do { tv1' <- convert tv1
+                                                   ; tv2' <- convert tv2
+                                                   ; return $ I.StoreAtomic atom v tv1' tv2' aa
+                                                   }
+                                        
+    convert (A.CmpXchg wk b1 tv1 tv2 tv3 b2 mf ff) = do { tv1' <- convert tv1
+                                                        ; tv2' <- convert tv2
+                                                        ; tv3' <- convert tv3
+                                                        ; return $ I.CmpXchg wk b1 tv1' tv2' tv3' b2 mf ff
+                                                        }
     convert (A.AtomicRmw b1 op tv1 tv2 b2 mf) = do { tv1' <- convert tv1
                                                    ; tv2' <- convert tv2
                                                    ; return $ I.AtomicRmw b1 op tv1' tv2' b2 mf
@@ -247,9 +261,9 @@ instance Converter A.CallSite (MyLabelMapM I.CallSite) where
                                                 ; aps' <- mapM convert aps
                                                 ; return $ I.CallFun cc pa t fn' aps' fa
                                                 } 
-    convert (A.CallAsm t b1 b2 qs1 qs2 as fa) = do { as' <- mapM convert as
-                                                   ; return $ I.CallAsm t b1 b2 qs1 qs2 as' fa
-                                                   }
+    convert (A.CallAsm t dia b1 b2 qs1 qs2 as fa) = do { as' <- mapM convert as
+                                                       ; return $ I.CallAsm t dia b1 b2 qs1 qs2 as' fa
+                                                       }
     convert (A.CallConversion pa t cv as fa) = do { cv' <- convert cv
                                                ; as' <- mapM convert as
                                                ; return $ I.CallConversion pa t cv' as' fa
@@ -296,10 +310,22 @@ instance Converter A.Aliasee (MyLabelMapM I.Aliasee) where
     convert (A.Ac a) = convert a >>= \a' -> return $ I.Ac a'
     convert (A.AgEp a) = Md.liftM I.AgEp (convert a)
 
+instance Converter A.Prefix (MyLabelMapM I.Prefix) where
+  convert (A.Prefix n) = Md.liftM I.Prefix (convert n)
+  
+instance Converter A.Prologue (MyLabelMapM I.Prologue) where  
+  convert (A.Prologue n) = Md.liftM I.Prologue (convert n)
+
+instance Converter a (MyLabelMapM b) => Converter (Maybe a) (MyLabelMapM (Maybe b)) where
+  convert (Just x) = Md.liftM Just (convert x)
+  convert Nothing = return Nothing
 
 instance Converter A.FunctionPrototype (MyLabelMapM I.FunctionPrototype) where
-    convert (A.FunctionPrototype f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11) = 
-        return $ I.FunctionPrototype f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11
+    convert (A.FunctionPrototype f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) = 
+      do { f13' <- convert f13
+         ; f14' <- convert f14
+         ; return $ I.FunctionPrototype f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13' f14'
+         }
 
 instance Converter A.PhiInst (MyLabelMapM I.PhiInst) where
     convert (A.PhiInst mg t branches) = do { branches' <- mapM (pairM convert convert) branches
@@ -358,9 +384,9 @@ instance Converter A.TerminatorInstWithDbg (MyLabelMapM I.TerminatorInstWithDbg)
                                                      } 
 
 
-toBlock :: A.Block -> MyLabelMapM (H.Graph I.Node H.C H.C)
--- toBlock b | trace ("toBlock " ++ toLlvm b) False = undefined
-toBlock (A.Block { A.lbl = f, A.phi = phi, A.comp = ms, A.term = l }) =
+toSingleNodeGraph :: A.Block -> MyLabelMapM (H.Graph I.Node H.C H.C)
+-- toSingleNodeGraph b | trace ("toSingleNodeGraph " ++ toLlvm b) False = undefined
+toSingleNodeGraph (A.Block { A.lbl = f, A.phi = phi, A.comp = ms, A.term = l }) =
   do { f'  <- toFirst f
      ; phi' <- mapM toPhi phi
      ; ms' <- mapM toMid ms
@@ -393,13 +419,13 @@ getEntryAndAlist bs =
      ; return (l', ord)
      }
 
-toBody :: [A.Block] -> MyLabelMapM (H.Graph I.Node H.C H.C)
-toBody bs =
+toGraph :: [A.Block] -> MyLabelMapM (H.Graph I.Node H.C H.C)
+toGraph bs =
   {-
     It's more likely that only reachable blocks are pulled out and used to create
     a graph, the unreachable blocks are left. 
   -}
-  do { g <- foldl (Md.liftM2 (H.|*><*|)) (return H.emptyClosedGraph) (map toBlock bs)
+  do { g <- foldl (Md.liftM2 (H.|*><*|)) (return H.emptyClosedGraph) (map toSingleNodeGraph bs)
      ; getBody g
      }
 
@@ -418,7 +444,7 @@ run (MyLabelMapM f) =
 blockToGraph :: A.FunctionPrototype -> [A.Block] -> MyLabelMapM (H.Label, H.Graph I.Node H.C H.C)
 blockToGraph fn blocks = 
   do { (entry, labels) <- getEntryAndAlist blocks
-     ; body <- toBody blocks
+     ; body <- toGraph blocks
      ; addAlist fn labels
      ; appendH2A 
      ; return (entry, body)
@@ -427,7 +453,7 @@ blockToGraph fn blocks =
 toplevel2Ir :: A.Toplevel -> MyLabelMapM I.Toplevel
 toplevel2Ir (A.ToplevelTriple q) = return $ I.ToplevelTriple q
 toplevel2Ir (A.ToplevelDataLayout q) = return $ I.ToplevelDataLayout q
-toplevel2Ir (A.ToplevelAlias g v l a) = convert a >>= return . (I.ToplevelAlias g v l)
+toplevel2Ir (A.ToplevelAlias g v dll tlm na l a) = convert a >>= return . (I.ToplevelAlias g v dll tlm na l)
 toplevel2Ir (A.ToplevelDbgInit s i) = return $ I.ToplevelDbgInit s i
 toplevel2Ir (A.ToplevelStandaloneMd s tv) = convert tv >>= return . (I.ToplevelStandaloneMd s)
 toplevel2Ir (A.ToplevelNamedMd m ns) = do { m' <- convert m
@@ -441,15 +467,17 @@ toplevel2Ir (A.ToplevelDefine f b) =
        ; return $ I.ToplevelDefine f' e g
        }
 
-toplevel2Ir (A.ToplevelGlobal a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11) = 
-  do { a9' <- maybeM convert a9
-     ; return $ I.ToplevelGlobal a1 a2 a3 a4 a5 a6 a7 a8 a9' a10 a11
+toplevel2Ir (A.ToplevelGlobal a1 a2 a3 a4 a5 a6 a7 a8 a8a a9 a10 a11 a12 a13) = 
+  do { a10' <- maybeM convert a10
+     ; return $ I.ToplevelGlobal a1 a2 a3 a4 a5 a6 a7 a8 a8a a9 a10' a11 a12 a13
      }
   
 toplevel2Ir (A.ToplevelTypeDef lid t) = return $ I.ToplevelTypeDef lid t
 toplevel2Ir (A.ToplevelDepLibs qs) = return $ I.ToplevelDepLibs qs
 toplevel2Ir (A.ToplevelUnamedType i t) = return $ I.ToplevelUnamedType i t
 toplevel2Ir (A.ToplevelModuleAsm q) = return $ I.ToplevelModuleAsm q
-                                      
+toplevel2Ir (A.ToplevelAttribute n l) = return $ I.ToplevelAttribute n l
+toplevel2Ir (A.ToplevelComdat l s) = return $ I.ToplevelComdat l s
+
 astToIr :: A.Module -> H.SimpleUniqueMonad (IdLabelMap, I.Module)
 astToIr (A.Module ts) = runLabelMapM emptyIdLabelMap $ Md.liftM I.Module (mapM toplevel2Ir ts)
