@@ -313,6 +313,7 @@ pPersFn = choice [ liftM PersFnId pGlobalOrLocalId
                       }
                  , reserved "undef" >> return PersFnUndef
                  , reserved "null" >> return PersFnNull
+                 , liftM PersFnConst pConst
                  ]
           
 pLandingPad :: P Rhs

@@ -1,7 +1,7 @@
 module Llvm.Pass.NormalGraph where
 import Compiler.Hoopl (Graph,C,analyzeAndRewriteFwd,MaybeC(..),mapInsert,mapEmpty,LabelMap,CheckingFuelMonad,SimpleUniqueMonad)
 import Llvm.VmCore.Ir
-import Llvm.VmCore.CoreIrWriter()
+-- import Llvm.VmCore.CoreIrWriter()
 import Llvm.Pass.PhiElimination
 import Llvm.Pass.Dominator
 

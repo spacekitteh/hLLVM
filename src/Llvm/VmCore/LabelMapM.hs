@@ -13,7 +13,7 @@ import qualified Data.Map as M
 import qualified Llvm.VmCore.Ast as A 
 #ifdef DEBUG
 import Debug.Trace
-import Llvm.VmCore.AsmWriter
+import Llvm.VmCore.AsmPrint
 import Llvm.VmCore.AstWriter
 #endif 
 {-

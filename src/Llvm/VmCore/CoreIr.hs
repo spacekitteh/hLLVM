@@ -246,10 +246,10 @@ data CallSite = CallFun { callSiteConv :: Maybe CallConv
                         , callSiteRetType :: Type
                         , callSiteIdent :: FunName
                         , callSiteActualParams :: [ActualParam]
-                        , callSiteFunAttr :: FunAttrCollection -- [FunAttr]
+                        , callSiteFunAttr :: [FunAttr]
                         }
-              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] FunAttrCollection -- [FunAttr] 
-              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] FunAttrCollection -- [FunAttr]
+              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
+              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
 data Clause = Catch TypedValue -- u1
@@ -356,7 +356,7 @@ data FunctionPrototype = FunctionPrototype
                          , fhName    :: GlobalId
                          , fhParams  :: FormalParamList
                          , fhAddrNaming :: Maybe AddrNaming                       
-                         , fhAttr1   :: FunAttrCollection
+                         , fhAttr1   :: [FunAttr] -- Collection
                          , fhSection :: Maybe Section
                          , fhComdat :: Maybe Comdat
                          , fhAlign :: Maybe Align
@@ -378,5 +378,3 @@ toLabel (LabelString l) = l
 toLabel (LabelQuoteString l) = l
 toLabel (LabelNumber l) = l
 toLabel (LabelQuoteNumber l) = l
-
-

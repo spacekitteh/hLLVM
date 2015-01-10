@@ -13,7 +13,7 @@ import qualified Compiler.Hoopl as H
 import Llvm.VmCore.AstCanonicalization
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
-import Llvm.VmCore.AstWriter
+-- mport Llvm.VmCore.AstWriter
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -79,7 +79,7 @@ main = do { sel <- cmdArgsRun mode
             Parser ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; m <- testParser ix inh 
-                               ; writeOut m outh
+                               ; writeOutLlvm m outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
@@ -87,7 +87,7 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let (m, ir) = testAst2Ir ast
-                               ; writeOut ir outh
+                               ; writeOutIr ir outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
@@ -96,7 +96,7 @@ main = do { sel <- cmdArgsRun mode
                                ; ast <- testParser ix inh
                                ; let (m, ir) = testAst2Ir ast
                                      ast' = testIr2Ast m ir
-                               ; writeOut ast' outh
+                               ; writeOutLlvm ast' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
@@ -106,7 +106,7 @@ main = do { sel <- cmdArgsRun mode
                                 ; let (m, ir) = testAst2Ir ast
                                 ; let ir' = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir)
                                 ; let ast' = testIr2Ast m ir'
-                                ; writeOut ast' outh
+                                ; writeOutLlvm ast' outh
                                 ; hClose inh
                                 ; closeFileOrStdout ox outh
                                 }
@@ -114,7 +114,7 @@ main = do { sel <- cmdArgsRun mode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
                                    ; let ast' = canonicalize ast
-                                   ; writeOut ast' outh
+                                   ; writeOutLlvm ast' outh
                                    ; hClose inh
                                    ; closeFileOrStdout ox outh
                                    }
@@ -127,7 +127,7 @@ main = do { sel <- cmdArgsRun mode
                                       ; let ir' = H.runSimpleUniqueMonad $ H.runWithFuel f applySteps'
                                       ; let ir'' = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir')
                                       ; let ast' = testIr2Ast m ir''
-                                      ; writeOut ast' outh
+                                      ; writeOutLlvm ast' outh
                                       ; hClose inh
                                       ; closeFileOrStdout ox outh
                                       }

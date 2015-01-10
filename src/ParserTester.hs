@@ -1,14 +1,15 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module ParserTester (testParser, writeOut) where
+module ParserTester (testParser, writeOutLlvm, writeOutIr) where
 import System.IO
 import Llvm.AsmParser.Basic
 import Llvm.AsmParser.Module
 import Llvm.VmCore.Ast
-import Llvm.VmCore.AsmWriter
+import Llvm.AsmPrinter.LlvmPrint
+import Llvm.AsmPrinter.IrPrint
 import Data.List
 import Llvm.VmCore.Ast2Ir
 import Llvm.VmCore.Ir2Ast
-import Llvm.VmCore.IrWriter
+-- import Llvm.VmCore.IrWriter
 
 displayError f s = 
   let sLine = sourceLine $ errorPos s
@@ -45,5 +46,8 @@ testParser fileName inh = do { inpStr <- hGetContents inh
                              }
                                        
                           
-writeOut :: AsmWriter a => a -> Handle -> IO ()
-writeOut m outh = hPutStr outh (render $ toLlvm m)
+writeOutLlvm :: AsmPrint a => a -> Handle -> IO ()
+writeOutLlvm m outh = hPutStr outh (render $ toLlvm m)
+
+writeOutIr :: IrPrint a => a -> Handle -> IO ()
+writeOutIr m outh = hPutStr outh (render $ printIr m)

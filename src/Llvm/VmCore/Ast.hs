@@ -1,6 +1,7 @@
 module Llvm.VmCore.Ast 
        ( module Llvm.VmCore.Ast
        , module Llvm.VmCore.SharedEntity
+       , module Llvm.VmCore.DataLayout
        ) where
 
 import Llvm.VmCore.SharedEntity
@@ -42,7 +43,7 @@ data TrapFlag = Nuw | Nsw | Exact deriving (Eq,Ord,Show)
 
 -- | Binary Operations <http://llvm.org/releases/3.0/docs/LangRef.html#binaryops>
 data IbinExpr v = IbinExpr IbinaryOperator [TrapFlag] Type v v deriving (Eq,Ord,Show)
-data FbinExpr v = FbinExpr FbinaryOperator FastMathFlags {-[TrapFlag]-} Type v v deriving (Eq,Ord,Show)
+data FbinExpr v = FbinExpr FbinaryOperator FastMathFlags Type v v deriving (Eq,Ord,Show)
 data BinExpr v = Ie (IbinExpr v)
                | Fe (FbinExpr v)
                deriving (Eq, Ord, Show)
@@ -140,10 +141,10 @@ data CallSite = CallFun { callSiteConv :: Maybe CallConv
                         , callSiteRetType :: Type
                         , callSiteIdent :: FunName
                         , callSiteActualParams :: [ActualParam]
-                        , callSiteFunAttr :: FunAttrCollection -- [FunAttr]
+                        , callSiteFunAttr :: [FunAttr]
                         }
-              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] FunAttrCollection -- [FunAttr] 
-              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] FunAttrCollection -- [FunAttr]
+              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
+              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
 data Clause = Catch TypedValue
@@ -155,6 +156,7 @@ data PersFn = PersFnId GlobalOrLocalId
             | PersFnCast (Conversion (Type, GlobalOrLocalId))
             | PersFnUndef
             | PersFnNull
+            | PersFnConst Const
             deriving (Eq, Ord, Show)
                      
                            
@@ -243,7 +245,7 @@ data FunctionPrototype = FunctionPrototype
                          , fhName    :: GlobalId
                          , fhParams  :: FormalParamList
                          , fhUnamed  :: Maybe AddrNaming
-                         , fhAttr1   :: FunAttrCollection
+                         , fhAttr1   :: [FunAttr] -- Collection
                          , fhSection :: Maybe Section
                          , fhComdat :: Maybe Comdat
                          , fhAlign :: Maybe Align
@@ -294,3 +296,5 @@ data Block = Block
              } deriving (Eq,Show)
 
 data Module = Module [Toplevel] deriving (Eq,Show)
+
+

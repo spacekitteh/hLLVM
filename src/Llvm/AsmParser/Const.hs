@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.AsmParser.Const where
 import Llvm.VmCore.Ast
 import Llvm.AsmParser.Basic
@@ -60,7 +59,7 @@ pIntOrFloat :: P SimpleConstant
 pIntOrFloat = lexeme (choice [try k, try u, try s, intOrFloat])
  where
    k = do { hd <- string "0x"
-          ; t <- option "" (choice [ string "K", string "M", string "H"])
+          ; t <- option "" (choice [ string "K", string "M", string "H", string "L"])
           ; cs <- many1 hexDigit
           ; return $ CpFloat (hd ++ t ++ cs)
           }

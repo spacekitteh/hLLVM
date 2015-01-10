@@ -8,10 +8,8 @@ import qualified Data.List as L
 import qualified Compiler.Hoopl as H
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
--- import Llvm.VmCore.LabelMapM (M)
 import Llvm.Pass.Uda
-import Llvm.VmCore.AsmWriter
-import Llvm.VmCore.CoreIrWriter()
+import Llvm.AsmPrinter.IrPrint
 
 type Live = Ds.Set LocalId
 liveLattice :: H.DataflowLattice Live
@@ -74,7 +72,7 @@ deadRmo inst live = case inst of
 
 
 isDeclare :: FunName -> Bool
-isDeclare (FunNameGlobal (GolG gl)) | (render $ toLlvm gl) == "@llvm.dbg.declare" = True
+isDeclare (FunNameGlobal (GolG gl)) | (render $ printIr gl) == "@llvm.dbg.declare" = True
 isDeclare _ = False
 
 

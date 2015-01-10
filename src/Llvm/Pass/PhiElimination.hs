@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -cpp #-}
-{-# OPTIONS_GHC -Wall -fno-warn-incomplete-patterns #-}
 {-# LANGUAGE ScopedTypeVariables, GADTs #-}
 
 module Llvm.Pass.PhiElimination (phiElimination) where
@@ -7,7 +6,7 @@ module Llvm.Pass.PhiElimination (phiElimination) where
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
-import Llvm.VmCore.CoreIrWriter()
+-- import Llvm.VmCore.CoreIrWriter()
 
 import Llvm.Pass.Rewriter
 #ifdef DEBUG

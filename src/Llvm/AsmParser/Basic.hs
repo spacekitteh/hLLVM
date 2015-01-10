@@ -58,6 +58,7 @@ lexer = T.makeTokenParser
              , "ccc", "fastcc", "coldcc", "cc", "webkit_jscc", "anyregcc", "preserve_mostcc", "preserve_allcc"
              , "spir_kernel", "spir_func", "intel_ocl_bicc", "x86_stdcallcc", "x86_fastcallcc", "x86_thiscallcc"
              , "arm_apcscc", "arm_aapcscc", "arm_aapcs_vfpcc", "msp430_intrcc", "ptx_kernel", "ptx_device"
+             , "x86_64_win64cc", "x86_64_sysvcc"
              -- Visibility Styles                                                                             
              , "default", "hidden", "protected"
              -- Parameter Attributes                                                             
@@ -153,14 +154,18 @@ pGlobalId = lexeme (char '@' >> choice [ liftM GlobalIdNum decimal
                                        ])
 
 pDollarId :: P DollarId
-pDollarId = lexeme (char '$' >> liftM DollarId (choice[pId, pQuoteStr]))
+pDollarId = lexeme (char '$' >> choice [ liftM DollarIdNum decimal
+                                       , liftM (DollarIdAlphaNum . Lstring) pId 
+                                       , liftM (DollarIdQuoteStr . Lstring) pQuoteStr
+                                       ])
 
 
 pMdVar :: P MdVar
 pMdVar = lexeme $ do { ignore (char '!')
-                     ; n <- (satisfy isAlpha)
+                     ; n <- choice [ liftM (\x -> [x]) (satisfy isAlpha)
+                                   , char '\\' >> intStrToken ]
                      ; l <- many (satisfy idChar)
-                     ; return $ MdVar (n:l)
+                     ; return $ MdVar (n++l)
                      }
 
 pId :: P String
@@ -272,24 +277,26 @@ pCallConv :: P CallConv
 pCallConv = choice [ try (reserved "ccc") >> return Ccc
                    , try (string "cc" >> liftM Cc intStrToken)
                    , reserved "cc" >> liftM Cc intStrToken
-                   , reserved "fastcc" >> return FastCc
-                   , reserved "coldcc" >> return ColdCc
-                   , reserved "webkit_jscc" >> return WebkitJsCc
-                   , reserved "anyregcc" >> return AnyRegCc
-                   , reserved "preserve_mostcc" >> return PreserveMostCc
-                   , reserved "preserve_allcc" >> return PreserveAllCc
-                   , reserved "spir_kernel" >> return SpirKernel
-                   , reserved "spir_func" >> return SpirFunc
-                   , reserved "intel_ocl_bicc" >> return IntelOclBiCc
-                   , reserved "x86_stdcallcc" >> return X86StdCallCc
-                   , reserved "x86_fastcallcc" >> return X86FastCallCc
-                   , reserved "x86_thiscallcc" >> return X86ThisCallCc
-                   , reserved "arm_apcscc" >> return ArmApcsCc
-                   , reserved "arm_aapcscc" >> return ArmAapcsCc
-                   , reserved "arm_aapcs_vfpcc" >> return ArmAapcsVfpCc
-                   , reserved "msp430_intrcc" >> return Msp430IntrCc
-                   , reserved "ptx_kernel" >> return PtxKernel
-                   , reserved "ptx_device" >> return PtxDevice
+                   , reserved "fastcc" >> return CcFast
+                   , reserved "coldcc" >> return CcCold
+                   , reserved "webkit_jscc" >> return CcWebkitJs
+                   , reserved "anyregcc" >> return CcAnyReg
+                   , reserved "preserve_mostcc" >> return CcPreserveMost
+                   , reserved "preserve_allcc" >> return CcPreserveAll
+                   , reserved "spir_kernel" >> return CcSpirKernel
+                   , reserved "spir_func" >> return CcSpirFunc
+                   , reserved "intel_ocl_bicc" >> return CcIntelOclBi
+                   , reserved "x86_stdcallcc" >> return CcX86StdCall
+                   , reserved "x86_fastcallcc" >> return CcX86FastCall
+                   , reserved "x86_thiscallcc" >> return CcX86ThisCall
+                   , reserved "arm_apcscc" >> return CcArmApcs
+                   , reserved "arm_aapcscc" >> return CcArmAapcs
+                   , reserved "arm_aapcs_vfpcc" >> return CcArmAapcsVfp
+                   , reserved "msp430_intrcc" >> return CcMsp430Intr
+                   , reserved "ptx_kernel" >> return CcPtxKernel
+                   , reserved "ptx_device" >> return CcPtxDevice
+                   , reserved "x86_64_win64cc" >> return CcX86_64_Win64
+                   , reserved "x86_64_sysvcc" >> return CcX86_64_SysV
                    ]
 
 
@@ -517,10 +524,10 @@ pAtomicOp = choice [ reserved "xchg" >> return Axchg
                    , reserved "umin" >> return Aumin
                    ]
 
-pFunAttrCollection :: P FunAttrCollection          
-pFunAttrCollection = choice [ char '#' >> liftM FunAttrGroup decimal
-                            , liftM FunAttrList (many pFunAttr)
-                            ]
+pFunAttrCollection :: P [FunAttr] -- Collection          
+pFunAttrCollection = many $ choice [ char '#' >> liftM FaGroup decimal
+                                   , pFunAttr
+                                   ]
 
 
 

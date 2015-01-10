@@ -34,26 +34,28 @@ data Linkage =
                
 -- | Calling Conventions <http://llvm.org/releases/3.5.0/docs/LangRef.html#calling-conventions>
 data CallConv = Ccc 
-              | FastCc 
-              | ColdCc 
+              | CcFast 
+              | CcCold 
               | Cc String
-              | WebkitJsCc
-              | AnyRegCc
-              | PreserveMostCc
-              | PreserveAllCc
+              | CcWebkitJs
+              | CcAnyReg
+              | CcPreserveMost
+              | CcPreserveAll
                 -- | the following calling conventions are not documented
-              | SpirKernel
-              | SpirFunc
-              | IntelOclBiCc
-              | X86StdCallCc
-              | X86FastCallCc
-              | X86ThisCallCc
-              | ArmApcsCc
-              | ArmAapcsCc
-              | ArmAapcsVfpCc
-              | Msp430IntrCc
-              | PtxKernel
-              | PtxDevice
+              | CcSpirKernel
+              | CcSpirFunc
+              | CcIntelOclBi
+              | CcX86StdCall
+              | CcX86FastCall
+              | CcX86ThisCall
+              | CcArmApcs
+              | CcArmAapcs
+              | CcArmAapcsVfp
+              | CcMsp430Intr
+              | CcPtxKernel
+              | CcPtxDevice
+              | CcX86_64_Win64
+              | CcX86_64_SysV
               deriving (Eq,Ord,Show)
 
 -- | Visibility Styles <http://llvm.org/releases/3.5.0/docs/LangRef.html#visibility-styles>
@@ -90,9 +92,11 @@ data ParamAttr = ZeroExt
                | PaAlign Integer
                  deriving (Eq,Ord,Show)
 
+{-
 data FunAttrCollection = FunAttrList [FunAttr]
                        | FunAttrGroup Integer
                        deriving (Eq, Ord, Show)
+-}
                          
 -- | Function Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#function-attributes>
 data FunAttr = FaAlignStack Integer
@@ -125,6 +129,7 @@ data FunAttr = FaAlignStack Integer
              | FaUwTable
              | FaPair QuoteStr (Maybe QuoteStr)
              | FaAlign Integer
+             | FaGroup Integer
              deriving (Eq,Ord,Show)
 
 
@@ -172,7 +177,10 @@ data LocalId = LocalIdNum Integer
              | LocalIdQuoteStr Lstring
              deriving (Eq,Ord,Show)
                       
-data DollarId = DollarId String deriving (Eq, Ord, Show)                      
+data DollarId = DollarIdNum Integer
+              | DollarIdAlphaNum Lstring 
+              | DollarIdQuoteStr Lstring 
+              deriving (Eq, Ord, Show)                      
 
 data Comdat = Comdat (Maybe DollarId) deriving (Eq, Ord, Show)
                       
@@ -312,3 +320,5 @@ data ExternallyInitialized = ExternallyInitialized deriving (Eq, Ord, Show)
 data AsmDialect = AsmDialectAtt
                 | AsmDialectIntel
                 deriving (Eq, Ord, Show)
+
+
