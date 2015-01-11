@@ -238,19 +238,19 @@ pCallFun = do { cc <- opt pCallConv
                             ]
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
-              ; return (not $ isVoidType t, CallFun cc atts0 t i params atts1)
+              ; return (not $ isVoidType t, CsFun cc atts0 t i params atts1)
               }
 
 pCallAsm :: P (Bool, CallSite)
 pCallAsm = do { t <- pType
               ; reserved "asm"
-              ; se <- option False (reserved "sideeffect" >> return True)
-              ; as <- option False (reserved "alignstack" >> return True)
+              ; se <- opt (reserved "sideeffect" >> return SideEffect)
+              ; as <- opt (reserved "alignstack" >> return AlignStack)
               ; dialect <- option AsmDialectAtt (reserved "inteldialect" >> return AsmDialectIntel)
               ; (s1, s2) <- pTuple pQuoteStr
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
-              ; return (not $ isVoidType t, CallAsm t se as dialect (QuoteStr s1) (QuoteStr s2) params atts1)
+              ; return (not $ isVoidType t, CsAsm t se as dialect (QuoteStr s1) (QuoteStr s2) params atts1)
               }
 
 pCallConversion :: P (Bool, CallSite)
@@ -259,7 +259,7 @@ pCallConversion = do { a <- many pParamAttr
                   ; convert <- pConstConversion
                   ; params <- parens (sepBy pActualParam comma)
                   ; atts1 <- pFunAttrCollection
-                  ; return (not $ isVoidType t, CallConversion a t convert params atts1)
+                  ; return (not $ isVoidType t, CsConversion a t convert params atts1)
                   }
                
 pCallSite :: P (Bool, CallSite)
@@ -269,7 +269,7 @@ pCallSite = choice [ try pCallFun
                    ]
          
 pCall :: P (Bool, Rhs)     
-pCall = do { tl <- option NonTailCall pTailCalling -- False (reserved "tail" >> return True)
+pCall = do { tl <- option TcNon pTailCall 
            ; reserved "call"
            ; (b, callSite) <- pCallSite
            ; return (b, Call tl callSite)

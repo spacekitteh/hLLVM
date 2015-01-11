@@ -232,7 +232,9 @@ pExplicitBlockLabel = lexeme (do { x <- pLabelId
                                  })
               
 pImplicitBlockLabel :: P BlockLabel              
-pImplicitBlockLabel = return ImplicitBlockLabel 
+pImplicitBlockLabel = do { pos <- getPosition
+                         ; return $ ImplicitBlockLabel (sourceName pos, sourceLine pos, sourceColumn pos)
+                         }
                       
 
 pBlockLabel :: P BlockLabel                      
@@ -240,18 +242,18 @@ pBlockLabel = choice [ try pExplicitBlockLabel
                      , pImplicitBlockLabel ]
 
 pParamAttr :: P ParamAttr
-pParamAttr = choice [ reserved "zeroext" >> return ZeroExt
-                    , reserved "signext" >> return SignExt
-                    , reserved "inreg" >> return InReg
-                    , reserved "byval" >> return ByVal
-                    , reserved "inalloca" >> return InAlloca
-                    , reserved "sret" >> return SRet
-                    , reserved "noalias" >> return NoAlias
-                    , reserved "nocapture" >> return NoCapture
-                    , reserved "nest" >> return Nest
-                    , reserved "returned" >> return Returned
-                    , reserved "nonnull" >> return NonNull
-                    , reserved "dereferenceable" >> liftM Dereferenceable (parens decimal)
+pParamAttr = choice [ reserved "zeroext" >> return PaZeroExt
+                    , reserved "signext" >> return PaSignExt
+                    , reserved "inreg" >> return PaInReg
+                    , reserved "byval" >> return PaByVal
+                    , reserved "inalloca" >> return PaInAlloca
+                    , reserved "sret" >> return PaSRet
+                    , reserved "noalias" >> return PaNoAlias
+                    , reserved "nocapture" >> return PaNoCapture
+                    , reserved "nest" >> return PaNest
+                    , reserved "returned" >> return PaReturned
+                    , reserved "nonnull" >> return PaNonNull
+                    , reserved "dereferenceable" >> liftM PaDereferenceable (parens decimal)
                     , reserved "readonly" >> return PaReadOnly
                     , reserved "readnone" >> return PaReadNone
                     , reserved "align" >> liftM PaAlign decimal
@@ -311,16 +313,16 @@ pLinkage = choice [ reserved "linker_private_weak_def_auto" >> return LinkagePri
                   , reserved "linker_private_weak" >> return LinkagePrivate
                   , reserved "private" >> return LinkagePrivate
                   , reserved "linker_private" >> return LinkagePrivate
-                  , reserved "internal" >> return Internal
-                  , reserved "external" >> return External
-                  , reserved "available_externally" >> return AvailableExternally
-                  , reserved "linkonce" >> return Linkonce
+                  , reserved "internal" >> return LinkageInternal
+                  , reserved "external" >> return LinkageExternal
+                  , reserved "available_externally" >> return LinkageAvailableExternally
+                  , reserved "linkonce" >> return LinkageLinkonce
                   , reserved "weak" >> return LinkageWeak
-                  , reserved "common" >> return Common
-                  , reserved "appending" >> return Appending
-                  , reserved "extern_weak" >> return ExternWeak
-                  , reserved "linkonce_odr" >> return LinkonceOdr
-                  , reserved "weak_odr" >> return WeakOdr
+                  , reserved "common" >> return LinkageCommon
+                  , reserved "appending" >> return LinkageAppending
+                  , reserved "extern_weak" >> return LinkageExternWeak
+                  , reserved "linkonce_odr" >> return LinkageLinkonceOdr
+                  , reserved "weak_odr" >> return LinkageWeakOdr
                   ]
 
 
@@ -394,16 +396,16 @@ pFcmpOp = choice [ reserved "oeq" >> return FcmpOeq
 
 pAliasLinkage :: P Linkage
 pAliasLinkage = choice [ reserved "private" >> return LinkagePrivate
-                       , reserved "internal" >> return Internal
-                       , reserved "available_externally" >> return AvailableExternally
-                       , reserved "linkonce" >> return Linkonce
+                       , reserved "internal" >> return LinkageInternal
+                       , reserved "available_externally" >> return LinkageAvailableExternally
+                       , reserved "linkonce" >> return LinkageLinkonce
                        , reserved "weak" >> return LinkageWeak
-                       , reserved "common" >> return Common
-                       , reserved "appending" >> return Appending
-                       , reserved "extern_weak" >> return ExternWeak
-                       , reserved "linkonce_odr" >> return LinkonceOdr
-                       , reserved "weak_odr" >> return WeakOdr
-                       , reserved "external" >> return External
+                       , reserved "common" >> return LinkageCommon
+                       , reserved "appending" >> return LinkageAppending
+                       , reserved "extern_weak" >> return LinkageExternWeak
+                       , reserved "linkonce_odr" >> return LinkageLinkonceOdr
+                       , reserved "weak_odr" >> return LinkageWeakOdr
+                       , reserved "external" >> return LinkageExternal
                        ]
 
 pDllStorageClass :: P DllStorage
@@ -417,10 +419,10 @@ pThreadLocalStorageClass = reserved "thread_local" >> option TlsNone (parens (ch
                                                                                      ]
                                                                              ))
 
-pTailCalling :: P TailCalling
-pTailCalling = choice [ reserved "tail" >> return TailCall
-                      , reserved "musttail" >> return MustTailCall
-                      ]
+pTailCall :: P TailCall
+pTailCall = choice [ reserved "tail" >> return TcTailCall
+                   , reserved "musttail" >> return TcMustTailCall
+                   ]
 {-
 allLinkage :: P Either Linkage DllStorage
 allLinkage = pExternalLinkage <|> pLinkage
@@ -465,8 +467,8 @@ pCarry = choice [ reserved "nuw" >> return Nuw
                 , reserved "exact" >> return Exact
                 ]
 
-pAlign :: P Align
-pAlign = reserved "align" >> liftM Align decimal
+pAlign :: P Alignment
+pAlign = reserved "align" >> liftM Alignment decimal
 
 pComdat :: P Comdat
 pComdat = reserved "comdat" >> liftM Comdat (opt pDollarId)

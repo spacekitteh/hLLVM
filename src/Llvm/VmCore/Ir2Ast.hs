@@ -111,14 +111,6 @@ instance Converter v1 (MyLabelMapM v2) => Converter (I.BinExpr v1) (MyLabelMapM 
 
                                              
 
-{-
-instance Converter v1 (MyLabelMapM v2) => Converter (I.Bitwise v1) (MyLabelMapM (A.Bitwise v2)) where
-    convert (I.Bitwise op cs t u1 u2) = do { u1' <- convert u1
-                                                         ; u2' <- convert u2
-                                                         ; return $ A.Bitwise op cs t u1' u2'
-                                                         }
--}
-                                    
 instance Converter v1 (MyLabelMapM v2) => Converter (I.Conversion v1) (MyLabelMapM (A.Conversion v2)) where    
     convert (I.Conversion op u t) = convert u >>= \u' -> return $ A.Conversion op u' t
                                                   
@@ -190,7 +182,6 @@ instance Converter I.Const (MyLabelMapM A.Const) where
           I.CblockAddress g a -> do { a' <- convert a
                                    ; return $ A.CblockAddress g a'
                                    }
---          I.Ca a -> Md.liftM A.Ca (convert a)
           I.Cb a -> Md.liftM A.Cb (convert a)
           I.Cconv a -> Md.liftM A.Cconv (convert a)
           I.CgEp a -> Md.liftM A.CgEp (convert a)
@@ -220,7 +211,6 @@ instance Converter I.MetaConst (MyLabelMapM A.MetaConst) where
 
 instance Converter I.Expr (MyLabelMapM A.Expr) where
     convert (I.EgEp c) = Md.liftM A.EgEp (convert c)
---    convert (I.Ea a) =  Md.liftM A.Ea (convert a)
     convert (I.EiC a) = Md.liftM A.EiC (convert a)
     convert (I.EfC a) = Md.liftM A.EfC (convert a)
     convert (I.Eb a) = Md.liftM A.Eb (convert a)
@@ -235,7 +225,6 @@ instance Converter I.Expr (MyLabelMapM A.Expr) where
 
 instance Converter I.MemOp (MyLabelMapM A.MemOp) where
     convert (I.Allocate mar t mtv ma) = maybeM convert mtv >>= \x -> return $ A.Alloca mar t x ma
---    convert (I.Free tv) = convert tv >>= return . A.Free
     convert (I.Load atom tv aa nonterm invr nonull) = convert tv >>= \tv' -> return $ A.Load atom tv' aa nonterm invr nonull
     convert (I.LoadAtomic atom v tv aa) = convert tv >>= \tv' -> return $ A.LoadAtomic atom v tv' aa
     convert (I.Store atom tv1 tv2 aa nonterm) = do { tv1' <- convert tv1
@@ -267,22 +256,21 @@ instance Converter I.Value (MyLabelMapM A.Value) where
     convert (I.VgOl a) = return $ A.VgOl a
     convert (I.Ve a) = Md.liftM A.Ve (convert a)
     convert (I.Vc a) = Md.liftM A.Vc (convert a)
-    convert (I.InlineAsm a1 a2 a3 a4) = return $ A.InlineAsm a1 a2 a3 a4
     convert (I.Deref _) = error "I.Deref should be removed in optimization"
       
    
 instance Converter I.CallSite (MyLabelMapM A.CallSite) where
-    convert  (I.CallFun cc pa t fn aps fa) = do { fn' <- convert fn
-                                                ; aps' <- mapM convert aps
-                                                ; return $ A.CallFun cc pa t fn' aps' fa
+    convert  (I.CsFun cc pa t fn aps fa) = do { fn' <- convert fn
+                                              ; aps' <- mapM convert aps
+                                              ; return $ A.CsFun cc pa t fn' aps' fa
+                                              } 
+    convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) = do { as' <- mapM convert as
+                                                     ; return $ A.CsAsm t dia b1 b2 qs1 qs2 as' fa
+                                                     }
+    convert (I.CsConversion pa t cv as fa) = do { cv' <- convert cv
+                                                ; as' <- mapM convert as
+                                                ; return $ A.CsConversion pa t cv' as' fa
                                                 } 
-    convert (I.CallAsm t dia b1 b2 qs1 qs2 as fa) = do { as' <- mapM convert as
-                                                       ; return $ A.CallAsm t dia b1 b2 qs1 qs2 as' fa
-                                                       }
-    convert (I.CallConversion pa t cv as fa) = do { cv' <- convert cv
-                                                  ; as' <- mapM convert as
-                                                  ; return $ A.CallConversion pa t cv' as' fa
-                                                  } 
                                         
 instance Converter I.Clause (MyLabelMapM A.Clause) where
     convert (I.Catch tv) = convert tv >>= \tv' -> return $ A.Catch tv'
@@ -296,6 +284,8 @@ instance Converter I.PersFn (MyLabelMapM A.PersFn) where
     convert (I.PersFnId s) = return $ A.PersFnId $ s
     convert (I.PersFnCast c) = convert c >>= return . A.PersFnCast 
     convert (I.PersFnUndef) = return $ A.PersFnUndef
+    convert (I.PersFnNull) = return $ A.PersFnNull
+    convert (I.PersFnConst c) = Md.liftM A.PersFnConst (convert c)
 
 
 instance Converter I.Rhs (MyLabelMapM A.Rhs) where
@@ -400,7 +390,7 @@ instance Converter I.TerminatorInstWithDbg (MyLabelMapM A.TerminatorInstWithDbg)
 type Pblock = (A.BlockLabel, [A.PhiInst], [A.ComputingInstWithDbg])
 
 getLabelId :: A.BlockLabel -> A.Lstring 
-getLabelId A.ImplicitBlockLabel  = error "ImplicitBlockLabel should be normalized"
+getLabelId (A.ImplicitBlockLabel _) = error "ImplicitBlockLabel should be normalized"
 getLabelId (A.ExplicitBlockLabel l) = A.labelIdToLstring l
               
 convertNode :: I.Node e x -> MyLabelMapM (M.Map A.Lstring A.Block, Maybe Pblock) 
@@ -421,9 +411,10 @@ convertNode (I.Tinst a) p = do { (bs, pb) <- p
                                ; a' <- convert a 
                                ; case pb of
                                  Nothing -> error "irrefutable"
-                                 Just (l, phis, cs) -> return (M.insert (getLabelId l) (A.Block l
-                                                                           (reverse phis) (reverse cs) a') bs, 
-                                                               Nothing)
+                                 Just (l, phis, cs) -> 
+                                   return (M.insert (getLabelId l) 
+                                           (A.Block l (reverse phis) (reverse cs) a') bs, 
+                                           Nothing)
                                }
 
 graphToBlocks :: H.Graph I.Node H.C H.C -> MyLabelMapM (M.Map A.Lstring A.Block)
@@ -463,6 +454,8 @@ toplevel2Ast (I.ToplevelDepLibs qs) = return $ A.ToplevelDepLibs qs
 toplevel2Ast (I.ToplevelUnamedType i t) = return $ A.ToplevelUnamedType i t
 toplevel2Ast (I.ToplevelModuleAsm q) = return $ A.ToplevelModuleAsm q
 toplevel2Ast (I.ToplevelComdat l s) = return $ A.ToplevelComdat l s
+toplevel2Ast (I.ToplevelAttribute n c) = return $ A.ToplevelAttribute n c
+-- toplevel2Ast x = error $ "unhandled toplevel " ++ show x
 
 irToAst :: IdLabelMap -> I.Module -> H.SimpleUniqueMonad A.Module
 irToAst m (I.Module ts) = do { x <- runLabelMapM m $ Md.liftM A.Module (mapM toplevel2Ast ts)

@@ -220,13 +220,13 @@ typeOfExpr x = error ("unexpected parameter " ++ (show x) ++ " is passed to type
 {-   (element type, element number, align) -}
 data MemOp = 
   -- | allocate m t s:u1 align
-  Allocate (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Align)
+  Allocate (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Alignment)
   -- | load a addr:u1u2 align
-  | Load (IsOrIsNot Volatile) TypedPointer (Maybe Align) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
-  | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Align)
+  | Load (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+  | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Alignment)
   -- | store v:u1 addr:u1d2 align
-  | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Align) (Maybe Nontemporal)
-  | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Align) 
+  | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
+  | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) 
   -- | fence 
   | Fence (IsOrIsNot SingleThread) FenceOrder
   -- | cmpxchg v1:u1u2d2 v2:u1 v3:u1 
@@ -241,15 +241,9 @@ data FunName =
   | FunNameString String
     deriving (Eq,Ord,Show)
              
-data CallSite = CallFun { callSiteConv :: Maybe CallConv
-                        , callSiteRetAttr :: [ParamAttr]
-                        , callSiteRetType :: Type
-                        , callSiteIdent :: FunName
-                        , callSiteActualParams :: [ActualParam]
-                        , callSiteFunAttr :: [FunAttr]
-                        }
-              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
-              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
+data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
+              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
+              | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
 data Clause = Catch TypedValue -- u1
@@ -260,12 +254,13 @@ data Clause = Catch TypedValue -- u1
 data PersFn = PersFnId GlobalOrLocalId -- u1
             | PersFnCast (Conversion (Type, GlobalOrLocalId))
             | PersFnUndef
+            | PersFnNull
+            | PersFnConst Const          
             deriving (Eq, Ord, Show)
                      
-                           
 data Rhs = RmO MemOp
          | Re Expr
-         | Call TailCalling CallSite
+         | Call TailCall CallSite
          | ReE (ExtractElem TypedValue)
          | RiE (InsertElem TypedValue)
          | RsV (ShuffleVector TypedValue)
@@ -316,7 +311,7 @@ data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
 
 data ActualParam = ActualParam { actualParamType :: Type
                                , actualParamPreAttrs :: [ParamAttr]
-                               , actualParamAlign :: Maybe Align
+                               , actualParamAlign :: Maybe Alignment
                                , actualParamValue :: Value -- u1
                                , actualParamPostAttrs :: [ParamAttr]
                                } deriving (Eq,Ord,Show)
@@ -325,11 +320,7 @@ data ActualParam = ActualParam { actualParamType :: Type
 data Value = VgOl GlobalOrLocalId 
            | Ve Expr
            | Vc Const
-           | InlineAsm { inlineAsmHasSideEffect :: Bool
-                       , inlineAsmAlignStack :: Bool
-                       , inlineAsmS1 :: String
-                       , inlineAsmS2 :: String
-                       }
+           -- | InlineAsm (Maybe SideEffect) (Maybe AlignStack) String String
            -- | Internal value to make the optimization easier
            | Deref Pointer
            deriving (Eq,Ord,Show)
@@ -359,7 +350,7 @@ data FunctionPrototype = FunctionPrototype
                          , fhAttr1   :: [FunAttr] -- Collection
                          , fhSection :: Maybe Section
                          , fhComdat :: Maybe Comdat
-                         , fhAlign :: Maybe Align
+                         , fhAlign :: Maybe Alignment
                          , fhGc :: Maybe Gc
                          , fhPrefix :: Maybe Prefix
                          , fhPrologue :: Maybe Prologue                        

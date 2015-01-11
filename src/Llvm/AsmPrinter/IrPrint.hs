@@ -37,16 +37,6 @@ optSepToLlvm (Nothing) _ = empty
 optSepToLlvm (Just x) sep = printIr x <+> sep
 
 
-{-
-commaSep :: Doc -> Doc -> Doc
-commaSep a b = a <+> comma <+> b
--}
-
-{-
-commaSepList :: [Doc] -> Doc
-commaSepList l = hsep $ punctuate comma l  
--} 
-  
 instance IrPrint Toplevel where 
   printIr (ToplevelTriple s) = text "target" <+> text "triple" <+> text "=" <+> printIr s
   printIr (ToplevelDataLayout s) = text "target" <+> text "datalayout" <+> text "=" <+> printIr s
@@ -328,27 +318,8 @@ instance IrPrint Expr where
   printIr (Es a) = printIr a
   printIr (Ev a) = printIr a
   
-  {-
-instance IrPrint MemSize where
-  printIr (MemSize t size) = printIr t ++ sepOptToLlvm ", " size ++ sepOptToLlvm ", " a
--}
-  
-instance IrPrint MemArea where  
-  printIr OnStack = text "alloca"
-  printIr InHeap = text "malloc"
-  
-{-  
-instance IrPrint (AddrAttr l) where
-  printIr (AddrAttr ptr align) = printIr ptr ++ sepOptToLlvm ", " align
--}
-
-
-
--- stOrdToLlvm st ord = (if st then " singlethread" else "") ++ sepOptToLlvm " " ord
-
 instance IrPrint MemOp where  
-  printIr (Allocate ma t s a) = printIr ma <+> printIr t <+> sepOptToLlvm comma s <+> sepOptToLlvm comma a
---   printIr (Free tv) = "free " ++ printIr tv
+  printIr (Allocate ma t s a) = text "alloca" <+> printIr ma <+> printIr t <+> sepOptToLlvm comma s <+> sepOptToLlvm comma a
   printIr (Load v ptr align nonterm invar nonull) = text "load" <+> printIr v
                               <+> printIr ptr <+> sepOptToLlvm comma align 
                               <+> sepOptToLlvm comma nonterm
@@ -395,11 +366,6 @@ instance IrPrint Value where
   printIr (VgOl i) = printIr i
   printIr (Ve e) = printIr e
   printIr (Vc c) = printIr c
---  printIr (ViA i) = printIr i
-  printIr (InlineAsm se as s1 s2) = text "asm" 
-                                   <+> (if se then text "sideeffect" else empty) 
-                                   <+> (if as then text "alignstack" else empty)
-                                   <+> text s1 <+> comma <+> text s2     
 
 instance IrPrint TypedValue where
   printIr (TypedValue t v) = printIr t <+> printIr v
@@ -419,22 +385,22 @@ instance IrPrint FunName where
   printIr (FunNameString s) = text s
   
 instance IrPrint CallSite where
-  printIr (CallFun cc ra rt ident params fa) = (maybe empty printIr cc) <+> (hsep $ fmap printIr ra)
-                                              <+> printIr rt <+> printIr ident
-                                              <+> parens (commaSepList $ fmap printIr params)
-                                              <+> (hsep $ fmap printIr fa)
-  printIr (CallAsm t se as dia s1 s2 params fa) = (printIr t) <+> text "asm"
-                                                 <+> (if se then text "sideeffect" else empty)
-                                                 <+> (if as then text "alignstack" else empty)
-                                                 <+> printIr dia
-                                                 <+> printIr s1 <+> comma <+> printIr s2
-                                                 <+> parens (commaSepList $ fmap printIr params)
-                                                 <+> (hsep $ fmap printIr fa)
-  printIr (CallConversion ra t convert params fa) = (hsep $ fmap printIr ra)
-                                                <+> (printIr t) 
-                                                <+> printIr convert 
-                                                <+> parens (hsep $ fmap printIr params)
+  printIr (CsFun cc ra rt ident params fa) = (maybe empty printIr cc) <+> (hsep $ fmap printIr ra)
+                                             <+> printIr rt <+> printIr ident
+                                             <+> parens (commaSepList $ fmap printIr params)
+                                             <+> (hsep $ fmap printIr fa)
+  printIr (CsAsm t se as dia s1 s2 params fa) = (printIr t) <+> text "asm"
+                                                <+> (maybe empty printIr se)
+                                                <+> (maybe empty printIr as)
+                                                <+> printIr dia
+                                                <+> printIr s1 <+> comma <+> printIr s2
+                                                <+> parens (commaSepList $ fmap printIr params)
                                                 <+> (hsep $ fmap printIr fa)
+  printIr (CsConversion ra t convert params fa) = (hsep $ fmap printIr ra)
+                                                  <+> (printIr t) 
+                                                  <+> printIr convert 
+                                                  <+> parens (hsep $ fmap printIr params)
+                                                  <+> (hsep $ fmap printIr fa)
 
 instance IrPrint Clause where
   printIr (Catch tv) = text "catch" <+> printIr tv
@@ -449,7 +415,8 @@ instance IrPrint PersFn where
     printIr (PersFnId g) = printIr g
     printIr (PersFnCast c) = printIr c
     printIr PersFnUndef = text "undef"                                     
-  
+    printIr PersFnNull = text "null"
+    printIr (PersFnConst c) = printIr c
 
 
 instance IrPrint (ExtractElem TypedValue) where
@@ -607,7 +574,7 @@ instance IrPrint PlainStr where
 instance IrPrint Section where
   printIr = P.print
 
-instance IrPrint Align where
+instance IrPrint Alignment where
     printIr = P.print
 
 instance IrPrint Gc where
@@ -689,7 +656,7 @@ instance IrPrint Nonnull where
   printIr = P.print
   
   
-instance IrPrint TailCalling where
+instance IrPrint TailCall where
   printIr = P.print
 
 instance IrPrint DollarId where
@@ -741,3 +708,12 @@ instance IrPrint LayoutSpec where
   
 instance IrPrint DataLayout where
   printIr = P.print
+  
+instance IrPrint SideEffect where  
+  printIr = P.print
+  
+instance IrPrint AlignStack where  
+  printIr = P.print
+  
+instance IrPrint DoubleQuotedString where  
+  printIr = P.print  

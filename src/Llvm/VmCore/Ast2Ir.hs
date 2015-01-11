@@ -16,7 +16,9 @@ import Llvm.VmCore.LabelMapM
 
 type MyLabelMapM = LabelMapM H.SimpleUniqueMonad
 
--- this is the real difference between Ast and Ir -- Ir uses Unique values as labels while Ast can use any strings as labels
+-- the real differences between Ast and Ir 
+-- 1. Ir uses Unique values as labels while Ast can use any strings as labels
+-- 2. All unreachable code are removed in Ir
 instance Converter (A.LabelId) (MyLabelMapM I.LabelId) where
   convert l@(A.LabelString _) = Md.liftM I.LabelString (labelFor $ A.labelIdToLstring l)
   convert l@(A.LabelQuoteString _) = Md.liftM I.LabelQuoteString (labelFor $ A.labelIdToLstring l)
@@ -30,7 +32,7 @@ instance Converter A.TargetLabel (MyLabelMapM I.TargetLabel) where
     convert (A.TargetLabel tl) = convert tl >>= return . I.TargetLabel
 
 instance Converter A.BlockLabel (MyLabelMapM I.BlockLabel) where
-    convert A.ImplicitBlockLabel = error "ImplicitBlockLabel should be normalized, and should not be leaked to Ast2Ir."
+    convert (A.ImplicitBlockLabel p) = error $ "ImplicitBlockLabel @" ++ show p ++ " should be normalized in AstSimplify, and should not be leaked to Ast2Ir."
     convert (A.ExplicitBlockLabel b) = convert b >>= return . I.BlockLabel
   
 instance Converter A.TypedConst (MyLabelMapM I.TypedConst) where
@@ -63,6 +65,8 @@ instance Converter v1 (MyLabelMapM v2) => Converter (A.IbinExpr v1) (MyLabelMapM
           A.Shl -> I.Shl (getnowrap cs)
           A.Lshr -> I.Lshr (getexact cs)
           A.Ashr -> I.Ashr (getexact cs)
+          A.Urem -> I.Urem
+          A.Srem -> I.Srem
           A.And -> I.And 
           A.Or -> I.Or
           A.Xor -> I.Xor
@@ -96,14 +100,6 @@ instance Converter v1 (MyLabelMapM v2) => Converter (A.BinExpr v1) (MyLabelMapM 
     convert (A.Fe e) = Md.liftM I.Fe (convert e)
                                                            
 
-{-
-instance Converter v1 (MyLabelMapM v2) => Converter (A.Bitwise v1) (MyLabelMapM (I.Bitwise v2)) where
-    convert (A.Bitwise op cs t u1 u2) = do { u1' <- convert u1
-                                           ; u2' <- convert u2
-                                           ; return $ I.Bitwise op cs t (I.U1 u1') (I.U1 u2')
-                                           }
--}
-                                    
 instance Converter v1 (MyLabelMapM v2) => Converter (A.Conversion v1) (MyLabelMapM (I.Conversion v2)) where    
     convert (A.Conversion op u t) = convert u >>= \u' -> return $ I.Conversion op u' t
                                                   
@@ -249,24 +245,22 @@ instance Converter A.Value (MyLabelMapM I.Value) where
     convert (A.VgOl a) = return $ I.VgOl a
     convert (A.Ve a) = Md.liftM I.Ve (convert a)
     convert (A.Vc a) = Md.liftM I.Vc (convert a)
-    convert (A.InlineAsm a1 a2 a3 a4) = return $ I.InlineAsm a1 a2 a3 a4
-
 
 instance Converter A.Pointer (MyLabelMapM I.Pointer) where
     convert (A.Pointer a) = convert a >>= return . I.Pointer
       
    
 instance Converter A.CallSite (MyLabelMapM I.CallSite) where
-    convert  (A.CallFun cc pa t fn aps fa) = do { fn' <- convert fn
-                                                ; aps' <- mapM convert aps
-                                                ; return $ I.CallFun cc pa t fn' aps' fa
-                                                } 
-    convert (A.CallAsm t dia b1 b2 qs1 qs2 as fa) = do { as' <- mapM convert as
-                                                       ; return $ I.CallAsm t dia b1 b2 qs1 qs2 as' fa
-                                                       }
-    convert (A.CallConversion pa t cv as fa) = do { cv' <- convert cv
+    convert  (A.CsFun cc pa t fn aps fa) = do { fn' <- convert fn
+                                              ; aps' <- mapM convert aps
+                                              ; return $ I.CsFun cc pa t fn' aps' fa
+                                              } 
+    convert (A.CsAsm t dia b1 b2 qs1 qs2 as fa) = do { as' <- mapM convert as
+                                                     ; return $ I.CsAsm t dia b1 b2 qs1 qs2 as' fa
+                                                     }
+    convert (A.CsConversion pa t cv as fa) = do { cv' <- convert cv
                                                ; as' <- mapM convert as
-                                               ; return $ I.CallConversion pa t cv' as' fa
+                                               ; return $ I.CsConversion pa t cv' as' fa
                                                } 
                                         
 instance Converter A.Clause (MyLabelMapM I.Clause) where
@@ -282,6 +276,8 @@ instance Converter A.PersFn (MyLabelMapM I.PersFn) where
     convert (A.PersFnId s) = return $ I.PersFnId s
     convert (A.PersFnCast c) = convert c >>= return . I.PersFnCast 
     convert (A.PersFnUndef) = return $ I.PersFnUndef
+    convert (A.PersFnNull) = return $ I.PersFnNull
+    convert (A.PersFnConst c) = Md.liftM I.PersFnConst (convert c)
 
 
 instance Converter A.Rhs (MyLabelMapM I.Rhs) where
@@ -414,8 +410,9 @@ getEntryAndAlist bs =
      ; let l' = case l of
               I.BlockLabel x -> I.toLabel x
      ; let ord = map (\b -> case A.lbl b of 
-                             A.ImplicitBlockLabel -> error "irrefutable implicitblock should be normalized first" -- A.labelIdToString x
-                             A.ExplicitBlockLabel x -> A.labelIdToLstring x) bs
+                             A.ImplicitBlockLabel p -> error $ "irrefutable implicitblock " ++ show p ++ " should be normalized in AstSimplify" -- A.labelIdToString x
+                             A.ExplicitBlockLabel x -> A.labelIdToLstring x
+                     ) bs
      ; return (l', ord)
      }
 

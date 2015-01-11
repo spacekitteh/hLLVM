@@ -128,11 +128,11 @@ uDofFunName (FunNameString _) = mempty
 
 
 uDofCallSite :: CallSite -> UDA
-uDofCallSite (CallFun _ _ _ fn params _) = (uDofFunName fn) `mappend` (mconcat $ map uDofActualParam params)
-                                           
-uDofCallSite (CallAsm _ _ _ _ _ _ params _) = mconcat $ map uDofActualParam params
-uDofCallSite (CallConversion _ _ c params _) = let s = uDofConversion uDofTypedConst c
-                                               in s `mappend` (mconcat $ map uDofActualParam params)
+uDofCallSite (CsFun _ _ _ fn params _) = (uDofFunName fn) `mappend` (mconcat $ map uDofActualParam params)
+                                         
+uDofCallSite (CsAsm _ _ _ _ _ _ params _) = mconcat $ map uDofActualParam params
+uDofCallSite (CsConversion _ _ c params _) = let s = uDofConversion uDofTypedConst c
+                                             in s `mappend` (mconcat $ map uDofActualParam params)
 
 uDofActualParam :: ActualParam -> UDA
 uDofActualParam (ActualParam _ _ _ v _) = uDofValue v
@@ -171,7 +171,8 @@ uDofPersFn :: PersFn -> UDA
 uDofPersFn (PersFnId g) = mempty { u1 = Ds.singleton g }
 uDofPersFn (PersFnCast c) = uDofConversion (\(_,x) -> mempty {u1 = Ds.singleton x}) c
 uDofPersFn PersFnUndef = mempty
-
+uDofPersFn PersFnNull = mempty
+uDofPersFn (PersFnConst c) = mempty
 
 uDofSimpleConstant :: SimpleConstant -> UDA
 uDofSimpleConstant (CpGlobalAddr g) = mempty { addr = Ds.singleton $ GolG g }
@@ -188,7 +189,6 @@ uDofValue :: Value -> UDA
 uDofValue (VgOl g) = mempty { u1 = Ds.singleton g }
 uDofValue (Ve e) = uDofExpr e
 uDofValue (Vc c) = uDofConst c
-uDofValue (InlineAsm _ _ _ _) = mempty
 uDofValue (Deref x) = uDofPointer x
 
 

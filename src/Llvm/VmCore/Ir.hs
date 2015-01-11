@@ -33,7 +33,7 @@ data Toplevel = ToplevelTriple Ci.QuoteStr
                                , toplevelGlobalConst :: Maybe Ci.Const
                                , toplevelGlobalSection :: Maybe Ci.Section
                                , toplevelGlobalComdat :: Maybe Ci.Comdat
-                               , toplevelGlobalAlign :: Maybe Ci.Align
+                               , toplevelGlobalAlign :: Maybe Ci.Alignment
                                }
               | ToplevelTypeDef Ci.LocalId Ci.Type
               | ToplevelDepLibs [Ci.QuoteStr]

@@ -1,64 +1,77 @@
 {-# OPTIONS_GHC -cpp #-}
-module Llvm.VmCore.AstCanonicalization (canonicalize) where
+module Llvm.VmCore.AstSimplify (simplify) where
 
 import Llvm.VmCore.Ast
 import qualified Data.Map as M
+import qualified Data.Set as St
 import qualified Control.Monad.State as S
+import qualified Control.Monad.Reader as R
 import Data.Maybe
 import Llvm.VmCore.Converter
 import Debug.Trace
 
+{-
+  Assign explicit names to all implicit variables  
+  Assign explicit labels to all implicit labels
+-}
 data MyState = MyState { _cnt :: Integer
                        , _renaming :: String
+                       , _curSet :: St.Set Integer
                        } 
                
-defaultMyState n f = MyState n f
+defaultMyState n v f = MyState n v f
                
 data FRef s a = FRef { get :: s -> a               
                      , set :: a -> s -> s
                      }
-                
-modify :: FRef s a -> (a -> a) -> (s -> s)
-modify ref f s = set ref (f (get ref s)) s
-                
-                 
 
 cnt :: FRef MyState Integer                
-cnt = FRef { get = \(MyState c _) -> c
-           , set = \v (MyState _ r) -> MyState v r
+cnt = FRef { get = \(MyState c _ _) -> c
+           , set = \v (MyState _ r f) -> MyState v r f
            }
-      
+
 renaming :: FRef MyState String
-renaming = FRef { get = \(MyState _ r) -> r
-                , set = \v (MyState c _) -> MyState c v
-                }           
-           
-           
+renaming = FRef { get = \(MyState _ r _) -> r
+                , set = \v (MyState c _ f) -> MyState c v f
+                }
+
+curFn :: FRef MyState (St.Set Integer)           
+curFn = FRef { get = \(MyState _ _ f) -> f
+             , set = \f (MyState c v _) -> MyState c v f
+             }
 
 type MS = S.State MyState
 
+idPrefix :: String
 idPrefix = "localId"
+
+lbPrefix :: String
 lbPrefix = "localLb"
 
-canonicalize :: Module -> Module
-canonicalize (Module l) = Module (fmap rnToplevel l)
+-- iteration 1
+iter1 :: [Toplevel] -> ([Toplevel], M.Map GlobalId (St.Set Integer))
+iter1 l = let (l1, m1) = unzip $ fmap rnToplevel1 l
+          in (l1, foldl M.union M.empty m1)
 
-rnToplevel :: Toplevel -> Toplevel
-rnToplevel (ToplevelDefine fp bs) = let (fp2, bs2) = S.evalState (do { fp' <- rnDefFunctionPrototype fp
-                                                                     ; bs' <- S.mapM rnBlock bs
-                                                                     ; return (fp', bs')
-                                                                     }) (defaultMyState 0 (show fp))
-                                    in (ToplevelDefine fp2 bs2)
-rnToplevel x = x
+rnToplevel1 :: Toplevel -> (Toplevel, M.Map GlobalId (St.Set Integer))
+rnToplevel1 (ToplevelDefine fp bs) = 
+  let ((fp2, bs2), mys) = S.runState (do { fp' <- rnDefFunctionPrototype fp
+                                         ; bs' <- S.mapM rnBlock bs
+                                         ; return (fp', bs')
+                                         }) (defaultMyState 0 (show fp) St.empty)
+  in ((ToplevelDefine fp2 bs2), M.insert (fhName fp) (get curFn mys) M.empty)
+rnToplevel1 x = (x, M.empty)
 
 
+getGlobalId :: FunctionPrototype -> GlobalId
+getGlobalId = fhName 
 
 rnDefFunctionPrototype :: FunctionPrototype -> MS FunctionPrototype
-rnDefFunctionPrototype (FunctionPrototype link vis cconv fas t g fp fnd fa sec cmd align gc prefix prologue) = 
-  do { fp' <- rnDefFormalParamList fp
-     ; prefix' <- rnPrefix prefix
-     ; prologue' <- rnPrologue prologue
-     ; return $ FunctionPrototype link vis cconv fas t g fp' fnd fa sec cmd align gc prefix' prologue'
+rnDefFunctionPrototype fpt@(FunctionPrototype _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = 
+  do { fp' <- rnDefFormalParamList (fhParams fpt) -- implicit variable starting from formal parameters
+     ; prefix' <- rnPrefix (fhPrefix fpt)
+     ; prologue' <- rnPrologue (fhPrologue fpt) 
+     ; return $ fpt { fhParams = fp', fhPrefix = prefix', fhPrologue = prologue' } 
      }
   
   
@@ -83,10 +96,13 @@ rnDefFparam (FexplicitParam x) = S.liftM FexplicitParam (rnDefLocalId x)
 
 rnLabelId :: LabelId -> MS LabelId
 rnLabelId (LabelNumber i) = return $ LabelString $ Lstring (lbPrefix ++ show i)
-rnLabelId (LabelQuoteNumber i) = return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
-rnLabelId x@(LabelQuoteString (Lstring s)) = case reads s :: [(Integer, String)] of
-                                               [(5, "")] -> return $ LabelQuoteString $ Lstring (lbPrefix ++ s)
-                                               _ -> return x
+rnLabelId x@(LabelQuoteNumber i) = return x -- return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
+rnLabelId x@(LabelQuoteString (Lstring s)) = return x --
+{-
+  case reads s :: [(Integer, String)] of
+    [(_, "")] -> return $ LabelQuoteString $ Lstring (lbPrefix ++ s)
+    _ -> return x
+-}
 rnLabelId x = return x
 
 
@@ -96,8 +112,8 @@ getNext = do { s <- S.get
              ; S.put (set cnt (x+1) s)
              ; return x
              }
-          
-getFp :: MS String          
+
+getFp :: MS String
 getFp = do { s <- S.get
            ; let x = get renaming s
            ; return x
@@ -107,11 +123,12 @@ rnDefLabel :: BlockLabel -> MS BlockLabel
 #ifdef DEBUG
 rnDefLabel bl | trace ("rnLabel " ++ (show bl)) False = undefined
 #endif
-rnDefLabel (ImplicitBlockLabel) = do { i <- getNext
-                                     ; i' <- rnLabelId (LabelNumber i)
-                                     ; return $ ExplicitBlockLabel i'
-                                     }
-rnDefLabel (ExplicitBlockLabel i) = S.liftM ExplicitBlockLabel (rnLabelId i)
+rnDefLabel (ImplicitBlockLabel _) = do { i <- getNext
+                                       ; S.modify (\s ->  (set curFn) (St.insert i (get curFn s)) s)
+                                       ; i' <- rnLabelId (LabelNumber i)
+                                       ; return $ ExplicitBlockLabel i'
+                                       }
+rnDefLabel x@(ExplicitBlockLabel i) = return x -- S.liftM ExplicitBlockLabel (rnLabelId i)
 
 
 
@@ -123,29 +140,6 @@ rnBlock (Block lbl phi comp term) = do { lbl' <- rnDefLabel lbl
                                        ; return (Block lbl' phi' comp' term')
                                        }
 
-
-{-
-rnDefId :: Integer -> MS Integer
-rnDefId i = do { ms <- S.get
-               ; let n = get cnt ms
-                     f = get renaming ms
-               ; let (g0, ms0) = if i > n then (n, MyState (n+1) (M.insert i n f)) 
-                                 else if i == n then (i, MyState (n+1) f)
-                                      else error (" i:" ++ (show i) ++ " <  n:" ++ (show n))
-               ; S.put ms0
-               ; return g0
-               }
-            
-rnId :: Integer -> MS Integer            
-rnId i = do { ms <- S.get
-            ; let f = get renaming ms
-                  v' = case M.lookup i f of
-                        Just i' -> i'
-                        Nothing -> i
-            ; return v'
-            }
--}
-
 rnDefLocalId :: LocalId -> MS LocalId
 #ifdef DEBUG
 rnDefLocalId l | trace ("rnDefLocalId " ++ (show l)) False = undefined
@@ -156,13 +150,15 @@ rnDefLocalId x = return x
 
 rnLhs :: GlobalOrLocalId -> MS GlobalOrLocalId
 -- rnLhs g | trace ("rnLhs is called with " ++ (show g)) False = undefined
-rnLhs (GolL localId) = S.liftM GolL (rnDefLocalId localId)
+rnLhs lhs@(GolL localId) = do { checkImpCount lhs
+                              ; S.liftM GolL (rnDefLocalId localId)
+                              }
 rnLhs x = return x
 
 
 rnPhi :: PhiInst -> MS PhiInst
-rnPhi (PhiInst lhs t ins) = do { maybe (return ()) checkImpCount lhs
-                               ; lhs' <- maybeM rnLhs lhs
+rnPhi (PhiInst lhs t ins) = do { -- maybe (return ()) checkImpCount lhs
+                               lhs' <- maybeM rnLhs lhs
                                ; lhs'' <- getLhs True lhs'
                                ; ins' <- S.mapM g ins
                                ; return $ PhiInst lhs'' t ins'
@@ -178,9 +174,11 @@ rnComputingInstWithDbg (ComputingInstWithDbg c l) = S.liftM (\x -> ComputingInst
                                                     (rnComputingInst c)
 
 rnComputingInst :: ComputingInst -> MS ComputingInst
--- rnComputingInst x | trace ("rnComputingInst " ++ show (x)) False = undefined
-rnComputingInst (ComputingInst lhs rhs) = do { maybe (return ()) checkImpCount lhs
-                                             ; lhs' <- maybeM rnLhs lhs
+#ifdef DEBUG
+rnComputingInst x | trace ("rnComputingInst " ++ show (x)) False = undefined
+#endif
+rnComputingInst (ComputingInst lhs rhs) = do { -- maybe (return ()) checkImpCount lhs
+                                             lhs' <- maybeM rnLhs lhs
                                              ; (b, rhs') <- rnRhs rhs
                                              ; lhs'' <- getLhs b lhs'
                                              ; return (ComputingInst lhs'' rhs')
@@ -207,7 +205,6 @@ rnValue :: Value -> MS Value
 rnValue (VgOl x) = S.liftM VgOl (rnGlobalOrLocalId x)
 rnValue (Vc x) = S.liftM Vc (rnConst x)
 rnValue (Ve x) = S.liftM Ve (rnExpr x)
-rnValue x = return x
 
                                          
 rnTypedValue :: TypedValue -> MS TypedValue
@@ -215,14 +212,15 @@ rnTypedValue (TypedValue t v) = S.liftM (TypedValue t) (rnValue v)
                                          
 
 checkImpCount :: GlobalOrLocalId -> MS ()
-checkImpCount x@(GolL (LocalIdNum i)) = do { m <- getNext
-                                           ; if (i == m) then
-                                               return ()
-                                             else 
-                                               do { y <- getFp
-                                                  ; error ("expect " ++ (show m) ++ " and but found " ++ (show x) ++ " in " ++ y)
-                                                  }
-                                           }
+checkImpCount x@(GolL (LocalIdNum i)) = 
+  do { m <- getNext
+     ; if (i == m) then
+         return ()
+       else 
+         do { y <- getFp
+            ; error ("AstSimplify:expect " ++ (show m) ++ " and but found " ++ (show x) ++ " in " ++ y)
+            }
+     }
 checkImpCount _ = return ()                
                                          
 rnRhs :: Rhs -> MS (Bool, Rhs)
@@ -242,7 +240,6 @@ rnMemOp :: MemOp -> MS (Bool, MemOp)
 rnMemOp (Alloca m t tv a) = do { tv' <- maybeM rnTypedValue tv
                                ; return (True, Alloca m t tv' a)
                                }
--- rnMemOp (Free tv) = S.liftM (\x -> (False, Free x)) (rnTypedValue tv)
 rnMemOp (Load a tp ma nt inv nl) = S.liftM (\x -> (True, Load a x ma nt inv nl)) (rnTypedPointer tp)
 rnMemOp (LoadAtomic at a tp ma) = S.liftM (\x -> (True, LoadAtomic at a x ma)) (rnTypedPointer tp)
 rnMemOp (Store a tv tp ma nt) = S.liftM2 (\x y -> (False, Store a x y ma nt))
@@ -311,17 +308,17 @@ rnFunName x = return x
   
 
 rnCallSite :: CallSite -> MS (Bool, CallSite)
-rnCallSite (CallFun c pa t fn aps fas) = do { fn' <- rnFunName fn
-                                            ; x <- mapM rnActualParam aps
-                                            ; return (not $ isVoidType t, CallFun c pa t fn' x fas)
-                                            }
-rnCallSite (CallAsm t dia b1 b2 qs1 qs2 aps fas) = 
+rnCallSite (CsFun c pa t fn aps fas) = do { fn' <- rnFunName fn
+                                          ; x <- mapM rnActualParam aps
+                                          ; return (not $ isVoidType t, CsFun c pa t fn' x fas)
+                                          }
+rnCallSite (CsAsm t dia b1 b2 qs1 qs2 aps fas) = 
   S.liftM 
-  (\x -> (not $ isVoidType t, CallAsm t dia b1 b2 qs1 qs2 x fas))
+  (\x -> (not $ isVoidType t, CsAsm t dia b1 b2 qs1 qs2 x fas))
   (mapM rnActualParam aps)
-rnCallSite (CallConversion pas t c aps fas) = S.liftM
-                                              (\x -> (not $ isVoidType t, CallConversion pas t c x fas))
-                                              (mapM rnActualParam aps)
+rnCallSite (CsConversion pas t c aps fas) = S.liftM
+                                            (\x -> (not $ isVoidType t, CsConversion pas t c x fas))
+                                            (mapM rnActualParam aps)
 
 rnActualParam :: ActualParam -> MS ActualParam
 rnActualParam (ActualParam t ps ma v pa) = S.liftM (\x -> ActualParam t ps ma x pa)
@@ -425,3 +422,171 @@ rnPrefix _ = return Nothing
 rnPrologue :: Maybe Prologue -> MS (Maybe Prologue)
 rnPrologue (Just (Prologue n)) = S.liftM (Just . Prologue) (rnTypedConst n)
 rnPrologue _ = return Nothing
+
+
+-- iteration 2
+type RD a = R.Reader (M.Map GlobalId (St.Set Integer)) a
+
+
+iter2 :: M.Map GlobalId (St.Set Integer) -> [Toplevel] -> [Toplevel]
+#ifdef DEBUG
+iter2 m tl | trace ("iter2 " ++ show m) False = undefined
+#endif
+iter2 m tl = fmap (\x -> R.runReader (rnToplevel2 x) m) tl
+  
+rnToplevel2 :: Toplevel -> RD Toplevel
+rnToplevel2 g@(ToplevelGlobal _ _ _ _ _ _ _ _ _ _ _ _ _ _) = 
+  do { x <- maybe (return Nothing) (\x -> R.liftM Just (rnConst2 x)) (toplevelGlobalConst g)
+     ; return (g { toplevelGlobalConst = x })
+     }
+rnToplevel2 x = return x
+
+rnConst2 :: Const -> RD Const
+rnConst2 (Cca x) = S.liftM Cca (rnComplexConstant2 x)
+rnConst2 (CmL x) = return $ CmL x -- S.liftM CmL (rnLocalId2 x)
+rnConst2 (Cl l) = return $ Cl l -- S.liftM Cl (rnLabelId2 l)
+rnConst2 (CblockAddress g l) = S.liftM (CblockAddress g) (rnPercentLabel2 g l)
+rnConst2 (Cb bexpr) = S.liftM Cb (rnBinExpr2 rnConst2 bexpr)
+rnConst2 (Cconv convert) = S.liftM Cconv (rnConversion2 rnTypedConst2 convert)
+rnConst2 (CgEp getelm) = S.liftM CgEp (rnGetElemPtr2 rnTypedConst2 getelm)
+rnConst2 (Cs select) = S.liftM Cs (rnSelect2 rnTypedConst2 select)
+rnConst2 (CiC icmp) = S.liftM CiC (rnIcmp2 rnConst2 icmp)
+rnConst2 (CfC fcmp) = S.liftM CfC (rnFcmp2 rnConst2 fcmp)
+rnConst2 (CsV shuffle) = S.liftM CsV (rnShuffleVector2 rnTypedConst2 shuffle)
+rnConst2 (CeV extract) = S.liftM CeV (rnExtractValue2 rnTypedConst2 extract)
+rnConst2 (CiV insert) = S.liftM CiV (rnInsertValue2 rnTypedConst2 insert)
+rnConst2 (CeE extract) = S.liftM CeE (rnExtractElem2 rnTypedConst2 extract)
+rnConst2 (CiE insert) = S.liftM CiE (rnInsertElem2 rnTypedConst2 insert)
+rnConst2 (CmC x) = S.liftM CmC (rnMetaConst2 x)
+rnConst2 x = return x
+
+
+
+rnComplexConstant2 :: ComplexConstant -> RD ComplexConstant
+rnComplexConstant2 (Cstruct b l) = S.liftM (Cstruct b) (S.mapM rnTypedConst2 l)
+rnComplexConstant2 (Carray l) = S.liftM Carray (S.mapM rnTypedConst2 l)
+rnComplexConstant2 (Cvector l) = S.liftM Cvector (S.mapM rnTypedConst2 l)
+                                  
+rnTypedConst2 :: TypedConst -> RD TypedConst                                  
+rnTypedConst2 (TypedConst t c) = S.liftM (TypedConst t) (rnConst2 c)
+rnTypedConst2 TypedConstNull = return $ TypedConstNull
+
+rnMetaConst2 :: MetaConst -> RD MetaConst
+rnMetaConst2 (MdRef l) = return $ MdRef l -- S.liftM MdRef (rnLocalId2 l)
+rnMetaConst2 (MdConst c) = S.liftM MdConst (rnConst2 c)
+rnMetaConst2 x = return x
+
+rnPercentLabel2 :: GlobalId -> PercentLabel -> RD PercentLabel
+rnPercentLabel2 g (PercentLabel x) = S.liftM PercentLabel (rnLabelId2 g x)
+
+
+rnLabelId2 :: GlobalId -> LabelId -> RD LabelId
+rnLabelId2 g l@(LabelNumber i) = do { b <- rnNumId2 g i
+                                  ; if b then return $ LabelString $ Lstring (lbPrefix ++ show i)
+                                    else return l
+                                  }
+rnLabelId2 g l@(LabelQuoteNumber i) = return l
+                                      {-do { b <- rnNumId2 g i
+                                         ; if b then return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
+                                           else return l
+                                         }-}
+rnLabelId2 g x@(LabelQuoteString (Lstring s)) = return x 
+{-
+  case reads s :: [(Integer, String)] of
+    [(i, "")] -> do { b <- rnNumId2 g i
+                    ; if b then return $ LabelQuoteString $ Lstring (lbPrefix ++ s)
+                      else return x
+                    }
+    _ -> return x
+-}
+rnLabelId2 g x = return x
+
+rnNumId2 :: GlobalId -> Integer -> RD Bool
+rnNumId2 g i = do { r <- R.ask
+                  ; case M.lookup g r of
+                    Nothing -> return False
+                    Just st -> return $ St.member i st 
+                  }
+
+
+rnTypedPointer2 :: TypedPointer -> RD TypedPointer
+rnTypedPointer2 (TypedPointer t p) = S.liftM (TypedPointer t) (rnPointer2 p)
+
+rnPointer2 :: Pointer -> RD Pointer
+rnPointer2 (Pointer v) = S.liftM Pointer (rnValue2 v)
+
+rnExpr2 :: Expr -> RD Expr
+rnExpr2 (EgEp e) = S.liftM EgEp (rnGetElemPtr2 rnTypedValue2 e)
+rnExpr2 (EiC e) = S.liftM EiC (rnIcmp2 rnValue2 e)
+rnExpr2 (EfC e) = S.liftM EfC (rnFcmp2 rnValue2 e)
+rnExpr2 (Eb e) = S.liftM Eb (rnBinExpr2 rnValue2 e)
+rnExpr2 (Ec e) = S.liftM Ec (rnConversion2 rnTypedValue2 e)
+rnExpr2 (Es e) = S.liftM Es (rnSelect2 rnTypedValue2 e)
+
+
+rnGetElemPtr2 :: (a -> RD a) -> GetElemPtr a -> RD (GetElemPtr a)
+rnGetElemPtr2 f (GetElemPtr b v vs) = do { v' <- f v
+                                         ; vs' <- mapM f vs
+                                         ; return $ GetElemPtr b v' vs'
+                                         }
+
+
+rnIcmp2 :: (a -> RD a) -> Icmp a -> RD (Icmp a)
+rnIcmp2 f (Icmp o t v1 v2) = S.liftM2 (Icmp o t) (f v1) (f v2)
+
+rnFcmp2 :: (a -> RD a) -> Fcmp a -> RD (Fcmp a)
+rnFcmp2 f (Fcmp o t v1 v2) = S.liftM2 (Fcmp o t) (f v1) (f v2)
+
+rnIbinExpr2 :: (a -> RD a) -> IbinExpr a -> RD (IbinExpr a)
+rnIbinExpr2 f (IbinExpr o tf t v1 v2) = S.liftM2 (IbinExpr o tf t) (f v1) (f v2)
+
+rnFbinExpr2 :: (a -> RD a) -> FbinExpr a -> RD (FbinExpr a)
+rnFbinExpr2 f (FbinExpr o tf t v1 v2) = S.liftM2 (FbinExpr o tf t) (f v1) (f v2)
+
+rnBinExpr2 :: (a -> RD a) -> BinExpr a -> RD (BinExpr a)
+rnBinExpr2 f (Ie x) = S.liftM Ie (rnIbinExpr2 f x)
+rnBinExpr2 f (Fe x) = S.liftM Fe (rnFbinExpr2 f x)
+
+rnConversion2 :: (a -> RD a) -> Conversion a -> RD (Conversion a)
+rnConversion2 f (Conversion o v t) = S.liftM (\x -> Conversion o x t) (f v)
+
+rnSelect2 :: (a -> RD a) -> Select a -> RD (Select a)
+rnSelect2 f (Select v1 v2 v3) = S.liftM3 Select (f v1) (f v2) (f v3)
+
+rnValue2 :: Value -> RD Value
+rnValue2 (VgOl x) = S.liftM VgOl (rnGlobalOrLocalId2 x)
+rnValue2 (Vc x) = S.liftM Vc (rnConst2 x)
+rnValue2 (Ve x) = S.liftM Ve (rnExpr2 x)
+
+rnTypedValue2 :: TypedValue -> RD TypedValue
+rnTypedValue2 (TypedValue t v) = S.liftM (TypedValue t) (rnValue2 v)
+
+
+rnGlobalOrLocalId2 :: GlobalOrLocalId -> RD GlobalOrLocalId
+-- rnGlobalOrLocalId2 (GolL l) = S.liftM GolL (rnLocalId2 l)
+rnGlobalOrLocalId2 x = return x
+
+
+rnExtractElem2 :: (a -> RD a) -> ExtractElem a -> RD (ExtractElem a)
+rnExtractElem2 f (ExtractElem v1 v2) = S.liftM2 ExtractElem (f v1) (f v2)
+
+rnInsertElem2 :: (a -> RD a) -> InsertElem a -> RD (InsertElem a)
+rnInsertElem2 f (InsertElem v1 v2 v3) = S.liftM3 InsertElem (f v1) (f v2) (f v3)
+
+rnShuffleVector2 :: (a -> RD a) -> ShuffleVector a -> RD (ShuffleVector a)
+rnShuffleVector2 f (ShuffleVector v1 v2 v3) = S.liftM3 ShuffleVector (f v1) (f v2) (f v3)
+
+
+rnExtractValue2 :: (a -> RD a) -> ExtractValue a -> RD (ExtractValue a)
+rnExtractValue2 f (ExtractValue v s) = S.liftM (\x -> ExtractValue x s) (f v)
+
+
+rnInsertValue2 :: (a -> RD a) -> InsertValue a -> RD (InsertValue a)
+rnInsertValue2 f (InsertValue v1 v2 s) = S.liftM2 (\x y -> InsertValue x y s)
+                                         (f v1) (f v2)
+
+
+
+simplify :: Module -> Module
+simplify (Module ml) = let (sl, ml1) = iter1 ml
+                       in Module (iter2 ml1 sl)

@@ -82,7 +82,7 @@ isDeadAP live ap  = let u = filterOutGlobalId $ u1 $ uDofActualParam ap
                     in dif == Ds.empty
 
 deadCallSite :: forall m. H.FuelMonad m => CallSite -> H.Fact H.O Live -> m (Maybe (H.Graph Node H.O H.O))
-deadCallSite (CallFun _ _ _ fn ap _) live | isDeclare fn = 
+deadCallSite (CsFun _ _ _ fn ap _) live | isDeclare fn = 
   if L.all (isDeadAP live) ap then return $ Just H.emptyGraph
   else return Nothing
 deadCallSite _ _ = return Nothing

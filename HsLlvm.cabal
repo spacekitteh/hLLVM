@@ -27,7 +27,7 @@ Library
                      pretty >= 1.1.1.1
 
   Exposed-modules:   Llvm.VmCore.Ast2Ir,
-                     Llvm.VmCore.AstCanonicalization,
+                     Llvm.VmCore.AstSimplify,
                      Llvm.VmCore.Ast,
                      Llvm.VmCore.SharedEntity,
 --                   Llvm.VmCore.ConstFold,

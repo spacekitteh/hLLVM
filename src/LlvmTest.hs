@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -cpp #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 import System.IO
 import System.Console.CmdArgs
@@ -10,10 +11,9 @@ import qualified Llvm.Pass.Mem2Reg as M2R
 import qualified Llvm.Pass.Liveness as L
 import Llvm.Pass.PassManager
 import qualified Compiler.Hoopl as H
-import Llvm.VmCore.AstCanonicalization
+import qualified Llvm.VmCore.AstSimplify as S
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
--- mport Llvm.VmCore.AstWriter
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -26,7 +26,8 @@ extractSteps l = map (\x -> case toStep x of
                          Nothing -> error (x ++ " is not step")) l
                  
 
-data Sample = Parser { input :: FilePath, output :: Maybe String }
+data Sample = Dummy { input :: FilePath, output :: Maybe String }
+            | Parser { input :: FilePath, output :: Maybe String }
             | Ast2Ir { input :: FilePath, output :: Maybe String }
             | Ir2Ast { input :: FilePath, output :: Maybe String }
             | Pass { input :: FilePath, output :: Maybe String, step :: [String], fuel :: Int }
@@ -37,6 +38,11 @@ data Sample = Parser { input :: FilePath, output :: Maybe String }
                      
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
          
+
+dummy = Dummy { input = def &= typ "<INPUT>" &= argPos 0
+              , output = outFlags Nothing
+              } &= help "Test LLVM Parser"
+
 parser = Parser { input = def &= typ "<INPUT>" &= argPos 0
                 , output = outFlags Nothing
                 } &= help "Test LLVM Parser"
@@ -66,7 +72,7 @@ phielim = PhiElim { input = def &= typ "<INPUT>" &= argPos 0
                   } &= help "Test PhiElim pass"
 
          
-mode = cmdArgsMode $ modes [parser, ast2ir, ir2ast, pass, astcanonic, phielim] &= help "Test sub components" 
+mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phielim] &= help "Test sub components" 
        &= program "Test" &= summary "Test driver v1.0"
        
        
@@ -74,7 +80,9 @@ mode = cmdArgsMode $ modes [parser, ast2ir, ir2ast, pass, astcanonic, phielim] &
 
 main :: IO ()
 main = do { sel <- cmdArgsRun mode
+#ifdef DEBUG                   
           ; putStr $ show sel
+#endif
           ; case sel of
             Parser ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
@@ -83,10 +91,20 @@ main = do { sel <- cmdArgsRun mode
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
+            AstCanonic ix ox -> do { inh <- openFile ix ReadMode
+                                   ; outh <- openFileOrStdout ox
+                                   ; ast <- testParser ix inh
+                                   ; let ast' = S.simplify ast
+                                   ; writeOutLlvm ast' outh
+                                   ; hClose inh
+                                   ; closeFileOrStdout ox outh
+                                   }
+                                        
             Ast2Ir ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
-                               ; let (m, ir) = testAst2Ir ast
+                               ; let ast' = S.simplify ast
+                               ; let (m, ir) = testAst2Ir ast'
                                ; writeOutIr ir outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -94,9 +112,10 @@ main = do { sel <- cmdArgsRun mode
             Ir2Ast ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
-                               ; let (m, ir) = testAst2Ir ast
-                                     ast' = testIr2Ast m ir
-                               ; writeOutLlvm ast' outh
+                               ; let ast' = S.simplify ast
+                               ; let (m, ir) = testAst2Ir ast'
+                                     ast'' = testIr2Ast m ir
+                               ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
@@ -110,18 +129,10 @@ main = do { sel <- cmdArgsRun mode
                                 ; hClose inh
                                 ; closeFileOrStdout ox outh
                                 }
-            AstCanonic ix ox -> do { inh <- openFile ix ReadMode
-                                   ; outh <- openFileOrStdout ox
-                                   ; ast <- testParser ix inh
-                                   ; let ast' = canonicalize ast
-                                   ; writeOutLlvm ast' outh
-                                   ; hClose inh
-                                   ; closeFileOrStdout ox outh
-                                   }
             Pass ix ox passes f -> do { inh <- openFile ix ReadMode
                                       ; outh <- openFileOrStdout ox
                                       ; ast' <- testParser ix inh
-                                      ; let ast = canonicalize ast'
+                                      ; let ast = S.simplify ast'
                                       ; let (m, ir) = testAst2Ir ast
                                       ; let applySteps' = applySteps (extractSteps passes) ir
                                       ; let ir' = H.runSimpleUniqueMonad $ H.runWithFuel f applySteps'

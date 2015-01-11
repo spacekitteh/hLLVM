@@ -53,7 +53,7 @@ pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
 -- Everything through visibility has already been parsed.
 --
 pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorage -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
-pAlias lhs vis dll tlm na = do { link <- option External pAliasLinkage
+pAlias lhs vis dll tlm na = do { link <- option LinkageExternal pAliasLinkage
                     ; aliasee <- pAliasee
                     ; return $ ToplevelAlias lhs vis dll tlm na (Just link) aliasee
                     }
@@ -88,14 +88,13 @@ pGlobal lhs link vis dll tls na =
        globalOpt t c s cd a
      }
   where hasInit x = case x of 
-            Just(ExternWeak) -> False
-            Just(External) -> False
-            -- Just(DllImport) -> False
-            Just(_) -> True
-            Nothing -> True
+          Just(LinkageExternWeak) -> False
+          Just(LinkageExternal) -> False
+          -- Just(DllImport) -> False
+          Just(_) -> True
+          Nothing -> True
 
-data LocalIdOrQuoteStr = L LocalId | Q QuoteStr 
-                       deriving (Eq,Show)
+data LocalIdOrQuoteStr = L LocalId | Q QuoteStr deriving (Eq,Show)
 
 pLhsType :: P LocalIdOrQuoteStr 
 pLhsType = do { lhs <- choice [ liftM L pLocalId
@@ -117,7 +116,11 @@ pToplevelTypeDef = do { lhsOpt <- opt pLhsType
 pToplevelTarget :: P Toplevel
 pToplevelTarget = do { reserved "target"
                      ; choice [ reserved "triple" >> chartok '=' >> pQuoteStr >>= \s -> return $ ToplevelTriple (QuoteStr s)
-                              , reserved "datalayout" >> chartok '=' >> lexeme (between (char '"') (char '"') pDataLayout) >>= \ls -> return $ ToplevelDataLayout ls 
+                              , do { reserved "datalayout" 
+                                   ; ignore (chartok '=') 
+                                   ; ls <- lexeme (between (char '"') (char '"') pDataLayout) 
+                                   ; return $ ToplevelDataLayout ls 
+                                   }
                               ]
                      }
 

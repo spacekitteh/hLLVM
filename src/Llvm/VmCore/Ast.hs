@@ -24,7 +24,7 @@ labelIdToLstring (LabelNumber n) = Lstring $ show n
 labelIdToLstring (LabelQuoteNumber n) = Lstring $ show n
 
 data BlockLabel = ExplicitBlockLabel LabelId 
-                | ImplicitBlockLabel 
+                | ImplicitBlockLabel (String, Int, Int)
                 deriving (Eq, Ord, Show)
                          
 data PercentLabel = PercentLabel LabelId deriving (Eq, Ord, Show)
@@ -119,11 +119,11 @@ data Expr = EgEp (GetElemPtr TypedValue)
                    
 
 -- | Memory Access and Addressing Operations <http://llvm.org/releases/3.5.0/docs/LangRef.html#memory-access-and-addressing-operations>
-data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Align)
-           | Load (IsOrIsNot Volatile) TypedPointer (Maybe Align) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
-           | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Align) 
-           | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Align) (Maybe Nontemporal)
-           | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Align)
+data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Alignment)
+           | Load (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+           | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) 
+           | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
+           | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment)
            | Fence (IsOrIsNot SingleThread) FenceOrder
            | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) FenceOrder FenceOrder
            | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) FenceOrder deriving (Eq,Ord,Show)
@@ -136,15 +136,9 @@ data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameString String
                deriving (Eq,Ord,Show)
              
-data CallSite = CallFun { callSiteConv :: Maybe CallConv
-                        , callSiteRetAttr :: [ParamAttr]
-                        , callSiteRetType :: Type
-                        , callSiteIdent :: FunName
-                        , callSiteActualParams :: [ActualParam]
-                        , callSiteFunAttr :: [FunAttr]
-                        }
-              | CallAsm Type Bool Bool AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
-              | CallConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
+data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
+              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
+              | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
 data Clause = Catch TypedValue
@@ -162,7 +156,7 @@ data PersFn = PersFnId GlobalOrLocalId
                            
 data Rhs = RmO MemOp
          | Re Expr
-         | Call TailCalling CallSite
+         | Call TailCall CallSite
          | ReE (ExtractElem TypedValue)
          | RiE (InsertElem TypedValue)
          | RsV (ShuffleVector TypedValue)
@@ -210,7 +204,7 @@ data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
                                       
 data ActualParam = ActualParam { actualParamType :: Type
                                , actualParamPreAttrs :: [ParamAttr]
-                               , actualParamAlign :: Maybe Align
+                               , actualParamAlign :: Maybe Alignment
                                , actualParamValue :: Value
                                , actualParamPostAttrs :: [ParamAttr]
                                } deriving (Eq,Ord,Show)
@@ -220,11 +214,7 @@ data Value = VgOl GlobalOrLocalId
            | Ve Expr
            | Vc Const
            -- | Inline Assembler Expressions <http://llvm.org/releases/3.0/docs/LangRef.html#inlineasm>
-           | InlineAsm { inlineAsmHasSideEffect :: Bool
-                       , inlineAsmAlignStack :: Bool
-                       , inlineAsmS1 :: String
-                       , inlineAsmS2 :: String
-                       }
+--           | InlineAsm (Maybe SideEffect) (Maybe AlignStack) String String
            deriving (Eq,Ord,Show)
 
 data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
@@ -248,7 +238,7 @@ data FunctionPrototype = FunctionPrototype
                          , fhAttr1   :: [FunAttr] -- Collection
                          , fhSection :: Maybe Section
                          , fhComdat :: Maybe Comdat
-                         , fhAlign :: Maybe Align
+                         , fhAlign :: Maybe Alignment
                          , fhGc :: Maybe Gc
                          , fhPrefix :: Maybe Prefix
                          , fhPrologue :: Maybe Prologue
@@ -277,7 +267,7 @@ data Toplevel = ToplevelTriple QuoteStr
                                , toplevelGlobalConst :: Maybe Const
                                , toplevelGlobalSection :: Maybe Section
                                , toplevelGlobalComdat :: Maybe Comdat
-                               , toplevelGlobalAlign :: Maybe Align
+                               , toplevelGlobalAlign :: Maybe Alignment
                                }
               | ToplevelTypeDef LocalId Type
               | ToplevelDepLibs [QuoteStr]

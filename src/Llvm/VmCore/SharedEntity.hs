@@ -20,16 +20,16 @@ data ConvertOp = Trunc | Zext | Sext | FpTrunc | FpExt | FpToUi
 -- | Linkage Types <http://llvm.org/releases/3.5.0/docs/LangRef.html#linkage-types>
 data Linkage = 
   LinkagePrivate
-  | Internal    
-  | AvailableExternally
-  | Linkonce
-  | Common
+  | LinkageInternal    
+  | LinkageAvailableExternally
+  | LinkageLinkonce
+  | LinkageCommon
   | LinkageWeak
-  | Appending
-  | ExternWeak
-  | LinkonceOdr
-  | WeakOdr
-  | External
+  | LinkageAppending
+  | LinkageExternWeak
+  | LinkageLinkonceOdr
+  | LinkageWeakOdr
+  | LinkageExternal
   deriving (Eq,Ord,Show)
                
 -- | Calling Conventions <http://llvm.org/releases/3.5.0/docs/LangRef.html#calling-conventions>
@@ -75,29 +75,23 @@ data ThreadLocalStorage = TlsLocalDynamic
                         deriving (Eq, Ord, Show)
 
 -- | Parameter Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#parameter-attributes>
-data ParamAttr = ZeroExt 
-               | SignExt
-               | InReg 
-               | ByVal 
-               | InAlloca
-               | SRet
-               | NoAlias 
-               | NoCapture
-               | Nest 
-               | Returned
-               | NonNull
-               | Dereferenceable Integer
+data ParamAttr = PaZeroExt 
+               | PaSignExt
+               | PaInReg 
+               | PaByVal 
+               | PaInAlloca
+               | PaSRet
+               | PaNoAlias 
+               | PaNoCapture
+               | PaNest 
+               | PaReturned
+               | PaNonNull
+               | PaDereferenceable Integer
                | PaReadOnly
                | PaReadNone
                | PaAlign Integer
                  deriving (Eq,Ord,Show)
 
-{-
-data FunAttrCollection = FunAttrList [FunAttr]
-                       | FunAttrGroup Integer
-                       deriving (Eq, Ord, Show)
--}
-                         
 -- | Function Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#function-attributes>
 data FunAttr = FaAlignStack Integer
              | FaAlwaysInline
@@ -146,7 +140,7 @@ data QuoteStr = QuoteStr String deriving (Eq,Ord,Show)
                        
 
 data PlainStr = PlainStr String deriving (Eq,Ord,Show)
-data Align = Align Integer deriving (Eq,Ord,Show)
+data Alignment = Alignment Integer deriving (Eq,Ord,Show)
 data Gc = Gc QuoteStr deriving (Eq,Ord,Show)
 data GlobalType = GlobalType String deriving (Eq,Ord,Show)
 data AddrSpace = AddrSpace Integer 
@@ -245,13 +239,12 @@ data Volatile = Volatile deriving (Eq, Ord, Show)
 
 data SingleThread = SingleThread deriving (Eq, Ord, Show)
 
-data MemArea = OnStack | InHeap deriving (Eq,Ord,Show)
 data InAllocaAttr = InAllocaAttr
                   deriving (Eq, Ord, Show)
   
-data TailCalling = NonTailCall
-                 | TailCall
-                 | MustTailCall deriving (Eq, Ord, Show)
+data TailCall = TcNon
+              | TcTailCall
+              | TcMustTailCall deriving (Eq, Ord, Show)
 
 isVoidType :: Type -> Bool
 isVoidType (Tprimitive TpVoid) = True
@@ -287,8 +280,8 @@ data Fparam = FimplicitParam
 data FormalParam = FormalParam
                    { formalParamType :: Type
                    , formalParamPreAttr :: [ParamAttr]
-                   , formalParamAlign :: Maybe Align
-                   , formalParamId :: Fparam -- Maybe LocalId
+                   , formalParamAlign :: Maybe Alignment
+                   , formalParamId :: Fparam 
                    , formalParamPostAttr :: [ParamAttr]
                    } deriving (Eq,Ord,Show)
 
@@ -321,4 +314,7 @@ data AsmDialect = AsmDialectAtt
                 | AsmDialectIntel
                 deriving (Eq, Ord, Show)
 
+data SideEffect = SideEffect deriving (Eq, Ord, Show)
+data AlignStack = AlignStack deriving (Eq, Ord, Show)
 
+data DoubleQuotedString = DoubleQuotedString String deriving (Eq, Ord, Show)

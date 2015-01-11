@@ -7,7 +7,6 @@ import Llvm.VmCore.Ast2Ir
 import Llvm.VmCore.Ir2Ast
 import qualified Llvm.VmCore.Ast as A
 import qualified Llvm.VmCore.Ir as I
-import Llvm.VmCore.AstCanonicalization
 import qualified Compiler.Hoopl as H
 import System.Environment (getArgs)
 import System.Console.CmdArgs

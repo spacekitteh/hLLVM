@@ -9,7 +9,6 @@ import Llvm.AsmPrinter.IrPrint
 import Data.List
 import Llvm.VmCore.Ast2Ir
 import Llvm.VmCore.Ir2Ast
--- import Llvm.VmCore.IrWriter
 
 displayError f s = 
   let sLine = sourceLine $ errorPos s

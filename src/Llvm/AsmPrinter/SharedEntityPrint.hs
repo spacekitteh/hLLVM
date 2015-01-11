@@ -123,16 +123,16 @@ instance Print ConvertOp where
 
 instance Print Linkage where
   print LinkagePrivate = text "private"
-  print Internal = text "internal"
-  print AvailableExternally = text "available_externally"
-  print External = text "external"
-  print Linkonce = text "linkonce"
+  print LinkageInternal = text "internal"
+  print LinkageAvailableExternally = text "available_externally"
+  print LinkageExternal = text "external"
+  print LinkageLinkonce = text "linkonce"
   print LinkageWeak = text "weak"
-  print Common = text "common"
-  print Appending = text "appending"
-  print ExternWeak = text "extern_weak"
-  print LinkonceOdr = text "linkonce_odr"
-  print WeakOdr = text "weak_odr"
+  print LinkageCommon = text "common"
+  print LinkageAppending = text "appending"
+  print LinkageExternWeak = text "extern_weak"
+  print LinkageLinkonceOdr = text "linkonce_odr"
+  print LinkageWeakOdr = text "weak_odr"
   
 
 
@@ -180,18 +180,18 @@ instance Print ThreadLocalStorage where
                 else text "thread_local" <+> parens d 
 
 instance Print ParamAttr where
-  print ZeroExt = text "zeroext"
-  print SignExt = text "signext"
-  print InReg = text "inreg"
-  print ByVal = text "byval"
-  print InAlloca = text "inalloca"
-  print SRet = text "sret"
-  print NoAlias = text "noalias"
-  print NoCapture = text "nocapture"
-  print Nest = text "nest"
-  print Returned = text "returned"
-  print NonNull = text "nonnull"
-  print (Dereferenceable n) = (text "dereferenceable") <> (parens $ integer n)
+  print PaZeroExt = text "zeroext"
+  print PaSignExt = text "signext"
+  print PaInReg = text "inreg"
+  print PaByVal = text "byval"
+  print PaInAlloca = text "inalloca"
+  print PaSRet = text "sret"
+  print PaNoAlias = text "noalias"
+  print PaNoCapture = text "nocapture"
+  print PaNest = text "nest"
+  print PaReturned = text "returned"
+  print PaNonNull = text "nonnull"
+  print (PaDereferenceable n) = (text "dereferenceable") <> (parens $ integer n)
   print PaReadOnly = text "readonly"
   print PaReadNone = text "readnone"
   print (PaAlign n) = text "align" <+> integer n
@@ -250,8 +250,8 @@ instance Print PlainStr where
 instance Print Section where
   print (Section s) = text "section" <+> (print s)
 
-instance Print Align where
-    print (Align s) = text "align" <+>  (integer s)
+instance Print Alignment where
+    print (Alignment s) = text "align" <+>  (integer s)
 
 instance Print Gc where
     print (Gc s) = text "gc" <+> (print s)
@@ -397,7 +397,7 @@ instance Print InBounds where
 instance Print a => Print (IsOrIsNot a) where
   print s = case s of
     Is x -> print x
-    IsNot x -> empty
+    IsNot _ -> empty
 
 instance Print Nontemporal where    
   print (Nontemporal i) = char '!'<>(text "nontemporal") <+> char '!'<>(integer i)
@@ -409,25 +409,11 @@ instance Print Nonnull where
   print (Nonnull i) = char '!'<>(text "nonnull") <+> char '!'<>(integer i)
   
   
-instance Print TailCalling where
+instance Print TailCall where
   print x = case x of
-    NonTailCall -> empty
-    TailCall -> text "tail"
-    MustTailCall -> text "musttail"
-    
-{-    
-instance Print AddrNaming where    
-  print x = case x of
-    UnnamedAddr -> text "unnamed_addr"
-    NamedAddr -> empty
--}
-
-{-
-instance Print FunAttrCollection where
-  print x = case x of
-    FunAttrList l -> hsep $ fmap print l
-    FunAttrGroup n -> char '#' <> (integer n)
--}    
+    TcNon -> empty
+    TcTailCall -> text "tail"
+    TcMustTailCall -> text "musttail"
     
 instance Print DollarId where
   print (DollarIdNum n) = char '$' <> (integer n)
@@ -460,3 +446,13 @@ instance Print AsmDialect where
     AsmDialectAtt -> empty
     AsmDialectIntel -> text "inteldialect"
   
+  
+instance Print SideEffect where
+  print SideEffect = text "sideeffect"
+  
+instance Print AlignStack where  
+  print AlignStack = text "alignstack"
+  
+  
+instance Print DoubleQuotedString where  
+  print (DoubleQuotedString s) = doubleQuotes $ text s
