@@ -19,15 +19,19 @@ The test driver 'llvm-test' is generated at dist/build/llvm-test
 Test:
 ==============
 ## test LLVM assembly parser
-dist/build/llvm-test/llvm-test parser --input test/test1.ll 
+dist/build/llvm-test/llvm-test parse -i test/test1.ll -o out.ll
 
 ## test mem2reg pass
-dist/build/llvm-test/llvm-test pass -s=mem2reg -f=10000 --input test/test1.ll
+dist/build/llvm-test/llvm-test pass -s=mem2reg -f=10000 -i test/test1.ll -o out.ll
 
 
 ## test dce pass
-dist/build/llvm-test/llvm-test pass -s=dce -f=10000 --input test/test1.ll
+dist/build/llvm-test/llvm-test pass -s=dce -f=10000 -i test/test1.ll -o out.ll
 
 
 ## test mem2reg and dce passes
-dist/build/llvm-test/llvm-test pass -s=mem2reg -s=dce -f=1000 --input test/test1.ll 
+dist/build/llvm-test/llvm-test pass -s=mem2reg -s=dce -f=1000 -i test/test1.ll -o out.ll
+
+
+## run tests in batch (llvm-test needs to be available in the executable search paths)
+test/runLlvmTest.sh [parse|ast2ir|ir2ast] <directory of llvm-3.5 test cases>
