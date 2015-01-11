@@ -5,3 +5,9 @@ cabal-dev
 *.chi
 *.chs.h
 .virthualenv
+*.ll
+*.bc
+skipped.list
+.ghci
+hoopl-3.8.7.4
+hoopl-3.10.0.1
