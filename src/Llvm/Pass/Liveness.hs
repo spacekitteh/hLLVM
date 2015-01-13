@@ -29,7 +29,10 @@ liveness = H.mkBTransfer live
     live :: Node e x -> H.Fact x Live -> Live
     live (Nlabel _) f = f
     live (Pinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofPinst n) `Ds.difference` (filterOutGlobalId $ d1ofPinst n)
-    live (Cinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofComputingInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofComputingInstWithDbg n)
+    -- | FIXME
+    -- | this is a very simplistic implementation and it does not consider function calls might have side effects. 
+    -- | we need to distinguish the uses of a possible side effect computation from the uses of a pure computation.
+    live (Cinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofComputingInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofComputingInstWithDbg n) 
     live x@(Tinst n) f = let bs = H.successors x
                              f' = foldl (\p -> \l -> p `Ds.union` (fact f l)) Ds.empty bs
                        in f' `Ds.union` (filterOutGlobalId $ u1ofTerminatorInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofTerminatorInstWithDbg n)

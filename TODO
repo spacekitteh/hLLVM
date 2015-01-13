@@ -1,2 +1,3 @@
-v0.2
+- hoopl will remove all unresearchable code, however, blockaddress might refer to some removed code labels. We need to write a pass to update all blockaddress that still refer to removed code labels to undef
+
 - constant folding

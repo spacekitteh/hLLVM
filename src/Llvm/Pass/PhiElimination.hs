@@ -6,7 +6,6 @@ module Llvm.Pass.PhiElimination (phiElimination) where
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
--- import Llvm.VmCore.CoreIrWriter()
 
 import Llvm.Pass.Rewriter
 #ifdef DEBUG
@@ -62,9 +61,9 @@ removePhi (PhiInst lhs t ins) live = if liveOperands == ins then
                                           else 
                                             return $ Just $ nodeToGraph $ Pinst $ PhiInst lhs t liveOperands
    where 
-#ifdef DEBUG     
+#ifdef DEBUG
      isAlive x s | trace ("isAlive is called with " ++ show x ++ "  " ++ show s) False = undefined
-     isAlive x s | trace ("isAlive result is " ++ show (labelOf x `mapMember` s)) False = undefined
+     isAlive x s | trace ("isAlive result is " ++ show (hooplLabelOf x `mapMember` s)) False = undefined
 #endif                                                                                          
      isAlive x s = (hooplLabelOf x) `mapMember` s
      liveOperands = foldl (\p -> \x@(_, PercentLabel li) -> 
@@ -85,11 +84,9 @@ phiElimination idom entry graph | trace ("killphi with idom " ++ show idom) Fals
 phiElimination idom entry graph | trace ("killphi with entry " ++ show entry) False = undefined
 #endif
 phiElimination idom entry graph = 
-  let idom' = mapInsert entry entry idom
-      fwd = fwdPass idom'
-  in
-   do { (graph', _, _) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph
-                              (mapInsert entry idom' mapEmpty)
-      ; return graph'
-      }
-
+  let idom0 = mapInsert entry entry idom
+      fwd = fwdPass idom0
+  in do { (graph0, _, _) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph
+                            (mapInsert entry idom0 mapEmpty)
+        ; return graph0
+        }

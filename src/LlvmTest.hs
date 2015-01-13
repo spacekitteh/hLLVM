@@ -6,7 +6,7 @@ import Data.Maybe
 import ParserTester
 import Ast2IrTester
 import Ir2AstTester
-import Llvm.Pass.Optimizer 
+import Llvm.Pass.Optimizer
 import qualified Llvm.Pass.Mem2Reg as M2R
 import qualified Llvm.Pass.Liveness as L
 import Llvm.Pass.PassManager
@@ -61,14 +61,14 @@ astcanonic = AstCanonic { input = def &= typ "<INPUT>" &= argPos 0
               
 pass = Pass { input = def &= typ "<INPUT>" &= argPos 0
             , output = outFlags Nothing
-            , fuel = def &= typ "FUEL" &= help "The fuel used to run the pass"
+            , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
             , step = def &= typ "STEP" &= help "Supported steps : mem2reg, dce. Multiple passes are supported by specifying multiple --step s, e.g., --step=mem2reg --step=dce"
             } &= help "Test Optimization pass"
          
 
 phielim = PhiElim { input = def &= typ "<INPUT>" &= argPos 0
                   , output = outFlags Nothing
-                  , fuel = def &= typ "FUEL" &= help "The fuel used to run the pass"
+                  , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
                   } &= help "Test PhiElim pass"
 
          
@@ -122,23 +122,24 @@ main = do { sel <- cmdArgsRun mode
             PhiElim ix ox f -> do { inh <- openFile ix ReadMode
                                 ; outh <- openFileOrStdout ox
                                 ; ast <- testParser ix inh
-                                ; let (m, ir) = testAst2Ir ast
-                                ; let ir' = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir)
-                                ; let ast' = testIr2Ast m ir'
-                                ; writeOutLlvm ast' outh
+                                ; let ast1 = S.simplify ast
+                                ; let (m, ir) = testAst2Ir ast1
+                                ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir)
+                                ; let ast2 = testIr2Ast m ir1
+                                ; writeOutLlvm ast2 outh
                                 ; hClose inh
                                 ; closeFileOrStdout ox outh
                                 }
             Pass ix ox passes f -> do { inh <- openFile ix ReadMode
                                       ; outh <- openFileOrStdout ox
-                                      ; ast' <- testParser ix inh
-                                      ; let ast = S.simplify ast'
-                                      ; let (m, ir) = testAst2Ir ast
+                                      ; ast <- testParser ix inh
+                                      ; let ast1 = S.simplify ast
+                                      ; let (m, ir) = testAst2Ir ast1
                                       ; let applySteps' = applySteps (extractSteps passes) ir
-                                      ; let ir' = H.runSimpleUniqueMonad $ H.runWithFuel f applySteps'
-                                      ; let ir'' = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir')
-                                      ; let ast' = testIr2Ast m ir''
-                                      ; writeOutLlvm ast' outh
+                                      ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f applySteps'
+                                      ; let ir2 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir1)
+                                      ; let ast2 = testIr2Ast m ir2
+                                      ; writeOutLlvm ast2 outh
                                       ; hClose inh
                                       ; closeFileOrStdout ox outh
                                       }

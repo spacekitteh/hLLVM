@@ -4,7 +4,7 @@ green=`tput setaf 2`
 reset=`tput sgr0`
 
 if [ "$#" -ne 2 ]; then
-   echo "usage: $0 <pass> <absolute_path_of_llvm_test_directory>"
+   echo "usage: $0 <step> <absolute_path_of_llvm_test_directory>"
    exit 1;
 fi
 
@@ -35,4 +35,5 @@ for i in $(cat /tmp/llvmfiles.list); do
         echo $i >> skipped.list
     fi
 done
+echo "${red}`cat skipped.list | wc -l` files are skipped!${reset}"
 echo "${green}All tests are done!${reset}"

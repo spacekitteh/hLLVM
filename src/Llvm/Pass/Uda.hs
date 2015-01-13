@@ -13,8 +13,8 @@ import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Boo
 import Debug.Trace
 #endif
 
-data UDA = UDA { u1 :: Ds.Set GlobalOrLocalId
-               , d1 :: Ds.Set GlobalOrLocalId
+data UDA = UDA { u1 :: Ds.Set GlobalOrLocalId -- uses
+               , d1 :: Ds.Set GlobalOrLocalId -- defs
                , addr :: Ds.Set GlobalOrLocalId
                } deriving (Show, Eq, Ord)
         
@@ -129,7 +129,6 @@ uDofFunName (FunNameString _) = mempty
 
 uDofCallSite :: CallSite -> UDA
 uDofCallSite (CsFun _ _ _ fn params _) = (uDofFunName fn) `mappend` (mconcat $ map uDofActualParam params)
-                                         
 uDofCallSite (CsAsm _ _ _ _ _ _ params _) = mconcat $ map uDofActualParam params
 uDofCallSite (CsConversion _ _ c params _) = let s = uDofConversion uDofTypedConst c
                                              in s `mappend` (mconcat $ map uDofActualParam params)
