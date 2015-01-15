@@ -28,7 +28,7 @@ instance AsmPrint LabelId where
   toLlvm (LabelString s) = toLlvm s 
   toLlvm (LabelNumber n) = integer n
   toLlvm (LabelQuoteNumber n) = doubleQuotes $ integer n
-  toLlvm (LabelQuoteString s) = doubleQuotes $ toLlvm s
+  toLlvm (LabelDqString s) = doubleQuotes $ toLlvm s
 
 instance AsmPrint PercentLabel where
   toLlvm (PercentLabel li) = char '%' <> (toLlvm li)
@@ -431,7 +431,7 @@ instance AsmPrint CallConv where
 instance AsmPrint Visibility where
   toLlvm = P.print
 
-instance AsmPrint DllStorage where
+instance AsmPrint DllStorageClass where
   toLlvm = P.print
   
 instance AsmPrint ThreadLocalStorage where  
@@ -449,11 +449,13 @@ instance AsmPrint SelectionKind where
 instance AsmPrint AddrNaming where
   toLlvm = P.print
 
-instance AsmPrint QuoteStr where
+instance AsmPrint DqString where
   toLlvm = P.print
 
+{-
 instance AsmPrint PlainStr where
   toLlvm = P.print 
+-}
 
 instance AsmPrint Section where
   toLlvm = P.print
@@ -488,7 +490,7 @@ instance AsmPrint GlobalId where
 instance AsmPrint SimpleConstant where
   toLlvm = P.print
                           
-instance AsmPrint FenceOrder where
+instance AsmPrint AtomicMemoryOrdering where
   toLlvm = P.print
 
 instance AsmPrint AtomicOp where
@@ -587,8 +589,6 @@ instance AsmPrint AbiAlign where
 instance AsmPrint PrefAlign where
   toLlvm = P.print
   
-  
-
 instance AsmPrint LayoutSpec where  
   toLlvm = P.print
   
@@ -599,7 +599,4 @@ instance AsmPrint SideEffect where
   toLlvm = P.print
   
 instance AsmPrint AlignStack where  
-  toLlvm = P.print
-  
-instance AsmPrint DoubleQuotedString where  
   toLlvm = P.print

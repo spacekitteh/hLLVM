@@ -54,24 +54,24 @@ iter1 l = let (l1, m1) = unzip $ fmap rnToplevel1 l
           in (l1, foldl M.union M.empty m1)
 
 rnToplevel1 :: Toplevel -> (Toplevel, M.Map GlobalId (St.Set Integer))
-rnToplevel1 (ToplevelDefine fp bs) = 
+rnToplevel1 (ToplevelDefine fp@(FunctionPrototype _ _ _ _ _ fhName _ _ _ _ _ _ _ _ _) bs) = 
   let ((fp2, bs2), mys) = S.runState (do { fp' <- rnDefFunctionPrototype fp
                                          ; bs' <- S.mapM rnBlock bs
                                          ; return (fp', bs')
                                          }) (defaultMyState 0 (show fp) St.empty)
-  in ((ToplevelDefine fp2 bs2), M.insert (fhName fp) (get curFn mys) M.empty)
+  in ((ToplevelDefine fp2 bs2), M.insert fhName (get curFn mys) M.empty)
 rnToplevel1 x = (x, M.empty)
 
 
 getGlobalId :: FunctionPrototype -> GlobalId
-getGlobalId = fhName 
+getGlobalId (FunctionPrototype _ _ _ _ _ fhName _ _ _ _ _ _ _ _ _) = fhName 
 
 rnDefFunctionPrototype :: FunctionPrototype -> MS FunctionPrototype
-rnDefFunctionPrototype fpt@(FunctionPrototype _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) = 
-  do { fp' <- rnDefFormalParamList (fhParams fpt) -- implicit variable starting from formal parameters
-     ; prefix' <- rnPrefix (fhPrefix fpt)
-     ; prologue' <- rnPrologue (fhPrologue fpt) 
-     ; return $ fpt { fhParams = fp', fhPrefix = prefix', fhPrologue = prologue' } 
+rnDefFunctionPrototype fpt@(FunctionPrototype v1 v2 v3 v4 v5 v6 fhParams v8 v9 v10 v11 v12 v13 fhPrefix fhPrologue) = 
+  do { fp' <- rnDefFormalParamList fhParams -- implicit variable starting from formal parameters
+     ; prefix' <- rnPrefix fhPrefix
+     ; prologue' <- rnPrologue fhPrologue 
+     ; return $ FunctionPrototype v1 v2 v3 v4 v5 v6 fp' v8 v9 v10 v11 v12 v13  prefix' prologue'
      }
   
   
@@ -97,7 +97,7 @@ rnDefFparam (FexplicitParam x) = S.liftM FexplicitParam (rnDefLocalId x)
 rnLabelId :: LabelId -> MS LabelId
 rnLabelId (LabelNumber i) = return $ LabelString $ Lstring (lbPrefix ++ show i)
 rnLabelId x@(LabelQuoteNumber i) = return x -- return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
-rnLabelId x@(LabelQuoteString (Lstring s)) = return x --
+rnLabelId x@(LabelDqString (Lstring s)) = return x --
 {-
   case reads s :: [(Integer, String)] of
     [(_, "")] -> return $ LabelQuoteString $ Lstring (lbPrefix ++ s)
@@ -435,9 +435,9 @@ iter2 m tl | trace ("iter2 " ++ show m) False = undefined
 iter2 m tl = fmap (\x -> R.runReader (rnToplevel2 x) m) tl
   
 rnToplevel2 :: Toplevel -> RD Toplevel
-rnToplevel2 g@(ToplevelGlobal _ _ _ _ _ _ _ _ _ _ _ _ _ _) = 
-  do { x <- maybe (return Nothing) (\x -> R.liftM Just (rnConst2 x)) (toplevelGlobalConst g)
-     ; return (g { toplevelGlobalConst = x })
+rnToplevel2 (ToplevelGlobal v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 const v12 v13 v14) = 
+  do { x <- maybe (return Nothing) (\x -> R.liftM Just (rnConst2 x)) const
+     ; return (ToplevelGlobal v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 const v12 v13 v14)
      }
 rnToplevel2 x = return x
 
@@ -490,7 +490,7 @@ rnLabelId2 g l@(LabelQuoteNumber i) = return l
                                          ; if b then return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
                                            else return l
                                          }-}
-rnLabelId2 g x@(LabelQuoteString (Lstring s)) = return x 
+rnLabelId2 g x@(LabelDqString (Lstring s)) = return x 
 {-
   case reads s :: [(Integer, String)] of
     [(i, "")] -> do { b <- rnNumId2 g i

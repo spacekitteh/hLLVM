@@ -105,7 +105,7 @@ instance IrPrint LabelId where
   printIr (LabelString l) = printIr l
   printIr (LabelNumber l) = printIr l
   printIr (LabelQuoteNumber l) = printIr l
-  printIr (LabelQuoteString l) = printIr l
+  printIr (LabelDqString l) = printIr l
 
 instance IrPrint PercentLabel where
   printIr (PercentLabel li) = char '%' <> (printIr li)
@@ -547,7 +547,7 @@ instance IrPrint CallConv where
 instance IrPrint Visibility where
   printIr = P.print
 
-instance IrPrint DllStorage where
+instance IrPrint DllStorageClass where
   printIr = P.print
   
 instance IrPrint ThreadLocalStorage where  
@@ -565,11 +565,9 @@ instance IrPrint SelectionKind where
 instance IrPrint AddrNaming where
   printIr = P.print
 
-instance IrPrint QuoteStr where
+instance IrPrint DqString where
   printIr = P.print
 
-instance IrPrint PlainStr where
-  printIr = P.print 
 
 instance IrPrint Section where
   printIr = P.print
@@ -604,7 +602,7 @@ instance IrPrint GlobalId where
 instance IrPrint SimpleConstant where
   printIr = P.print
                           
-instance IrPrint FenceOrder where
+instance IrPrint AtomicMemoryOrdering where
   printIr = P.print
 
 instance IrPrint AtomicOp where
@@ -714,6 +712,3 @@ instance IrPrint SideEffect where
   
 instance IrPrint AlignStack where  
   printIr = P.print
-  
-instance IrPrint DoubleQuotedString where  
-  printIr = P.print  

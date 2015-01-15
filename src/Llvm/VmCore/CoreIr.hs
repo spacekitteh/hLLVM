@@ -10,14 +10,14 @@ import Compiler.Hoopl (Label)
 
 -- | We have to keep the original label kinds to map Hoopl labels back to labels that llvm-as likes
 data LabelId = LabelString Label
-             | LabelQuoteString Label
+             | LabelDqString Label
              | LabelNumber Label
              | LabelQuoteNumber Label  
              deriving (Eq, Ord, Show)
                       
 hooplLabelOf :: LabelId -> Label
 hooplLabelOf (LabelString x) = x
-hooplLabelOf (LabelQuoteString x) = x
+hooplLabelOf (LabelDqString x) = x
 hooplLabelOf (LabelNumber x) = x
 hooplLabelOf (LabelQuoteNumber x) = x
 
@@ -196,7 +196,7 @@ data Const = Ccp SimpleConstant
 data MdVar = MdVar String deriving (Eq,Ord,Show)
 data MdNode = MdNode String deriving (Eq,Ord,Show)
 data MetaConst = MdConst Const
-               | MdString QuoteStr
+               | MdString DqString
                | McMn MdNode
                | McMv MdVar
                | MdRef LocalId
@@ -228,11 +228,11 @@ data MemOp =
   | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
   | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) 
   -- | fence 
-  | Fence (IsOrIsNot SingleThread) FenceOrder
+  | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
   -- | cmpxchg v1:u1u2d2 v2:u1 v3:u1 
-  | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) FenceOrder FenceOrder
+  | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
   -- | atomicrmw v1:u1u2d2 v2:u1 
-  | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) FenceOrder
+  | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering
   deriving (Eq,Ord,Show)
                          
 data FunName = 
@@ -242,7 +242,7 @@ data FunName =
     deriving (Eq,Ord,Show)
              
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
+              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr] 
               | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
@@ -305,16 +305,9 @@ targetOf (Invoke _ _ t1 t2) = [t1,t2]
 targetOf (Resume _) = []
 targetOf Unwind = []
 
-                             
-data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg] 
-                           deriving (Eq,Show)
+data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg] deriving (Eq,Show)
 
-data ActualParam = ActualParam { actualParamType :: Type
-                               , actualParamPreAttrs :: [ParamAttr]
-                               , actualParamAlign :: Maybe Alignment
-                               , actualParamValue :: Value -- u1
-                               , actualParamPostAttrs :: [ParamAttr]
-                               } deriving (Eq,Ord,Show)
+data ActualParam = ActualParam Type [ParamAttr] (Maybe Alignment) Value [ParamAttr] deriving (Eq,Ord,Show)
                           
                                             
 data Value = VgOl GlobalOrLocalId 
@@ -326,7 +319,8 @@ data Value = VgOl GlobalOrLocalId
            deriving (Eq,Ord,Show)
 
 data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
-data TypedConst = TypedConst Type Const | TypedConstNull deriving (Eq,Ord,Show)
+data TypedConst = TypedConst Type Const 
+                | TypedConstNull deriving (Eq,Ord,Show)
                                           
 
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
@@ -338,23 +332,22 @@ data Aliasee = AtV TypedValue -- u1
              | AgEp (GetElemPtr TypedConst)
              deriving (Eq,Show)
                         
-data FunctionPrototype = FunctionPrototype
-                         { fhLinkage :: Maybe Linkage
-                         , fhVisibility :: Maybe Visibility
-                         , fhCCoonc :: Maybe CallConv
-                         , fhAttr   :: [ParamAttr]
-                         , fhRetType :: Type
-                         , fhName    :: GlobalId
-                         , fhParams  :: FormalParamList
-                         , fhAddrNaming :: Maybe AddrNaming                       
-                         , fhAttr1   :: [FunAttr] -- Collection
-                         , fhSection :: Maybe Section
-                         , fhComdat :: Maybe Comdat
-                         , fhAlign :: Maybe Alignment
-                         , fhGc :: Maybe Gc
-                         , fhPrefix :: Maybe Prefix
-                         , fhPrologue :: Maybe Prologue                        
-                         }            
+data FunctionPrototype = FunctionPrototype 
+                         (Maybe Linkage)
+                         (Maybe Visibility)
+                         (Maybe CallConv)
+                         [ParamAttr]
+                         Type
+                         GlobalId
+                         FormalParamList
+                         (Maybe AddrNaming)                       
+                         [FunAttr]
+                         (Maybe Section)
+                         (Maybe Comdat)
+                         (Maybe Alignment)
+                         (Maybe Gc)
+                         (Maybe Prefix)
+                         (Maybe Prologue)
                        deriving (Eq,Ord,Show)
 
 data Prefix = Prefix TypedConst deriving (Eq, Ord, Show)
@@ -366,6 +359,6 @@ getTargetLabel (TargetLabel (PercentLabel l)) = toLabel l
 
 toLabel :: LabelId -> Label 
 toLabel (LabelString l) = l
-toLabel (LabelQuoteString l) = l
+toLabel (LabelDqString l) = l
 toLabel (LabelNumber l) = l
 toLabel (LabelQuoteNumber l) = l

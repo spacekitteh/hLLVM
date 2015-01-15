@@ -250,7 +250,7 @@ pCallAsm = do { t <- pType
               ; (s1, s2) <- pTuple pQuoteStr
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
-              ; return (not $ isVoidType t, CsAsm t se as dialect (QuoteStr s1) (QuoteStr s2) params atts1)
+              ; return (not $ isVoidType t, CsAsm t se as dialect (DqString s1) (DqString s2) params atts1)
               }
 
 pCallConversion :: P (Bool, CallSite)

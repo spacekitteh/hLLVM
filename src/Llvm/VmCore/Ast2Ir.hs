@@ -21,7 +21,7 @@ type MyLabelMapM = LabelMapM H.SimpleUniqueMonad
 -- 2. All unreachable code are removed in Ir
 instance Converter (A.LabelId) (MyLabelMapM I.LabelId) where
   convert l@(A.LabelString _) = Md.liftM I.LabelString (labelFor $ A.labelIdToLstring l)
-  convert l@(A.LabelQuoteString _) = Md.liftM I.LabelQuoteString (labelFor $ A.labelIdToLstring l)
+  convert l@(A.LabelDqString _) = Md.liftM I.LabelDqString (labelFor $ A.labelIdToLstring l)
   convert l@(A.LabelNumber _) = Md.liftM I.LabelNumber (labelFor $ A.labelIdToLstring l)
   convert l@(A.LabelQuoteNumber _) = Md.liftM I.LabelQuoteNumber (labelFor $ A.labelIdToLstring l)
 
@@ -382,7 +382,7 @@ instance Converter A.TerminatorInstWithDbg (MyLabelMapM I.TerminatorInstWithDbg)
 
 toSingleNodeGraph :: A.Block -> MyLabelMapM (H.Graph I.Node H.C H.C)
 -- toSingleNodeGraph b | trace ("toSingleNodeGraph " ++ toLlvm b) False = undefined
-toSingleNodeGraph (A.Block { A.lbl = f, A.phi = phi, A.comp = ms, A.term = l }) =
+toSingleNodeGraph (A.Block f  phi ms l) =
   do { f'  <- toFirst f
      ; phi' <- mapM toPhi phi
      ; ms' <- mapM toMid ms
@@ -406,10 +406,10 @@ toLast inst = convert inst >>= return . I.Tinst
 getEntryAndAlist :: [A.Block] -> MyLabelMapM (H.Label, [A.Lstring])
 getEntryAndAlist [] = error "Parsed procedures should not be empty"
 getEntryAndAlist bs = 
-  do { l <- convert $ A.lbl $ head bs
+  do { l <- convert $ A.blockLabel $ head bs
      ; let l' = case l of
               I.BlockLabel x -> I.toLabel x
-     ; let ord = map (\b -> case A.lbl b of 
+     ; let ord = map (\b -> case A.blockLabel b of 
                              A.ImplicitBlockLabel p -> error $ "irrefutable implicitblock " ++ show p ++ " should be normalized in AstSimplify" -- A.labelIdToString x
                              A.ExplicitBlockLabel x -> A.labelIdToLstring x
                      ) bs
@@ -430,13 +430,6 @@ getBody :: forall n. H.Graph n H.C H.C -> MyLabelMapM (H.Graph n H.C H.C)
 getBody graph = LabelMapM f
   where f m = return (m, graph)
 
-{-
-run :: MyLabelMapM a -> M (IdLabelMap, a)
-run (MyLabelMapM f) = 
-  do { x <- f (IdLabelMap { a2h = M.empty, h2a = M.empty, alist = M.empty})
-     ; return x
-     }
--}
 
 blockToGraph :: A.FunctionPrototype -> [A.Block] -> MyLabelMapM (H.Label, H.Graph I.Node H.C H.C)
 blockToGraph fn blocks = 

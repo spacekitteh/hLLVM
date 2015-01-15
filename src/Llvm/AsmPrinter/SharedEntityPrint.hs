@@ -2,7 +2,7 @@
 module Llvm.AsmPrinter.SharedEntityPrint where
 import Prelude (($),fmap, Maybe(..),maybe, (.),null)
 
-import Text.PrettyPrint
+import Llvm.AsmPrinter.Common -- Text.PrettyPrint
 import Llvm.VmCore.DataLayout
 import Llvm.VmCore.SharedEntity
 
@@ -10,10 +10,11 @@ import Llvm.VmCore.SharedEntity
 class Print a where
   print :: a -> Doc
   
+{-  
 sepOptToLlvmX :: Print a => (Doc -> Doc) -> Maybe a -> Doc
 sepOptToLlvmX _  (Nothing) = empty
 sepOptToLlvmX sep (Just x) = sep $ print x
-  
+-}  
   
 instance Print Endianness where
   print LittleEndian = char 'e'
@@ -55,26 +56,24 @@ instance Print LayoutSpec where
     DlP ls s a n -> char 'p' <> (print ls) 
                     <> char ':' <> (print s) 
                     <> char ':' <> (print a) 
-                    <> sepOptToLlvmX (\x -> char ':' <> x) n
+                    <> sepMaybe print (char ':' <>) n
     DlI s a n -> char 'i' <> (print s)
                  <> char ':' <> (print a)
-                 <> sepOptToLlvmX (\x -> char ':' <> x) n
+                 <> sepMaybe print (char ':' <>) n
     DlF s a n -> char 'f' <> (print s)
                  <> char ':' <> (print a)
-                 <> sepOptToLlvmX (\x -> char ':' <> x) n
+                 <> sepMaybe print (char ':' <>) n
     DlV s a n -> char 'v' <> (print s)
                  <> char ':' <> (print a)
-                 <> sepOptToLlvmX (\x -> char ':' <> x) n
+                 <> sepMaybe print (char ':' <>) n
     DlA s a n -> char 'a' <> (maybe empty print s)
                  <> char ':' <> (print a)
-                 <> sepOptToLlvmX (\x -> char ':' <> x) n
+                 <> sepMaybe print (char ':' <>) n
     DlM m -> char 'm' <> char ':' <> (print m)
     DlN l -> char 'n' <> (hcat $ punctuate (char ':') $ fmap print l)
   
 instance Print DataLayout where
   print (DataLayout l) = doubleQuotes (hcat $ punctuate (char '-') $ fmap print l)
-  
-    
   
 instance Print IcmpOp where
   print IcmpEq = text "eq"
@@ -161,14 +160,14 @@ instance Print CallConv where
   print CcX86_64_SysV = text "x86_64_sysvcc"
 
 instance Print Visibility where
-  print Default = text "default"
-  print Hidden = text "hidden"
-  print Protected = text "protected"
+  print VisDefault = text "default"
+  print VisHidden = text "hidden"
+  print VisProtected = text "protected"
 
 
-instance Print DllStorage where
-  print DllImport = text "dllimport"
-  print DllExport = text "dllexport"
+instance Print DllStorageClass where
+  print DscImport = text "dllimport"
+  print DscExport = text "dllexport"
   
 instance Print ThreadLocalStorage where  
   print x = let d = case x of 
@@ -241,11 +240,13 @@ instance Print AddrNaming where
   print UnnamedAddr = text "unnamed_addr"
   print NamedAddr = empty
 
-instance Print QuoteStr where
-  print (QuoteStr x) = doubleQuotes $ text x
+instance Print DqString where
+  print (DqString x) = doubleQuotes $ text x
 
+{-
 instance Print PlainStr where
   print (PlainStr x) = text x
+-}
 
 instance Print Section where
   print (Section s) = text "section" <+> (print s)
@@ -285,12 +286,12 @@ instance Print GlobalOrLocalId where
 instance Print LocalId where
   print (LocalIdNum s) = char '%'<>(integer s)
   print (LocalIdAlphaNum s) = char '%' <> print s
-  print (LocalIdQuoteStr s) = char '%' <> (doubleQuotes $ print s)
+  print (LocalIdDqString s) = char '%' <> (doubleQuotes $ print s)
                       
 instance Print GlobalId where
   print (GlobalIdNum s) = char '@'<>(integer s)
   print (GlobalIdAlphaNum s) = char '@'<>print s
-  print (GlobalIdQuoteStr s) = char '@'<> (doubleQuotes $ print s)
+  print (GlobalIdDqString s) = char '@'<> (doubleQuotes $ print s)
 
   
 instance Print SimpleConstant where
@@ -307,27 +308,27 @@ instance Print SimpleConstant where
     CpGlobalAddr g -> print g
     CpStr s -> char 'c'<> (doubleQuotes $ text s)
                           
-instance Print FenceOrder where
-  print Acquire = text "acquire"
-  print Release = text "release"
-  print AcqRel =  text "acq_rel"
-  print SeqCst = text "seq_cst"
-  print Unordered = text "unordered"
-  print Monotonic = text "monotonic"
+instance Print AtomicMemoryOrdering where
+  print AmoAcquire = text "acquire"
+  print AmoRelease = text "release"
+  print AmoAcqRel =  text "acq_rel"
+  print AmoSeqCst = text "seq_cst"
+  print AmoUnordered = text "unordered"
+  print AmoMonotonic = text "monotonic"
 
 
 instance Print AtomicOp where
-    print Axchg = text "xchg"
-    print Aadd = text "add"
-    print Asub = text "sub"
-    print Aand = text "and"
-    print Anand = text "nand"
-    print Aor = text "or"
-    print Axor = text "xor"
-    print Amax = text "max"
-    print Amin = text "min"
-    print Aumax = text "umax"
-    print Aumin = text "umin"                   
+    print AoXchg = text "xchg"
+    print AoAdd = text "add"
+    print AoSub = text "sub"
+    print AoAnd = text "and"
+    print AoNand = text "nand"
+    print AoOr = text "or"
+    print AoXor = text "xor"
+    print AoMax = text "max"
+    print AoMin = text "min"
+    print AoUmax = text "umax"
+    print AoUmin = text "umin"                   
     
 instance Print AddrSpace where
   print (AddrSpace n) = text "addrspace" <+> (parens $ integer n)
@@ -352,14 +353,10 @@ instance Print Type where
     Tpointer t addr -> print t <+> print addr <+> text "*"
     Tfunction t fp atts -> print t <+> print fp <+> (hsep $ punctuate comma $ fmap print atts)
     
-    
-    
-
 instance Print Fparam where
   print (FimplicitParam) = text "; implicit param\n"
   print (FexplicitParam x) = print x
   
-
 instance Print FormalParam where
   print (FormalParam t att1 align id att2) =
     (print t) <+> (hsep $ fmap print att1) <> (maybe empty ((comma <+>) . print) align)
@@ -367,15 +364,10 @@ instance Print FormalParam where
 
 instance Print FormalParamList where
   print (FormalParamList params b atts) =
-    parens ((hsep $ punctuate comma $ fmap print params) <+>
-            (if b then (if null params then empty else comma) <+> text "..." else empty))
-    <+> (hsep $ fmap print atts)
-
+    parens ((hsep $ punctuate comma $ fmap print params) <+> print b) <+> (hsep $ fmap print atts)
 
 instance Print TypeParamList where
-  print (TypeParamList params b) =
-    parens ((hsep $ punctuate comma $ fmap print params) <+>
-            (if b then (if null params then empty else comma) <+> text "..." else empty))
+  print (TypeParamList params b) = parens ((hsep $ punctuate comma $ fmap print params) <+> print b)
     
 instance Print InAllocaAttr where
   print s = case s of
@@ -418,7 +410,7 @@ instance Print TailCall where
 instance Print DollarId where
   print (DollarIdNum n) = char '$' <> (integer n)
   print (DollarIdAlphaNum s) = char '$' <> (print s)
-  print (DollarIdQuoteStr s) = char '$' <> (doubleQuotes $ print s)
+  print (DollarIdDqString s) = char '$' <> (doubleQuotes $ print s)
                                     
                         
 instance Print Comdat where
@@ -453,6 +445,10 @@ instance Print SideEffect where
 instance Print AlignStack where  
   print AlignStack = text "alignstack"
   
-  
+{-  
 instance Print DoubleQuotedString where  
   print (DoubleQuotedString s) = doubleQuotes $ text s
+-}
+
+instance Print VarArgParam where
+  print VarArgParam = text "..."

@@ -142,7 +142,7 @@ idChar c = isAlphaNum c || c == '$' || c == '.' || c == '_' || c == '-'
 pLocalId :: P LocalId
 pLocalId = do { x <- lexeme (char '%' >> choice [ liftM LocalIdNum decimal
                                                 , liftM (LocalIdAlphaNum . Lstring) (many1 (satisfy idChar))
-                                                , liftM (LocalIdQuoteStr . Lstring) pQuoteStr
+                                                , liftM (LocalIdDqString . Lstring) pQuoteStr
                                                 ])
               ; return x
               }
@@ -150,13 +150,13 @@ pLocalId = do { x <- lexeme (char '%' >> choice [ liftM LocalIdNum decimal
 pGlobalId :: P GlobalId
 pGlobalId = lexeme (char '@' >> choice [ liftM GlobalIdNum decimal
                                        , liftM (GlobalIdAlphaNum . Lstring) (many1 (satisfy idChar))
-                                       , liftM (GlobalIdQuoteStr . Lstring) pQuoteStr
+                                       , liftM (GlobalIdDqString . Lstring) pQuoteStr
                                        ])
 
 pDollarId :: P DollarId
 pDollarId = lexeme (char '$' >> choice [ liftM DollarIdNum decimal
                                        , liftM (DollarIdAlphaNum . Lstring) pId 
-                                       , liftM (DollarIdQuoteStr . Lstring) pQuoteStr
+                                       , liftM (DollarIdDqString . Lstring) pQuoteStr
                                        ])
 
 
@@ -203,7 +203,7 @@ pLabelId = choice [ do { s <- (many1 (satisfy lblChar))
                   , do { s <- pQuoteStr
                        ; case readInteger s of
                            Right x -> return $ LabelQuoteNumber x
-                           Left x -> return $ LabelQuoteString $ Lstring x
+                           Left x -> return $ LabelDqString $ Lstring x
                        }
                   ]
            where
@@ -303,9 +303,9 @@ pCallConv = choice [ try (reserved "ccc") >> return Ccc
 
 
 pVisibility :: P Visibility
-pVisibility = (reserved "default" >> return Default)
-              <|> (reserved "hidden" >> return Hidden)
-              <|> (reserved "protected" >> return Protected)
+pVisibility = (reserved "default" >> return VisDefault)
+              <|> (reserved "hidden" >> return VisHidden)
+              <|> (reserved "protected" >> return VisProtected)
 
 
 pLinkage :: P Linkage
@@ -408,9 +408,9 @@ pAliasLinkage = choice [ reserved "private" >> return LinkagePrivate
                        , reserved "external" >> return LinkageExternal
                        ]
 
-pDllStorageClass :: P DllStorage
-pDllStorageClass = choice [ reserved "dllimport" >> return DllImport
-                          , reserved "dllexport" >> return DllExport
+pDllStorageClass :: P DllStorageClass
+pDllStorageClass = choice [ reserved "dllimport" >> return DscImport
+                          , reserved "dllexport" >> return DscExport
                           ] 
 pThreadLocalStorageClass :: P ThreadLocalStorage                   
 pThreadLocalStorageClass = reserved "thread_local" >> option TlsNone (parens (choice [ reserved "localdynamic" >> return TlsLocalDynamic
@@ -458,7 +458,7 @@ pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens decimal
                    , reserved "sspstrong" >> return FaSspStrong
                    , reserved "uwtable" >> return FaUwTable
                    , reserved "align" >> liftM FaAlign integer
-                   , liftM QuoteStr pQuoteStr >>= \s1 -> opt (symbol "=" >> liftM QuoteStr pQuoteStr) >>= \s2 -> return (FaPair s1 s2)
+                   , liftM DqString pQuoteStr >>= \s1 -> opt (symbol "=" >> liftM DqString pQuoteStr) >>= \s2 -> return (FaPair s1 s2)
                    ]
 
 pCarry :: P TrapFlag
@@ -483,7 +483,7 @@ pNonnull :: P Nonnull
 pNonnull = char '!' >> reserved "nonnull" >> char '!' >> liftM Nonnull decimal
 
 pSection :: P Section
-pSection =  reserved "section" >> liftM (Section . QuoteStr) pQuoteStr
+pSection =  reserved "section" >> liftM (Section . DqString) pQuoteStr
 
 
 pSelectionKind :: P SelectionKind
@@ -503,27 +503,27 @@ pGlobalType = choice [ reserved "constant" >> return (GlobalType "constant")
                      ]
 
 
-pFenceOrder :: P FenceOrder
-pFenceOrder = choice [ reserved "acquire" >> return Acquire
-                     , reserved "release" >> return Release
-                     , reserved "acq_rel" >> return AcqRel
-                     , reserved "seq_cst" >> return SeqCst
-                     , reserved "unordered" >> return Unordered
-                     , reserved "monotonic" >> return Monotonic
+pFenceOrder :: P AtomicMemoryOrdering
+pFenceOrder = choice [ reserved "acquire" >> return AmoAcquire
+                     , reserved "release" >> return AmoRelease
+                     , reserved "acq_rel" >> return AmoAcqRel
+                     , reserved "seq_cst" >> return AmoSeqCst
+                     , reserved "unordered" >> return AmoUnordered
+                     , reserved "monotonic" >> return AmoMonotonic
                      ]
 
 pAtomicOp :: P AtomicOp
-pAtomicOp = choice [ reserved "xchg" >> return Axchg
-                   , reserved "add" >> return Aadd
-                   , reserved "sub" >> return Asub
-                   , reserved "and" >> return Aand
-                   , reserved "nand" >> return Anand
-                   , reserved "or" >> return Aor
-                   , reserved "xor" >> return Axor
-                   , reserved "max" >> return Amax
-                   , reserved "min" >> return Amin
-                   , reserved "umax" >> return Aumax
-                   , reserved "umin" >> return Aumin
+pAtomicOp = choice [ reserved "xchg" >> return AoXchg
+                   , reserved "add" >> return AoAdd
+                   , reserved "sub" >> return AoSub
+                   , reserved "and" >> return AoAnd
+                   , reserved "nand" >> return AoAnd
+                   , reserved "or" >> return AoOr
+                   , reserved "xor" >> return AoXor
+                   , reserved "max" >> return AoMax
+                   , reserved "min" >> return AoMin
+                   , reserved "umax" >> return AoUmax
+                   , reserved "umin" >> return AoUmin
                    ]
 
 pFunAttrCollection :: P [FunAttr] -- Collection          

@@ -20,7 +20,7 @@ type MyLabelMapM = LabelMapM H.SimpleUniqueMonad
 
 instance Converter I.LabelId (MyLabelMapM A.LabelId) where
   convert (I.LabelString l) = Md.liftM A.LabelString (labelIdFor l)
-  convert (I.LabelQuoteString l) = Md.liftM A.LabelQuoteString (labelIdFor l)
+  convert (I.LabelDqString l) = Md.liftM A.LabelDqString (labelIdFor l)
   convert (I.LabelNumber l) = do { A.Lstring s <- labelIdFor l
                                  ; let n = read s :: Integer
                                  ; return $ A.LabelNumber n

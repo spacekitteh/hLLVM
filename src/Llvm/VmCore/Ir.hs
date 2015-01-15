@@ -12,33 +12,33 @@ import qualified Data.Set as S
 
 {- An intermediate representation that is suitable for Hoopl -}
 
-data Toplevel = ToplevelTriple Ci.QuoteStr
+data Toplevel = ToplevelTriple Ci.DqString
               | ToplevelDataLayout Ci.DataLayout
-              | ToplevelAlias Ci.GlobalId (Maybe Ci.Visibility) (Maybe Ci.DllStorage) (Maybe Ci.ThreadLocalStorage) AddrNaming (Maybe Ci.Linkage) Ci.Aliasee
+              | ToplevelAlias Ci.GlobalId (Maybe Ci.Visibility) (Maybe Ci.DllStorageClass) (Maybe Ci.ThreadLocalStorage) AddrNaming (Maybe Ci.Linkage) Ci.Aliasee
               | ToplevelDbgInit String Integer
               | ToplevelStandaloneMd String Ci.TypedValue
               | ToplevelNamedMd Ci.MdVar [Ci.MdNode]
               | ToplevelDeclare Ci.FunctionPrototype
               | ToplevelDefine Ci.FunctionPrototype H.Label (H.Graph Node H.C H.C)
-              | ToplevelGlobal { toplevelGlobalLhs :: Maybe Ci.GlobalId
-                               , toplevelGlobalLinkage :: Maybe Ci.Linkage
-                               , toplevelGlobalVisibility :: Maybe Ci.Visibility
-                               , toplevelGlobalDllStorage :: Maybe Ci.DllStorage
-                               , toplevelGlobalThreadLocation :: Maybe Ci.ThreadLocalStorage
-                               , toplevelGlobalUnamedAddr :: AddrNaming
-                               , toplevelGlobalAddrSpace :: Maybe Ci.AddrSpace
-                               , toplevelGlobalExternallyInitialized :: IsOrIsNot Ci.ExternallyInitialized
-                               , toplevelGlobalGlobalType :: Ci.GlobalType
-                               , toplevelGlobalType :: Ci.Type
-                               , toplevelGlobalConst :: Maybe Ci.Const
-                               , toplevelGlobalSection :: Maybe Ci.Section
-                               , toplevelGlobalComdat :: Maybe Ci.Comdat
-                               , toplevelGlobalAlign :: Maybe Ci.Alignment
-                               }
+              | ToplevelGlobal 
+                (Maybe Ci.GlobalId)
+                (Maybe Ci.Linkage)
+                (Maybe Ci.Visibility)
+                (Maybe Ci.DllStorageClass)
+                (Maybe Ci.ThreadLocalStorage)
+                AddrNaming
+                (Maybe Ci.AddrSpace)
+                (IsOrIsNot Ci.ExternallyInitialized)
+                Ci.GlobalType
+                Ci.Type
+                (Maybe Ci.Const)
+                (Maybe Ci.Section)
+                (Maybe Ci.Comdat)
+                (Maybe Ci.Alignment)
               | ToplevelTypeDef Ci.LocalId Ci.Type
-              | ToplevelDepLibs [Ci.QuoteStr]
+              | ToplevelDepLibs [Ci.DqString]
               | ToplevelUnamedType Integer Ci.Type
-              | ToplevelModuleAsm Ci.QuoteStr
+              | ToplevelModuleAsm Ci.DqString
               | ToplevelAttribute Integer [FunAttr]
               | ToplevelComdat Ci.DollarId Ci.SelectionKind
                 

@@ -12,14 +12,14 @@ import Llvm.VmCore.DataLayout
 -- | it's still unclear when a quoted verion is used  
 -- | we keep the original format to make llvm-as happy 
 data LabelId = LabelString Lstring
-             | LabelQuoteString Lstring
+             | LabelDqString Lstring
              | LabelNumber Integer
              | LabelQuoteNumber Integer
              deriving (Eq,Ord,Show)
 
 labelIdToLstring :: LabelId -> Lstring
 labelIdToLstring (LabelString s) = s
-labelIdToLstring (LabelQuoteString s) = s
+labelIdToLstring (LabelDqString s) = s
 labelIdToLstring (LabelNumber n) = Lstring $ show n
 labelIdToLstring (LabelQuoteNumber n) = Lstring $ show n
 
@@ -99,7 +99,7 @@ data Prologue = Prologue TypedConst deriving (Eq, Ord, Show)
 data MdVar = MdVar String deriving (Eq,Ord,Show)
 data MdNode = MdNode String deriving (Eq,Ord,Show)
 data MetaConst = MdConst Const
-               | MdString QuoteStr
+               | MdString DqString
                | McMn MdNode
                | McMv MdVar
                | MdRef LocalId
@@ -124,9 +124,9 @@ data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Alig
            | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) 
            | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
            | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment)
-           | Fence (IsOrIsNot SingleThread) FenceOrder
-           | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) FenceOrder FenceOrder
-           | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) FenceOrder deriving (Eq,Ord,Show)
+           | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
+           | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
+           | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering deriving (Eq,Ord,Show)
 
 
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
@@ -137,7 +137,7 @@ data FunName = FunNameGlobal GlobalOrLocalId
                deriving (Eq,Ord,Show)
              
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect QuoteStr QuoteStr [ActualParam] [FunAttr] 
+              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr] 
               | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
@@ -202,23 +202,19 @@ data TerminatorInst =
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg] 
                              deriving (Eq,Show)
                                       
-data ActualParam = ActualParam { actualParamType :: Type
-                               , actualParamPreAttrs :: [ParamAttr]
-                               , actualParamAlign :: Maybe Alignment
-                               , actualParamValue :: Value
-                               , actualParamPostAttrs :: [ParamAttr]
-                               } deriving (Eq,Ord,Show)
+data ActualParam = ActualParam Type [ParamAttr] (Maybe Alignment) Value [ParamAttr]
+                 deriving (Eq,Ord,Show)
                           
                                             
 data Value = VgOl GlobalOrLocalId
            | Ve Expr
            | Vc Const
-           -- | Inline Assembler Expressions <http://llvm.org/releases/3.0/docs/LangRef.html#inlineasm>
---           | InlineAsm (Maybe SideEffect) (Maybe AlignStack) String String
            deriving (Eq,Ord,Show)
 
 data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
-data TypedConst = TypedConst Type Const | TypedConstNull deriving (Eq,Ord,Show)
+data TypedConst = TypedConst Type Const 
+                | TypedConstNull 
+                deriving (Eq,Ord,Show)
         
                                                 
 data Aliasee = AtV TypedValue
@@ -227,63 +223,59 @@ data Aliasee = AtV TypedValue
              deriving (Eq,Show)
                         
 data FunctionPrototype = FunctionPrototype
-                         { fhLinkage :: Maybe Linkage
-                         , fhVisibility :: Maybe Visibility
-                         , fhCCoonc :: Maybe CallConv
-                         , fhAttr   :: [ParamAttr]
-                         , fhRetType :: Type
-                         , fhName    :: GlobalId
-                         , fhParams  :: FormalParamList
-                         , fhUnamed  :: Maybe AddrNaming
-                         , fhAttr1   :: [FunAttr] -- Collection
-                         , fhSection :: Maybe Section
-                         , fhComdat :: Maybe Comdat
-                         , fhAlign :: Maybe Alignment
-                         , fhGc :: Maybe Gc
-                         , fhPrefix :: Maybe Prefix
-                         , fhPrologue :: Maybe Prologue
-                         } 
+                         (Maybe Linkage)
+                         (Maybe Visibility)
+                         (Maybe CallConv)
+                         [ParamAttr]
+                         Type
+                         GlobalId
+                         FormalParamList
+                         (Maybe AddrNaming)
+                         [FunAttr]
+                         (Maybe Section)
+                         (Maybe Comdat)
+                         (Maybe Alignment)
+                         (Maybe Gc)
+                         (Maybe Prefix)
+                         (Maybe Prologue)
                        deriving (Eq,Ord,Show)
 
 
-data Toplevel = ToplevelTriple QuoteStr
+data Toplevel = ToplevelTriple DqString
               | ToplevelDataLayout DataLayout
-              | ToplevelAlias GlobalId (Maybe Visibility) (Maybe DllStorage) (Maybe ThreadLocalStorage) AddrNaming (Maybe Linkage) Aliasee
+              | ToplevelAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage) AddrNaming (Maybe Linkage) Aliasee
               | ToplevelDbgInit String Integer
               | ToplevelStandaloneMd String TypedValue
               | ToplevelNamedMd MdVar [MdNode]
               | ToplevelDeclare FunctionPrototype
               | ToplevelDefine FunctionPrototype [Block]
-              | ToplevelGlobal { toplevelGlobalLhs :: Maybe GlobalId
-                               , toplevelGlobalLinkage :: Maybe Linkage
-                               , toplevelGlobalVisibility :: Maybe Visibility
-                               , toplevelGlobalDllStorage :: Maybe DllStorage
-                               , toplevelGlobalThreadLocation :: Maybe ThreadLocalStorage
-                               , toplevelGlobalUnamedAddr :: AddrNaming
-                               , toplevelGlobalAddrSpace :: Maybe AddrSpace
-                               , toplevelGlobalExternallyInitialized :: IsOrIsNot ExternallyInitialized
-                               , toplevelGlobalGlobalType :: GlobalType
-                               , toplevelGlobalType :: Type
-                               , toplevelGlobalConst :: Maybe Const
-                               , toplevelGlobalSection :: Maybe Section
-                               , toplevelGlobalComdat :: Maybe Comdat
-                               , toplevelGlobalAlign :: Maybe Alignment
-                               }
+              | ToplevelGlobal 
+                (Maybe GlobalId)
+                (Maybe Linkage)
+                (Maybe Visibility)
+                (Maybe DllStorageClass)
+                (Maybe ThreadLocalStorage)
+                AddrNaming
+                (Maybe AddrSpace)
+                (IsOrIsNot ExternallyInitialized)
+                GlobalType
+                Type
+                (Maybe Const)
+                (Maybe Section)
+                (Maybe Comdat)
+                (Maybe Alignment)
               | ToplevelTypeDef LocalId Type
-              | ToplevelDepLibs [QuoteStr]
+              | ToplevelDepLibs [DqString]
               | ToplevelUnamedType Integer Type
-              | ToplevelModuleAsm QuoteStr
+              | ToplevelModuleAsm DqString
               | ToplevelAttribute Integer [FunAttr]
               | ToplevelComdat DollarId SelectionKind
               deriving (Eq,Show)
                        
+data Block = Block BlockLabel [PhiInst] [ComputingInstWithDbg] TerminatorInstWithDbg deriving (Eq,Show)
 
-data Block = Block 
-             { lbl:: BlockLabel, 
-               phi:: [PhiInst], 
-               comp:: [ComputingInstWithDbg], 
-               term:: TerminatorInstWithDbg 
-             } deriving (Eq,Show)
+blockLabel :: Block -> BlockLabel
+blockLabel (Block v _ _ _) = v
 
 data Module = Module [Toplevel] deriving (Eq,Show)
 

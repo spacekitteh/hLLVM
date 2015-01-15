@@ -52,7 +52,7 @@ pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
 --
 -- Everything through visibility has already been parsed.
 --
-pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorage -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
+pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
 pAlias lhs vis dll tlm na = do { link <- option LinkageExternal pAliasLinkage
                     ; aliasee <- pAliasee
                     ; return $ ToplevelAlias lhs vis dll tlm na (Just link) aliasee
@@ -72,7 +72,7 @@ pAlias lhs vis dll tlm na = do { link <- option LinkageExternal pAliasLinkage
 --
 -- Everything through visibility has been parsed already.
 --
-pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> Maybe DllStorage -> Maybe ThreadLocalStorage -> AddrNaming ->  P Toplevel
+pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage -> AddrNaming ->  P Toplevel
 pGlobal lhs link vis dll tls na = 
   do { addrOpt <- opt pAddrSpace
      ; exti <- option (IsNot ExternallyInitialized) (reserved "externally_initialized" >> return (Is ExternallyInitialized))
@@ -94,11 +94,11 @@ pGlobal lhs link vis dll tls na =
           Just(_) -> True
           Nothing -> True
 
-data LocalIdOrQuoteStr = L LocalId | Q QuoteStr deriving (Eq,Show)
+data LocalIdOrQuoteStr = L LocalId | Q DqString deriving (Eq,Show)
 
 pLhsType :: P LocalIdOrQuoteStr 
 pLhsType = do { lhs <- choice [ liftM L pLocalId
-                              , liftM (Q . QuoteStr) pQuoteStr
+                              , liftM (Q . DqString) pQuoteStr
                               ] 
               ; _ <- chartok '='
               ; reserved "type"              
@@ -115,7 +115,7 @@ pToplevelTypeDef = do { lhsOpt <- opt pLhsType
 
 pToplevelTarget :: P Toplevel
 pToplevelTarget = do { reserved "target"
-                     ; choice [ reserved "triple" >> chartok '=' >> pQuoteStr >>= \s -> return $ ToplevelTriple (QuoteStr s)
+                     ; choice [ reserved "triple" >> chartok '=' >> pQuoteStr >>= \s -> return $ ToplevelTriple (DqString s)
                               , do { reserved "datalayout" 
                                    ; ignore (chartok '=') 
                                    ; ls <- lexeme (between (char '"') (char '"') pDataLayout) 
@@ -128,7 +128,7 @@ pToplevelDepLibs :: P Toplevel
 pToplevelDepLibs = do { reserved "deplibs"
                       ; _ <- chartok '='
                       ; l <- brackets (sepBy pQuoteStr comma)
-                      ; return $ ToplevelDepLibs (fmap QuoteStr l)
+                      ; return $ ToplevelDepLibs (fmap DqString l)
                       }
 
                      
@@ -146,7 +146,7 @@ pFunctionPrototype = do { lopt <- opt pLinkage
                         ; sopt <- opt pSection
                         ; cdopt <- opt pComdat
                         ; aopt <- opt pAlign
-                        ; gopt <- opt (liftM (Gc . QuoteStr) (reserved "gc" >> pQuoteStr))
+                        ; gopt <- opt (liftM (Gc . DqString) (reserved "gc" >> pQuoteStr))
                         ; prefixOpt <- opt pPrefix
                         ; prologueOpt <- opt pPrologue
                         ; return (FunctionPrototype lopt vopt copt 
@@ -184,7 +184,7 @@ pToplevelModuleAsm :: P Toplevel
 pToplevelModuleAsm = do { reserved "module"
                         ; reserved "asm"
                         ; s <- pQuoteStr
-                        ; return $ ToplevelModuleAsm $ QuoteStr s
+                        ; return $ ToplevelModuleAsm $ DqString s
                         }
                      
 

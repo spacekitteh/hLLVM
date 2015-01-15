@@ -209,7 +209,7 @@ pConstGetElemPtr = do { reserved "getelementptr"
                       
 pMetaConst :: P MetaConst
 pMetaConst = char '!' >> choice [ liftM MdConst pMetaStruct
-                                , liftM (MdString . QuoteStr) pQuoteStr
+                                , liftM (MdString . DqString) pQuoteStr
                                 , liftM (McMn . MdNode) intStrToken
                                 , liftM MdRef pLocalId ]
                     
