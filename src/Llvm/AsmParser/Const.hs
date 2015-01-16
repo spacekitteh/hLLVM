@@ -94,15 +94,13 @@ pComplexConstant = choice [ pConstStruct
                           ]
 
 pConstStruct :: P ComplexConstant
-pConstStruct = liftM (Cstruct False) (braces (sepBy pTypedConst comma))
+pConstStruct = liftM (Cstruct Unpacked) (braces (sepBy pTypedConst comma))
 
 pMetaStruct :: P Const
-pMetaStruct = liftM (Cca . (Cstruct False)) (braces (sepBy pTypedConst1 comma))
-
-
+pMetaStruct = liftM (Cca . (Cstruct Unpacked)) (braces (sepBy pTypedConst1 comma))
 
 pPackedStructConst :: P ComplexConstant
-pPackedStructConst = liftM (Cstruct True) (anglebraces (sepBy pTypedConst comma))
+pPackedStructConst = liftM (Cstruct Packed) (anglebraces (sepBy pTypedConst comma))
                         
 pConstVector :: P ComplexConstant
 pConstVector = liftM Cvector (angles (sepBy pTypedConst comma))
@@ -112,7 +110,8 @@ pConstArray = liftM Carray (brackets (sepBy pTypedConst comma))
 
 
 pBlockAddr :: P Const
-pBlockAddr = reserved "blockaddress" >> parens (pTuple2 pGlobalId pPercentLabel) >>= return . (uncurry CblockAddress)
+pBlockAddr = reserved "blockaddress" >> parens (pTuple2 pGlobalId pPercentLabel) 
+             >>= return . (uncurry CblockAddress)
                 
 pConstIbinaryOperation :: P (IbinExpr Const)
 pConstIbinaryOperation = do { op <- pIbinaryOperator

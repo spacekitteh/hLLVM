@@ -14,15 +14,12 @@ class AsmPrint a where
 commaSepMaybe :: AsmPrint a => Maybe a -> Doc
 commaSepMaybe = maybe empty ((comma<+>) . toLlvm)
 
-spSepMaybe :: AsmPrint a => Maybe a -> Doc
-spSepMaybe = maybe empty ((empty<+>) . toLlvm)
-
 maybeSepByEquals :: AsmPrint a => Maybe a -> Doc
 maybeSepByEquals = maybe empty ((<+>equals).toLlvm)
 
-sepOptToLlvmX :: AsmPrint a => (Doc -> Doc) -> Maybe a -> Doc
-sepOptToLlvmX _  (Nothing) = empty
-sepOptToLlvmX sep (Just x) = sep $ toLlvm x
+instance AsmPrint a => AsmPrint (Maybe a) where
+  toLlvm (Just x) = toLlvm x
+  toLlvm Nothing = empty
 
 instance AsmPrint LabelId where
   toLlvm (LabelString s) = toLlvm s 
@@ -34,7 +31,7 @@ instance AsmPrint PercentLabel where
   toLlvm (PercentLabel li) = char '%' <> (toLlvm li)
   
 instance AsmPrint TargetLabel where
-  toLlvm (TargetLabel id) = text "label" <+> toLlvm id
+  toLlvm (TargetLabel x) = text "label" <+> toLlvm x
   
 instance AsmPrint BlockLabel where
   toLlvm (ImplicitBlockLabel (f, l, c)) = 
@@ -43,7 +40,9 @@ instance AsmPrint BlockLabel where
 
 instance AsmPrint ComplexConstant where
   toLlvm (Cstruct b ts) = 
-    let (start, end) = if b then (char '<', char '>') else (empty, empty)
+    let (start, end) = case b of 
+          Packed -> (char '<', char '>') 
+          Unpacked -> (empty, empty)
     in start <> braces (commaSepList $ fmap toLlvm ts) <> end
   toLlvm (Cvector ts) = char '<' <+> (commaSepList $ fmap toLlvm ts) <+> char '>'
   toLlvm (Carray ts) = brackets $ commaSepList $ fmap toLlvm ts
@@ -96,7 +95,7 @@ instance AsmPrint (GetElemPtr TypedConst) where
 
 instance AsmPrint (Select TypedConst) where
   toLlvm (Select cnd tc1 tc2) = 
-    text "select" <+> parens (toLlvm cnd <> comma <+> toLlvm tc1 <> comma <+> toLlvm tc2)
+    text "select" <+> parens (commaSepList [toLlvm cnd, toLlvm tc1, toLlvm tc2])
 
 
 instance AsmPrint (Icmp Const) where
@@ -110,7 +109,7 @@ instance AsmPrint (Fcmp Const) where
 
 instance AsmPrint (ShuffleVector TypedConst) where
   toLlvm (ShuffleVector tc1 tc2 mask) = 
-    text "shufflevector" <+> parens (toLlvm tc1 <> comma <+> toLlvm tc2 <+> comma <+> toLlvm mask)
+    text "shufflevector" <+> parens (commaSepList [toLlvm tc1, toLlvm tc2, toLlvm mask])
 
 
 instance AsmPrint (ExtractValue TypedConst) where
@@ -128,7 +127,7 @@ instance AsmPrint (ExtractElem TypedConst) where
                                   
 instance AsmPrint (InsertElem TypedConst) where                                  
   toLlvm (InsertElem tc1 tc2 index) = 
-    text "insertelement" <+> parens (toLlvm tc1 <> comma <+> toLlvm tc2)
+    text "insertelement" <+> parens (commaSepList [toLlvm tc1, toLlvm tc2, toLlvm index])
     
 
 instance AsmPrint TrapFlag where
@@ -142,7 +141,6 @@ instance AsmPrint Const where
     Cca a -> toLlvm a
     Cl l -> toLlvm l
     CblockAddress g a -> text "blockaddress" <+> parens (toLlvm g <> comma <+> toLlvm a)
-    -- Ca a -> toLlvm a
     Cb a -> toLlvm a
     Cconv a -> toLlvm a 
     CgEp a -> toLlvm a
@@ -155,7 +153,7 @@ instance AsmPrint Const where
     CeE a -> toLlvm a
     CiE a -> toLlvm a
     CmC mc -> toLlvm mc
-    CmL id -> toLlvm id
+    CmL v -> toLlvm v
 
 instance AsmPrint MdVar where 
   toLlvm (MdVar s) = char '!'<> (text s)
@@ -201,13 +199,13 @@ instance AsmPrint Expr where
   toLlvm (Es a) = toLlvm a
 
 instance AsmPrint MemOp where  
-  toLlvm (Alloca ma t s a) = hsep [text "alloca", toLlvm ma, hcat [toLlvm t, maybe empty ((comma<+>) . toLlvm) s, maybe empty ((comma<+>) . toLlvm) a]]
+  toLlvm (Alloca ma t s a) = hsep [text "alloca", toLlvm ma, hcat [toLlvm t, commaSepMaybe s, commaSepMaybe a]]
   toLlvm (Load b ptr align noterm inv nonul) = 
     hsep [text "load", toLlvm b, hcat [toLlvm ptr, commaSepMaybe align, commaSepMaybe noterm, commaSepMaybe inv, commaSepMaybe nonul]]
   toLlvm (LoadAtomic (Atomicity st ord) b ptr align) = 
     hsep [text "load", text "atomic", toLlvm b, toLlvm ptr, toLlvm st, toLlvm ord] <> (commaSepMaybe align)
   toLlvm (Store b v addr align noterm) = 
-    hsep [text "store", toLlvm b, toLlvm v <> comma, toLlvm addr <> (commaSepMaybe align)]
+    hsep [text "store", toLlvm b, toLlvm v <> comma, toLlvm addr <> (commaSepMaybe align) <> (commaSepMaybe noterm)]
   toLlvm (StoreAtomic (Atomicity st ord) b v ptr align) = 
     hsep [text "store", text "atomic", toLlvm b, toLlvm v <> comma, toLlvm ptr, toLlvm st, toLlvm ord] <> (commaSepMaybe align)
   toLlvm (Fence b order) = hsep [text "fence", toLlvm b, toLlvm order]
@@ -241,23 +239,12 @@ instance AsmPrint FunName where
   toLlvm (FunNameString s) = text s
   
 instance AsmPrint CallSite where
-  toLlvm (CsFun cc ra rt ident params fa) = (maybe empty toLlvm cc) 
-                                            <+> (hsep $ fmap toLlvm ra)
-                                            <+> toLlvm rt <+> toLlvm ident
-                                            <+> parens (commaSepList $ fmap toLlvm params)
-                                            <+> (hsep $ fmap toLlvm fa)
-  toLlvm (CsAsm t se as dia s1 s2 params fa) = (toLlvm t) <+> text "asm"
-                                               <+> (maybe empty toLlvm se)
-                                               <+> (maybe empty toLlvm as)
-                                               <+> toLlvm dia
-                                               <+> toLlvm s1 <> comma <+> toLlvm s2
-                                               <+> parens (commaSepList $ fmap toLlvm params)
-                                               <+> (hsep $ fmap toLlvm fa)
-  toLlvm (CsConversion ra t convert params fa) = (hsep $ fmap toLlvm ra)
-                                                 <+> toLlvm t 
-                                                 <+> toLlvm convert 
-                                                 <+> parens (commaSepList $ fmap toLlvm params)
-                                                 <+> (hsep $ fmap toLlvm fa)
+  toLlvm (CsFun cc ra rt ident params fa) = 
+    hsep [toLlvm cc, hsep $ fmap toLlvm ra, toLlvm rt, toLlvm ident, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
+  toLlvm (CsAsm t se as dia s1 s2 params fa) = 
+    hsep [toLlvm t, text "asm", toLlvm se, toLlvm as, toLlvm dia, toLlvm s1 <> comma, toLlvm s2, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
+  toLlvm (CsConversion ra t convert params fa) = 
+    hsep [hsep $ fmap toLlvm ra, toLlvm t, toLlvm convert, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
 
 instance AsmPrint Clause where
   toLlvm (Catch tv) = text "catch" <+> toLlvm tv
@@ -297,7 +284,7 @@ instance AsmPrint (InsertValue TypedValue) where
 instance AsmPrint Rhs where
   toLlvm (RmO a) = toLlvm a
   toLlvm (Re a) = toLlvm a
-  toLlvm (Call tail callSite) = hsep [toLlvm tail, text "call", toLlvm callSite]
+  toLlvm (Call tailc callSite) = hsep [toLlvm tailc, text "call", toLlvm callSite]
   toLlvm (ReE a) = toLlvm a
   toLlvm (RiE a) = toLlvm a
   toLlvm (RsV a) = toLlvm a
@@ -305,13 +292,12 @@ instance AsmPrint Rhs where
   toLlvm (RiV a) = toLlvm a
   toLlvm (VaArg tv t) = hsep [text "va_arg", toLlvm tv <> comma, toLlvm t]
   toLlvm (LandingPad rt pt tgl b clause) = 
-    hsep ([text "landingpad", toLlvm rt, text "personality", toLlvm pt, toLlvm tgl, if b then text "cleanup" else empty] ++ (fmap toLlvm clause))
+    hsep ([text "landingpad", toLlvm rt, text "personality", toLlvm pt, toLlvm tgl, toLlvm b] ++ (fmap toLlvm clause))
   
 
 instance AsmPrint ActualParam where
-  toLlvm (ActualParam t att1 align v att2) = toLlvm t <+> (hsep $ fmap toLlvm att1)
-                                             <+> (maybe empty toLlvm) align
-                                             <+> toLlvm v <+> (hsep $ fmap toLlvm att2)
+  toLlvm (ActualParam t att1 align v att2) = 
+    hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm align, toLlvm v, hsep $ fmap toLlvm att2]
 
 instance AsmPrint Dbg where
   toLlvm (Dbg mv meta) = toLlvm mv <+> toLlvm meta
@@ -338,10 +324,8 @@ instance AsmPrint TerminatorInst where
 instance AsmPrint TerminatorInstWithDbg where
   toLlvm (TerminatorInstWithDbg ins dbgs) = commaSepList ((toLlvm ins):fmap toLlvm dbgs)
 
-
 instance AsmPrint ComputingInstWithDbg where
   toLlvm (ComputingInstWithDbg ins dbgs) = commaSepList ((toLlvm ins):fmap toLlvm dbgs)
-
 
 instance AsmPrint Aliasee where
   toLlvm (AtV tv ) = toLlvm tv
@@ -350,18 +334,11 @@ instance AsmPrint Aliasee where
                       
 
 instance AsmPrint FunctionPrototype where
-  toLlvm (FunctionPrototype fhLinkage fhVisibility
-          fhCCoonc fhAttr fhRetType fhName fhParams fnd fhAttr1 fhSection
-          fhcmd fhAlign fhGc fhPrefix fhPrologue) = 
-    hsep [spSepMaybe fhLinkage, spSepMaybe fhVisibility, spSepMaybe fhCCoonc, hsep $ fmap toLlvm fhAttr 
-         , toLlvm fhRetType, toLlvm fhName, toLlvm fhParams, spSepMaybe fnd
-         , hsep $ fmap toLlvm fhAttr1
-         , spSepMaybe fhSection
-         , spSepMaybe fhcmd
-         , spSepMaybe fhAlign
-         , spSepMaybe fhGc
-         , spSepMaybe fhPrefix
-         , spSepMaybe fhPrologue]
+  toLlvm (FunctionPrototype fhLinkage fhVisibility fhCCoonc fhAttr fhRetType fhName fhParams fnd 
+          fhAttr1 fhSection fhcmd fhAlign fhGc fhPrefix fhPrologue) = 
+    hsep [toLlvm fhLinkage, toLlvm fhVisibility, toLlvm fhCCoonc, hsep $ fmap toLlvm fhAttr 
+         , toLlvm fhRetType, toLlvm fhName, toLlvm fhParams, toLlvm fnd, hsep $ fmap toLlvm fhAttr1
+         , toLlvm fhSection, toLlvm fhcmd, toLlvm fhAlign, toLlvm fhGc, toLlvm fhPrefix, toLlvm fhPrologue]
 
 instance AsmPrint Block where
   toLlvm (Block lbl phis ins end) = toLlvm lbl $$
@@ -371,35 +348,30 @@ instance AsmPrint Block where
                                       toLlvm end))
 
 instance AsmPrint Toplevel where 
-  toLlvm (ToplevelTriple s) = text "target" <+> text "triple" <+> equals <+> toLlvm s
-  toLlvm (ToplevelDataLayout s) = text "target" <+> text "datalayout" <+> equals <+> toLlvm s
+  toLlvm (ToplevelTriple s) = hsep [text "target", text "triple", equals, toLlvm s]
+  toLlvm (ToplevelDataLayout s) = hsep [text "target", text "datalayout", equals, toLlvm s]
   toLlvm (ToplevelAlias lhs vis dll tlm naddr link aliasee) = 
-    toLlvm lhs <+> equals <+> (maybe empty toLlvm vis) 
-    <+> (maybe empty toLlvm dll) 
-    <+> (maybe empty toLlvm tlm) 
-    <+> toLlvm naddr
-    <+> text "alias" <+> (maybe empty toLlvm link) 
-    <+> toLlvm aliasee
+    hsep [toLlvm lhs, equals, toLlvm vis, toLlvm dll, toLlvm tlm, toLlvm naddr, text "alias", toLlvm link, toLlvm aliasee]
   toLlvm (ToplevelDbgInit s i) = error "DbgInit is not implemented"
   toLlvm (ToplevelStandaloneMd s t) = char '!' <> (text s) <+> equals <+> toLlvm t
   toLlvm (ToplevelNamedMd mv nds) = toLlvm mv <+> equals <+> char '!'<>(braces (commaSepList $ fmap toLlvm nds))
   toLlvm (ToplevelDeclare fproto) = text "declare" <+> toLlvm fproto
   toLlvm (ToplevelDefine fproto blocks) = text "define" <+> toLlvm fproto <+> text "{" $$
                                           (fcat $ fmap toLlvm blocks) $$ text "}"
-  toLlvm (ToplevelGlobal lhs linkage vis dllStor threadLoc un addrspace externali gty ty const 
+  toLlvm (ToplevelGlobal lhs linkage vis dllStor threadLoc un addrspace externali gty ty const0 
           section comdat align) = 
-    hsep [maybeSepByEquals lhs, spSepMaybe linkage, spSepMaybe vis, spSepMaybe dllStor
-         , spSepMaybe threadLoc, toLlvm un, spSepMaybe addrspace, toLlvm externali
-         , toLlvm gty, toLlvm ty, spSepMaybe const]
+    hsep [maybeSepByEquals lhs, toLlvm linkage, toLlvm vis, toLlvm dllStor, toLlvm threadLoc, toLlvm un
+         , toLlvm addrspace, toLlvm externali, toLlvm gty, toLlvm ty, toLlvm const0]
     <> (hcat [commaSepMaybe section, commaSepMaybe comdat, commaSepMaybe align])
 
   toLlvm (ToplevelTypeDef n t) = toLlvm n <+> equals <+> text "type" <+> toLlvm t
   toLlvm (ToplevelDepLibs l) = text "deplibs" <+> equals <+> brackets (commaSepList $ fmap toLlvm l)
-  toLlvm (ToplevelUnamedType id t) = text "type" <+> toLlvm t <+> text "; " <+> (integer id)
+  toLlvm (ToplevelUnamedType x t) = text "type" <+> toLlvm t <+> text "; " <+> (integer x)
   toLlvm (ToplevelModuleAsm qs) = text "module asm" <+> toLlvm qs
-  toLlvm (ToplevelAttribute n l) = text "attributes" <+> char '#' <> (integer n) 
-                                   <+> equals <+> braces (hsep $ fmap toLlvm l)
-  toLlvm (ToplevelComdat l c) = toLlvm l <+> equals <+> text "comdat" <+> toLlvm c
+  toLlvm (ToplevelAttribute n l) = 
+    hsep [text "attributes", char '#' <> (integer n), equals, braces (hsep $ fmap toLlvm l)]
+  toLlvm (ToplevelComdat l c) = 
+    hsep [toLlvm l, equals, text "comdat", toLlvm c]
 
 
 
@@ -408,7 +380,6 @@ instance AsmPrint Module where
 
 instance AsmPrint Prefix where
   toLlvm (Prefix n) = text "prefix" <+> toLlvm n
-  
   
 instance AsmPrint Prologue where  
   toLlvm (Prologue n) = text "prologue" <+> toLlvm n
@@ -452,11 +423,6 @@ instance AsmPrint AddrNaming where
 instance AsmPrint DqString where
   toLlvm = P.print
 
-{-
-instance AsmPrint PlainStr where
-  toLlvm = P.print 
--}
-
 instance AsmPrint Section where
   toLlvm = P.print
 
@@ -469,10 +435,8 @@ instance AsmPrint Gc where
 instance AsmPrint GlobalType where
     toLlvm = P.print
 
-
 instance AsmPrint TypePrimitive where
   toLlvm = P.print
-
 
 instance AsmPrint Lstring where
   toLlvm = P.print
@@ -486,7 +450,6 @@ instance AsmPrint LocalId where
 instance AsmPrint GlobalId where
   toLlvm = P.print
 
-  
 instance AsmPrint SimpleConstant where
   toLlvm = P.print
                           
@@ -540,14 +503,12 @@ instance AsmPrint InvariantLoad where
   
 instance AsmPrint Nonnull where
   toLlvm = P.print
-  
-  
+
 instance AsmPrint TailCall where
   toLlvm = P.print
 
 instance AsmPrint DollarId where
   toLlvm = P.print
-
 
 instance AsmPrint Comdat where
   toLlvm = P.print
@@ -599,4 +560,7 @@ instance AsmPrint SideEffect where
   toLlvm = P.print
   
 instance AsmPrint AlignStack where  
+  toLlvm = P.print
+  
+instance AsmPrint Cleanup where  
   toLlvm = P.print

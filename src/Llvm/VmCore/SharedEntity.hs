@@ -3,10 +3,6 @@ module Llvm.VmCore.SharedEntity where
 -- | Double Quoted String
 data DqString = DqString String deriving (Eq, Ord, Show)
 
-{-
-data PlainStr = PlainStr String deriving (Eq,Ord,Show)
--}
-
 data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt 
             | IcmpUle | IcmpSgt | IcmpSge | IcmpSlt | IcmpSle
             deriving (Eq,Ord,Show)
@@ -280,9 +276,9 @@ data Fparam = FimplicitParam
 data FormalParam = FormalParam Type [ParamAttr] (Maybe Alignment) Fparam [ParamAttr]
                  deriving (Eq,Ord,Show)
 
-data FormalParamList = FormalParamList [FormalParam] (IsOrIsNot VarArgParam) [FunAttr] deriving (Eq,Ord,Show)
+data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) [FunAttr] deriving (Eq,Ord,Show)
 
-data TypeParamList = TypeParamList [Type] (IsOrIsNot VarArgParam) deriving (Eq,Ord,Show)
+data TypeParamList = TypeParamList [Type] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 
 data Weak = Weak deriving (Eq, Ord, Show)
 
@@ -312,3 +308,5 @@ data SideEffect = SideEffect deriving (Eq, Ord, Show)
 data AlignStack = AlignStack deriving (Eq, Ord, Show)
 
 data VarArgParam = VarArgParam deriving (Eq, Ord, Show)
+
+data Cleanup = Cleanup deriving (Eq, Ord, Show)

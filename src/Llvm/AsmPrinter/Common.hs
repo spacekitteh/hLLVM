@@ -12,6 +12,7 @@ import qualified Data.Map as M(Map, foldWithKey)
 angleBrackets :: Doc -> Doc  
 angleBrackets x = char '<' <> x <> char '>'
 
+{-
 listToDoc :: (a -> Doc) -> [a] -> (Doc -> Doc -> Doc) -> Doc
 listToDoc _ [] _ = mempty
 listToDoc f ls dcat = Prelude.foldl g mempty ls
@@ -25,18 +26,16 @@ mapToDoc kToStr vToStr m kvsep sepFun =
                      else p `sepFun` entry
                 ) empty m
 
+-} 
 
 commaSepList :: [Doc] -> Doc
 commaSepList l = hsep $ punctuate comma l
 
+commaSepNonEmpty :: [Doc] -> Doc
+commaSepNonEmpty l = commaSepList (filter (not . isEmpty) l)
 
 sepMaybe :: (a -> Doc) -> (Doc -> Doc) -> Maybe a -> Doc
 sepMaybe f _  (Nothing) = empty
 sepMaybe f sep (Just x) = sep $ f x
 
 
-{-
-maybeSep :: (a -> Doc) -> Maybe a -> (Doc -> Doc) -> Doc
-maybeSep f (Nothing) _  = empty
-maybeSep f (Just x) sep = sep $ f x
--}

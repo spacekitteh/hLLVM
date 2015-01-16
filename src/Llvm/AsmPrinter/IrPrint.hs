@@ -15,40 +15,24 @@ class IrPrint a where
   printIr :: a -> Doc
   
   
-  
-optToLlvm :: IrPrint a => Maybe a -> Doc
-optToLlvm (Nothing) = empty
-optToLlvm (Just x) = printIr x
-
-
-
-sepOptToLlvm :: IrPrint a => Doc -> Maybe a -> Doc
-sepOptToLlvm _  (Nothing) = empty
-sepOptToLlvm sep (Just x) = sep <+> printIr x
-
-
-sepOptToLlvmX :: IrPrint a => (Doc -> Doc) -> Maybe a -> Doc
-sepOptToLlvmX _  (Nothing) = empty
-sepOptToLlvmX sep (Just x) = sep $ printIr x
+commaSepMaybe :: IrPrint a => Maybe a -> Doc
+commaSepMaybe = maybe empty ((comma <+>) . printIr)
 
 
 optSepToLlvm :: IrPrint a => Maybe a -> Doc -> Doc
 optSepToLlvm (Nothing) _ = empty
 optSepToLlvm (Just x) sep = printIr x <+> sep
 
+instance IrPrint a => IrPrint (Maybe a) where
+  printIr (Just x) = printIr x
+  printIr Nothing = empty
 
 instance IrPrint Toplevel where 
-  printIr (ToplevelTriple s) = text "target" <+> text "triple" <+> text "=" <+> printIr s
-  printIr (ToplevelDataLayout s) = text "target" <+> text "datalayout" <+> text "=" <+> printIr s
+  printIr (ToplevelTriple s) = hsep [text "target", text "triple", equals, printIr s]
+  printIr (ToplevelDataLayout s) = hsep [text "target", text "datalayout", equals, printIr s]
   printIr (ToplevelAlias lhs vis dll tlm na link aliasee) = 
-    printIr lhs <+> equals
-    <+> (maybe empty printIr vis) 
-    <+> (maybe empty printIr dll)
-    <+> (maybe empty printIr tlm)
-    <+> (printIr na)
-    <+> (text "alias") <+> (maybe empty printIr link)
-    <+> printIr aliasee
-  printIr (ToplevelDbgInit _ _) = undefined
+    hsep [printIr lhs, equals, printIr vis, printIr dll, printIr tlm, printIr na, text "alias", printIr link, printIr aliasee]
+  printIr (ToplevelDbgInit s i) = hsep [text "dbginit", text s, integer i]
   printIr (ToplevelStandaloneMd s t) = char '!'<>(text s) <+> equals <+> printIr t
   printIr (ToplevelNamedMd mv nds) = printIr mv <+> equals <+> char '!'<>(braces (hsep $ punctuate comma $ fmap printIr nds))
   printIr (ToplevelDeclare fproto) = text "declare" <+> printIr fproto
@@ -56,29 +40,16 @@ instance IrPrint Toplevel where
                                                text "; the entry label is" <+> 
                                                printIr entry $$
                                                printIr graph
-  printIr (ToplevelGlobal lhs linkage vis dll tlm un addrspace externali gty ty c section comdat align)
-                              = optSepToLlvm lhs equals <+>
-                                optSepToLlvm linkage empty <+>
-                                optSepToLlvm vis empty <+>
-                                optSepToLlvm dll empty <+>
-                                optSepToLlvm tlm empty <+>
-                                printIr un <+> 
-                                optSepToLlvm addrspace empty <+>
-                                printIr externali <+>
-                                printIr gty <+>
-                                printIr ty <+>
-                                sepOptToLlvm empty c <+>
-                                sepOptToLlvm comma section <+> 
-                                sepOptToLlvm comma comdat <+>
-                                sepOptToLlvm comma align
-
-  printIr (ToplevelTypeDef n t) = printIr n <+> equals <+> text "type" <+> printIr t
-  printIr (ToplevelDepLibs l) = text "deplibs" <+> equals <+> brackets (hsep $ punctuate comma $ fmap printIr l)
+  printIr (ToplevelGlobal lhs linkage vis dll tlm un addrspace externali gty ty c section comdat align) = 
+    hsep [optSepToLlvm lhs equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, printIr addrspace
+         , printIr externali, printIr gty, printIr ty, printIr c, commaSepNonEmpty [printIr section, printIr comdat, printIr align]]
+  printIr (ToplevelTypeDef n t) = hsep [printIr n, equals, text "type", printIr t]
+  printIr (ToplevelDepLibs l) = hsep [text "deplibs", equals, brackets (hsep $ punctuate comma $ fmap printIr l)]
   printIr (ToplevelUnamedType x t) = text "type" <+> printIr t <+> text("; " ++ (show x))
-  printIr (ToplevelModuleAsm qs) = text "module" <+> text "asm" <+> printIr qs
-  printIr (ToplevelAttribute n l) = text "attributes" <+> char '#' <> (integer n) 
-                                   <+> braces (hsep $ fmap printIr l)
-  printIr (ToplevelComdat l s) = printIr l <+> equals <+> printIr s
+  printIr (ToplevelModuleAsm qs) = hsep [text "module", text "asm", printIr qs]
+  printIr (ToplevelAttribute n l) = 
+    hsep [text "attributes", char '#' <> (integer n), braces (hsep $ fmap printIr l)]
+  printIr (ToplevelComdat l s) = hsep [printIr l, equals, printIr s]
 
 
 instance IrPrint Module where 
@@ -95,9 +66,6 @@ instance IrPrint (Node e x) where
 instance IrPrint (H.Graph Node H.C H.C) where
   printIr g = braces (H.foldGraphNodes (\n -> \s -> s $$ (printIr n)) g empty)
 
-  
-  
-  
 instance IrPrint Label where
   printIr l = text (show l) 
   
@@ -111,7 +79,7 @@ instance IrPrint PercentLabel where
   printIr (PercentLabel li) = char '%' <> (printIr li)
   
 instance IrPrint TargetLabel where
-  printIr (TargetLabel id) = text "label" <+> printIr id
+  printIr (TargetLabel x) = text "label" <+> printIr x
   
 
 instance IrPrint BlockLabel where
@@ -119,8 +87,9 @@ instance IrPrint BlockLabel where
 
 instance IrPrint ComplexConstant where
   printIr (Cstruct b ts) = let v = (braces (commaSepList $ fmap printIr ts))
-                          in if b then angleBrackets v
-                             else v
+                           in case b of 
+                             Packed -> angleBrackets v
+                             Unpacked -> v
   printIr (Cvector ts) = angleBrackets (commaSepList $ fmap printIr ts)
   printIr (Carray ts) = brackets (commaSepList $ fmap printIr ts)
 
@@ -139,13 +108,13 @@ instance IrPrint (IbinExpr Const) where
                   (c1, c2) = operandOfIbinExpr e
                   t = typeOfIbinExpr e
                   cs = case e of
-                        Add x _ _ _ -> optToLlvm x
-                        Sub x _ _ _ -> optToLlvm x
-                        Udiv x _ _ _ -> optToLlvm x
-                        Sdiv x _ _ _ -> optToLlvm x
-                        Shl x _ _ _ -> optToLlvm x
-                        Lshr x _ _ _ -> optToLlvm x
-                        Ashr x _ _ _ -> optToLlvm x
+                        Add x _ _ _ -> printIr x
+                        Sub x _ _ _ -> printIr x
+                        Udiv x _ _ _ -> printIr x
+                        Sdiv x _ _ _ -> printIr x
+                        Shl x _ _ _ -> printIr x
+                        Lshr x _ _ _ -> printIr x
+                        Ashr x _ _ _ -> printIr x
                         _ -> empty
               in text op <+> cs <+> parens (printIr (TypedConst t c1) <> comma <+> printIr (TypedConst t c2))
 
@@ -167,19 +136,15 @@ instance IrPrint (BinExpr Const) where
   printIr (Ie e) = printIr e
   printIr (Fe e) = printIr e
 
-
 instance IrPrint (Conversion TypedConst) where
   printIr (Conversion op tc t) = printIr op <+> parens (printIr tc <+> text "to" <+> printIr t)
 
-
 instance IrPrint (GetElemPtr TypedConst) where
-  printIr (GetElemPtr b base indices) = text "getelementptr" 
-                                       <+> printIr b
-                                       <+> parens (commaSepList ((printIr base):fmap printIr indices))
+  printIr (GetElemPtr b base indices) = 
+    hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
                                        
 instance IrPrint (Select TypedConst) where
   printIr (Select cnd tc1 tc2) = text "select" <+> (parens (commaSepList [printIr cnd, printIr tc1, printIr tc2]))
-
 
 instance IrPrint (Icmp Const) where
   printIr (Icmp op t c1 c2) = 
@@ -189,30 +154,26 @@ instance IrPrint (Fcmp Const) where
   printIr (Fcmp op t c1 c2) = 
     text "fcmp" <+> printIr op <+> parens (commaSepList [printIr (TypedConst t c1), printIr (TypedConst t c2)])
   
-
 instance IrPrint (ShuffleVector TypedConst) where
   printIr (ShuffleVector tc1 tc2 mask) = 
     text "shufflevector" <+> parens (commaSepList [printIr tc1, printIr tc2, printIr mask])
 
-
 instance IrPrint (ExtractValue TypedConst) where
-  printIr (ExtractValue tc indices) = text "extractvalue" <+> 
-                                     parens (commaSepList ((printIr tc:(fmap text indices))))
+  printIr (ExtractValue tc indices) = 
+    hsep [text "extractvalue", parens (commaSepList ((printIr tc:(fmap text indices))))]
                                    
 instance IrPrint (InsertValue TypedConst) where
-  printIr (InsertValue vect tc indices) = text "insertvalue" <+> 
-                                         parens (commaSepList ((printIr vect:printIr tc:(fmap text indices))))
+  printIr (InsertValue vect tc indices) = 
+    hsep [text "insertvalue", parens (commaSepList ((printIr vect:printIr tc:(fmap text indices))))]
                                        
 instance IrPrint (ExtractElem TypedConst) where
-  printIr (ExtractElem tc index) = text "extractelement" <+> 
-                                  parens (printIr tc <> comma <+> printIr index)
+  printIr (ExtractElem tc index) = 
+    hsep [text "extractelement", parens (printIr tc <> comma <+> printIr index)]
                                 
-                                  
 instance IrPrint (InsertElem TypedConst) where                                  
-  printIr (InsertElem tc1 tc2 index) = text "insertelement" <+> 
-                                      parens (printIr tc1 <> comma <+> printIr tc2)
-    
-                                      
+  printIr (InsertElem tc1 tc2 index) = 
+    hsep [text "insertelement", parens (printIr tc1 <> comma <+> printIr tc2 <> comma <+> printIr index)]
+                                          
 instance IrPrint Const where
   printIr x = case x of
     Ccp c -> printIr c
@@ -247,9 +208,8 @@ instance IrPrint MetaConst where
   printIr (MdRef s) = text $ show s
                         
 instance IrPrint (GetElemPtr TypedValue) where
-  printIr (GetElemPtr ib tv tcs) = text "getelementptr" <+> 
-                                  printIr ib <+>
-                                  printIr tv <+> (commaSepList $ fmap printIr tcs)
+  printIr (GetElemPtr ib tv tcs) = 
+    hsep [text "getelementptr", printIr ib, printIr tv, (commaSepList $ fmap printIr tcs)]
   
 
 instance IrPrint (IbinExpr Value) where  
@@ -257,13 +217,13 @@ instance IrPrint (IbinExpr Value) where
                   (v1, v2) = operandOfIbinExpr e
                   t = typeOfIbinExpr e
                   cs = case e of
-                        Add x _ _ _ -> optToLlvm x
-                        Sub x _ _ _ -> optToLlvm x
-                        Udiv x _ _ _ -> optToLlvm x
-                        Sdiv x _ _ _ -> optToLlvm x
-                        Shl x _ _ _ -> optToLlvm x
-                        Lshr x _ _ _ -> optToLlvm x
-                        Ashr x _ _ _ -> optToLlvm x
+                        Add x _ _ _ -> printIr x
+                        Sub x _ _ _ -> printIr x
+                        Udiv x _ _ _ -> printIr x
+                        Sdiv x _ _ _ -> printIr x
+                        Shl x _ _ _ -> printIr x
+                        Lshr x _ _ _ -> printIr x
+                        Ashr x _ _ _ -> printIr x
                         _ -> empty
               in 
                text op <+> cs 
@@ -291,20 +251,13 @@ instance IrPrint (BinExpr Value) where
   printIr (Fe e) = printIr e
   
 instance IrPrint (Icmp Value) where  
-  printIr (Icmp op t v1 v2) = text "icmp" 
-                             <+> printIr op 
-                             <+> printIr t 
-                             <+> printIr v1 <> comma <+> printIr v2
-
+  printIr (Icmp op t v1 v2) = hsep [text "icmp", printIr op, printIr t, printIr v1 <> comma, printIr v2]
   
 instance IrPrint (Fcmp Value) where  
-  printIr (Fcmp op t v1 v2) = text "fcmp" 
-                             <+> printIr op 
-                             <+> printIr t
-                             <+> printIr v1 <> comma <+> printIr v2
+  printIr (Fcmp op t v1 v2) = hsep [text "fcmp", printIr op, printIr t, printIr v1 <> comma, printIr v2]
   
 instance IrPrint (Conversion TypedValue) where  
-  printIr (Conversion op tv t) = printIr op <+> printIr tv <+> (text "to") <+> printIr t
+  printIr (Conversion op tv t) = hsep [printIr op, printIr tv, text "to", printIr t]
   
 instance IrPrint (Select TypedValue) where  
   printIr (Select c t f) = text "select" <+> (commaSepList [printIr c, printIr t, printIr f])
@@ -319,49 +272,22 @@ instance IrPrint Expr where
   printIr (Ev a) = printIr a
   
 instance IrPrint MemOp where  
-  printIr (Allocate ma t s a) = text "alloca" <+> printIr ma <+> printIr t <+> sepOptToLlvm comma s <+> sepOptToLlvm comma a
-  printIr (Load v ptr align nonterm invar nonull) = text "load" <+> printIr v
-                              <+> printIr ptr <+> sepOptToLlvm comma align 
-                              <+> sepOptToLlvm comma nonterm
-                              <+> sepOptToLlvm comma invar
-                              <+> sepOptToLlvm comma nonull
+  printIr (Allocate ma t s a) = 
+    hsep [text "alloca", printIr ma, printIr t, commaSepMaybe s, commaSepMaybe a]
+  printIr (Load v ptr align nonterm invar nonull) = 
+    hsep [text "load", printIr v, printIr ptr, commaSepNonEmpty [printIr align, printIr nonterm, printIr invar, printIr nonull]]
   printIr (LoadAtomic (Atomicity st ord) v ptr align) = 
-    text "load atomic"
-    <+> printIr v
-    <+> printIr ptr 
-    <+> printIr st
-    <+> printIr ord
-    <+> sepOptToLlvm comma align
-  printIr (Store b v addr align nonterm) = text "store" <+> printIr b
-                                          <+> printIr v <+> comma <+> printIr addr <+> sepOptToLlvm comma align
-                                          <+> sepOptToLlvm comma nonterm 
+    hsep [text "load atomic", printIr v, printIr ptr, printIr st, printIr ord, commaSepMaybe align]
+  printIr (Store b v addr align nonterm) = 
+    hsep [text "store", printIr b, printIr v <> comma, printIr addr, commaSepMaybe align, commaSepMaybe nonterm]
   printIr (StoreAtomic (Atomicity st ord) b v ptr align) = 
-    text "store atomic" 
-    <+> printIr b
-    <+> printIr v <+> comma
-    <+> printIr ptr 
-    <+> printIr st 
-    <+> printIr ord
-    <+> sepOptToLlvm comma align
-  printIr (Fence b order) = text "fence" <+> printIr b <+> printIr order
+    hsep [text "store atomic", printIr b, printIr v <> comma, printIr ptr, printIr st, printIr ord <> commaSepMaybe align]
+  printIr (Fence b order) = hsep [text "fence", printIr b, printIr order]
   printIr (CmpXchg wk v p c n st sord ford) = 
-    text "cmpxchg" <+> printIr wk
-    <+> printIr v
-    <+> printIr p <+> comma
-    <+> printIr c <+> comma
-    <+> printIr n 
-    <+> printIr st
-    <+> printIr sord
-    <+> printIr ford
+    hsep [text "cmpxchg", printIr wk, printIr v, printIr p <> comma, printIr c <> comma, printIr n, printIr st, printIr sord, printIr ford]
   printIr (AtomicRmw v op p vl st ord) = 
-    text "atomicrmw" <+> printIr v
-    <+> printIr op 
-    <+> printIr p <+> comma
-    <+> printIr vl 
-    <+> printIr st
-    <+> printIr ord
+    hsep [text "atomicrmw", printIr v, printIr op, printIr p <> comma, printIr vl, printIr st, printIr ord]
   
-
 instance IrPrint Value where
   printIr (VgOl i) = printIr i
   printIr (Ve e) = printIr e
@@ -385,22 +311,12 @@ instance IrPrint FunName where
   printIr (FunNameString s) = text s
   
 instance IrPrint CallSite where
-  printIr (CsFun cc ra rt ident params fa) = (maybe empty printIr cc) <+> (hsep $ fmap printIr ra)
-                                             <+> printIr rt <+> printIr ident
-                                             <+> parens (commaSepList $ fmap printIr params)
-                                             <+> (hsep $ fmap printIr fa)
-  printIr (CsAsm t se as dia s1 s2 params fa) = (printIr t) <+> text "asm"
-                                                <+> (maybe empty printIr se)
-                                                <+> (maybe empty printIr as)
-                                                <+> printIr dia
-                                                <+> printIr s1 <+> comma <+> printIr s2
-                                                <+> parens (commaSepList $ fmap printIr params)
-                                                <+> (hsep $ fmap printIr fa)
-  printIr (CsConversion ra t convert params fa) = (hsep $ fmap printIr ra)
-                                                  <+> (printIr t) 
-                                                  <+> printIr convert 
-                                                  <+> parens (hsep $ fmap printIr params)
-                                                  <+> (hsep $ fmap printIr fa)
+  printIr (CsFun cc ra rt ident params fa) = 
+    hsep [printIr cc, hsep $ fmap printIr ra, printIr rt, printIr ident, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
+  printIr (CsAsm t se as dia s1 s2 params fa) = 
+    hsep [printIr t, text "asm", printIr se, printIr as, printIr dia, printIr s1 <> comma, printIr s2, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
+  printIr (CsConversion ra t convert params fa) = 
+    hsep [hsep $ fmap printIr ra, printIr t, printIr convert, parens (hsep $ fmap printIr params), hsep $ fmap printIr fa]
 
 instance IrPrint Clause where
   printIr (Catch tv) = text "catch" <+> printIr tv
@@ -408,8 +324,7 @@ instance IrPrint Clause where
   printIr (Cco c) = printIr c
 
 instance IrPrint (Conversion (Type, GlobalOrLocalId)) where
-  printIr (Conversion op (t, g) dt) = printIr op <+> 
-                                     parens  (printIr t <+> printIr g <+> text "to" <+> printIr dt)
+  printIr (Conversion op (t, g) dt) = printIr op <+> parens  (printIr t <+> printIr g <+> text "to" <+> printIr dt)
   
 instance IrPrint PersFn where
     printIr (PersFnId g) = printIr g
@@ -420,20 +335,19 @@ instance IrPrint PersFn where
 
 
 instance IrPrint (ExtractElem TypedValue) where
-  printIr (ExtractElem tv1 tv2) = text "extractelement" <+> printIr tv1 <+> comma <+> printIr tv2
+  printIr (ExtractElem tv1 tv2) = hsep [text "extractelement", printIr tv1 <> comma, printIr tv2]
   
 instance IrPrint (InsertElem TypedValue) where  
-  printIr (InsertElem vect tv idx) = text "insertelement" <+> printIr vect <+> comma 
-                                    <+> printIr tv <+> comma <+> printIr idx
+  printIr (InsertElem vect tv idx) = 
+    hsep [text "insertelement", printIr vect <> comma, printIr tv <> comma, printIr idx]
   
 instance IrPrint (ShuffleVector TypedValue) where  
-  printIr (ShuffleVector vect1 vect2 mask) = text "shufflevector" <+> printIr vect1 <+> comma
-                                        <+> printIr vect2 <+> comma
-                                        <+> printIr mask
+  printIr (ShuffleVector vect1 vect2 mask) = 
+    hsep [text "shufflevector", printIr vect1 <> comma, printIr vect2 <> comma, printIr mask]
   
 instance IrPrint (ExtractValue TypedValue) where  
-  printIr (ExtractValue tv idxs) = text "extractvalue" <+> printIr tv 
-                                  <+> comma <+> (commaSepList $ fmap text idxs)
+  printIr (ExtractValue tv idxs) = 
+    hsep [text "extractvalue", printIr tv <> comma, (commaSepList $ fmap text idxs)]
                                   
 instance IrPrint (InsertValue TypedValue) where  
   printIr (InsertValue vect tv idx) = text "insertvalue" <+> hsep (punctuate comma ((printIr vect):(printIr tv):(fmap text idx)))
@@ -441,25 +355,20 @@ instance IrPrint (InsertValue TypedValue) where
 instance IrPrint Rhs where
   printIr (RmO a) = printIr a
   printIr (Re a) = printIr a
-  printIr (Call tail callSite) = printIr tail <+> text "call" <+> printIr callSite
+  printIr (Call tailc callSite) = printIr tailc <+> text "call" <+> printIr callSite
   printIr (ReE a) = printIr a
   printIr (RiE a) = printIr a
   printIr (RsV a) = printIr a
   printIr (ReV a) = printIr a
   printIr (RiV a) = printIr a
   printIr (VaArg tv t) = text "va_arg" <+> printIr tv <+> comma <+> printIr t    
-  printIr (LandingPad rt pt tgl b clause) =  text "landingpad" <+> printIr rt
-                                            <+> text "personality" 
-                                            <+> (printIr pt) 
-                                            <+> (printIr tgl) 
-                                            <+> (if b then text "cleanup" else empty)
-                                            <+> listToDoc printIr clause (<+>)
+  printIr (LandingPad rt pt tgl b clause) =  
+    hsep [text "landingpad", printIr rt, text "personality", printIr pt, printIr tgl, printIr b, hsep $ fmap printIr clause]
   
 
 instance IrPrint ActualParam where
-  printIr (ActualParam t att1 align v att2) = printIr t <+> (hsep $ fmap printIr att1)
-                                             <+> (maybe empty printIr align)
-                                             <+> printIr v <+> (hsep $ fmap printIr att2)
+  printIr (ActualParam t att1 align v att2) = 
+    hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]
   
 
 instance IrPrint Dbg where
@@ -479,13 +388,11 @@ instance IrPrint TerminatorInst where
   printIr (Return x) = text "ret" <+> (if null x then text "void" else commaSepList $ fmap printIr x)
   printIr (Br a) = text "br" <+> printIr a
   printIr (Cbr v t f) = text "br i1" <+> (commaSepList [printIr v, printIr t, printIr f])
-  printIr (IndirectBr v l) = text "indirectbr" <+> printIr v <+> comma <+> brackets  (commaSepList $ fmap printIr l)
-  printIr (Switch v d tbl) = text "switch" <+> printIr v <+> comma  <+> printIr d <+> 
-                            brackets (listToDoc (\(p1,p2) -> printIr p1 <> comma <+> printIr p2) tbl (<+>))
-  printIr (Invoke lhs callSite toL unwindL) = optSepToLlvm lhs equals <+>
-                                             text "invoke" <+> printIr callSite 
-                                             <+> text "to" <+> printIr toL 
-                                             <+> text "unwind" <+> printIr unwindL
+  printIr (IndirectBr v l) = hsep [text "indirectbr", printIr v <> comma, brackets (commaSepList $ fmap printIr l)]
+  printIr (Switch v d tbl) = 
+    hsep [text "switch", printIr v <> comma, printIr d, brackets (hsep $ fmap (\(p1,p2) -> printIr p1 <> comma <+> printIr p2) tbl)]
+  printIr (Invoke lhs callSite toL unwindL) = 
+    hsep [optSepToLlvm lhs equals, text "invoke", printIr callSite, text "to", printIr toL, text "unwind", printIr unwindL]
   printIr Unreachable = text "unreachable"
   printIr (Resume a) = text "resume" <+> printIr a
   printIr Unwind = text "unwind"
@@ -505,20 +412,11 @@ instance IrPrint Aliasee where
                       
 
 instance IrPrint FunctionPrototype where
-  printIr (FunctionPrototype fhLinkage fhVisibility
-          fhCCoonc fhAttr fhRetType fhName fhParams fhd fhAttr1 fhSection
-          fhCmd fhAlign fhGc fhPrefix fhPrologue
-         ) = (maybe empty printIr fhLinkage) <+>  (maybe empty printIr fhVisibility) 
-             <+> (maybe empty printIr fhCCoonc) <+> (hsep $ fmap printIr fhAttr)
-             <+> printIr fhRetType <+> printIr fhName <+> printIr fhParams 
-             <+> (maybe empty printIr fhd)
-             <+> (hsep $ fmap printIr fhAttr1) 
-             <+> (maybe empty printIr fhSection) 
-             <+> (maybe empty printIr fhCmd)
-             <+> (maybe empty printIr fhAlign)
-             <+> (maybe empty printIr fhGc)
-             <+> (maybe empty printIr fhPrefix)
-             <+> (maybe empty printIr fhPrologue)
+  printIr (FunctionPrototype fhLinkage fhVisibility fhCCoonc fhAttr fhRetType fhName fhParams fhd fhAttr1 fhSection
+           fhCmd fhAlign fhGc fhPrefix fhPrologue) = 
+    hsep [printIr fhLinkage, printIr fhVisibility, printIr fhCCoonc, hsep $ fmap printIr fhAttr
+         , printIr fhRetType, printIr fhName, printIr fhParams, printIr fhd, hsep $ fmap printIr fhAttr1
+         , printIr fhSection, printIr fhCmd, printIr fhAlign, printIr fhGc, printIr fhPrefix, printIr fhPrologue]
   
 
 
@@ -711,4 +609,7 @@ instance IrPrint SideEffect where
   printIr = P.print
   
 instance IrPrint AlignStack where  
+  printIr = P.print
+
+instance IrPrint Cleanup where
   printIr = P.print

@@ -322,7 +322,7 @@ pLandingPad = do { reserved "landingpad"
                  ; reserved "personality"
                  ; ft <- pType
                  ; ix <- pPersFn
-                 ; cl <- option False (reserved "cleanup" >> return True)
+                 ; cl <- option Nothing (reserved "cleanup" >> return (Just Cleanup))
                  ; c <- many pClause
                  ; return $ LandingPad rt ft ix cl c
                  }

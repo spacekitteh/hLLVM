@@ -66,7 +66,7 @@ data InsertValue v = InsertValue v v [String] deriving (Eq,Ord,Show)
 data Conversion v = Conversion ConvertOp v Type deriving (Eq,Ord,Show)
 
 -- | Complex Constants <http://llvm.org/releases/3.0/docs/LangRef.html#complexconstants>  
-data ComplexConstant = Cstruct Bool [TypedConst] 
+data ComplexConstant = Cstruct Packing [TypedConst] 
                      | Carray [TypedConst]
                      | Cvector [TypedConst]
                        deriving (Eq,Ord,Show)
@@ -78,7 +78,6 @@ data Const = Ccp SimpleConstant
            | Cl LabelId
            -- | Addresses of Basic Block <http://llvm.org/releases/3.0/docs/LangRef.html#blockaddress>
            | CblockAddress GlobalId PercentLabel
-           -- | Ca (BinaryOperation Const)
            | Cb (BinExpr Const)
            | Cconv (Conversion TypedConst)
            | CgEp (GetElemPtr TypedConst)
@@ -109,7 +108,6 @@ data GetResult = GetResult TypedValue String deriving (Eq, Ord, Show)
 
 
 data Expr = EgEp (GetElemPtr TypedValue)
-          -- | Ea (BinaryOperation Value)
           | EiC (Icmp Value)
           | EfC (Fcmp Value)
           | Eb (BinExpr Value) 
@@ -163,7 +161,7 @@ data Rhs = RmO MemOp
          | ReV (ExtractValue TypedValue) 
          | RiV (InsertValue TypedValue)
          | VaArg TypedValue Type
-         | LandingPad Type Type PersFn Bool [Clause] 
+         | LandingPad Type Type PersFn (Maybe Cleanup) [Clause] 
          deriving (Eq,Ord,Show)
               
 data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)

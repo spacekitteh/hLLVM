@@ -169,7 +169,7 @@ typeOfFcmp :: Fcmp v -> Type
 typeOfFcmp (Fcmp _ t _ _) = t
 
 
-data ComplexConstant = Cstruct Bool [TypedConst] 
+data ComplexConstant = Cstruct Packing [TypedConst] 
                      | Cvector [TypedConst]
                      | Carray [TypedConst]
                        deriving (Eq,Ord,Show)
@@ -267,7 +267,7 @@ data Rhs = RmO MemOp
          | ReV (ExtractValue TypedValue) 
          | RiV (InsertValue TypedValue)
          | VaArg TypedValue Type
-         | LandingPad Type Type PersFn Bool [Clause] 
+         | LandingPad Type Type PersFn (Maybe Cleanup) [Clause] 
          deriving (Eq,Ord,Show)
               
 data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)

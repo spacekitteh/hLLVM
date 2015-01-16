@@ -1,21 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Llvm.AsmPrinter.SharedEntityPrint where
-import Prelude (($),fmap, Maybe(..),maybe, (.),null)
+import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++))
 
-import Llvm.AsmPrinter.Common -- Text.PrettyPrint
+import Llvm.AsmPrinter.Common 
 import Llvm.VmCore.DataLayout
 import Llvm.VmCore.SharedEntity
 
 
 class Print a where
   print :: a -> Doc
-  
-{-  
-sepOptToLlvmX :: Print a => (Doc -> Doc) -> Maybe a -> Doc
-sepOptToLlvmX _  (Nothing) = empty
-sepOptToLlvmX sep (Just x) = sep $ print x
--}  
-  
+
 instance Print Endianness where
   print LittleEndian = char 'e'
   print BigEndian = char 'E'
@@ -363,11 +357,11 @@ instance Print FormalParam where
     <+> (print id) <+> (hsep $ fmap print att2)
 
 instance Print FormalParamList where
-  print (FormalParamList params b atts) =
-    parens ((hsep $ punctuate comma $ fmap print params) <+> print b) <+> (hsep $ fmap print atts)
+  print (FormalParamList params var atts) =
+    parens (commaSepNonEmpty ((fmap print params) ++ [maybe empty print var])) <+> (hsep $ fmap print atts)
 
 instance Print TypeParamList where
-  print (TypeParamList params b) = parens ((hsep $ punctuate comma $ fmap print params) <+> print b)
+  print (TypeParamList params b) = parens (commaSepNonEmpty ((fmap print params) ++ [maybe empty print b]))
     
 instance Print InAllocaAttr where
   print s = case s of
@@ -445,10 +439,8 @@ instance Print SideEffect where
 instance Print AlignStack where  
   print AlignStack = text "alignstack"
   
-{-  
-instance Print DoubleQuotedString where  
-  print (DoubleQuotedString s) = doubleQuotes $ text s
--}
-
 instance Print VarArgParam where
   print VarArgParam = text "..."
+  
+instance Print Cleanup where
+  print Cleanup = text "cleanup"

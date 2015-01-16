@@ -35,6 +35,7 @@ pType =
                    , reserved "metadata" >> return Tmetadata
                    ]
 
+pTypeName :: P Type
 pTypeName = do { x <- pLocalId 
                ; case x of 
                  LocalIdNum n -> return $ Tno n 
@@ -83,19 +84,18 @@ pPrimType = choice [ try pTypeI
 pTypeParamList :: P TypeParamList
 pTypeParamList = do { chartok '('
                     ; (l, f) <- args []
---                    ; funAttrs <- many pFunAttr
-                    ; return $ TypeParamList l f -- funAttrs
+                    ; return $ TypeParamList l f
                     }
  where
-   args :: [Type] -> P ([Type], IsOrIsNot VarArgParam)
+   args :: [Type] -> P ([Type], Maybe VarArgParam)
    args l =  choice [ do { p <- pType
                          ; let l' = p:l
                          ; choice [ comma >> args l'
-                                  , chartok ')' >> return (reverse l', IsNot VarArgParam)
+                                  , chartok ')' >> return (reverse l', Nothing)
                                   ]
                          }
-                    , symbol "..." >> chartok ')' >> return (reverse l, Is VarArgParam)
-                    , chartok ')' >> return (reverse l, IsNot VarArgParam)
+                    , symbol "..." >> chartok ')' >> return (reverse l, Just VarArgParam)
+                    , chartok ')' >> return (reverse l, Nothing)
                     ]
   
 
@@ -106,15 +106,15 @@ pFormalParamList = do { chartok '('
                       ; return $ FormalParamList l f funAttrs
                       }
  where
-   args :: [FormalParam] -> P ([FormalParam], IsOrIsNot VarArgParam)
+   args :: [FormalParam] -> P ([FormalParam], Maybe VarArgParam)
    args l =  choice [ do { p <- param
                          ; let l' = p:l
                          ; choice [ comma >> args l'
-                                  , chartok ')' >> return (reverse l', IsNot VarArgParam)
+                                  , chartok ')' >> return (reverse l', Nothing)
                                   ]
                          }
-                    , symbol "..." >> chartok ')' >> return (reverse l, Is VarArgParam)
-                    , chartok ')' >> return (reverse l, IsNot VarArgParam)
+                    , symbol "..." >> chartok ')' >> return (reverse l, Just VarArgParam)
+                    , chartok ')' >> return (reverse l, Nothing)
                     ]
     where
         param = do { at <- pType
