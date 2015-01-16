@@ -54,7 +54,7 @@ Library
                      Llvm.Pass.NormalGraph,
                      Llvm.Pass.Optimizer,
                      Llvm.Pass.PassManager,
-                     Llvm.Pass.PhiElimination,
+                     Llvm.Pass.PhiFixUp,
                      Llvm.Pass.Rewriter,
                      Llvm.Pass.Uda,
                      ParserTester,

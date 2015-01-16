@@ -16,11 +16,12 @@ import Prelude hiding(lookup)
 import Debug.Trace
 #endif
  
+-- | TODO: describe in details what this pass is doing  
 type Mem2RegFact = Dm.Map LValue (WithTop Value)
 
 data LValue = Mem Lstring
-          | Ref Lstring
-          deriving (Eq, Show, Ord)
+            | Ref Lstring
+            deriving (Eq, Show, Ord)
 
 mem2RegLattice :: DataflowLattice Mem2RegFact
 mem2RegLattice = DataflowLattice { fact_name = "Mem 2 Reg"
@@ -88,9 +89,6 @@ insert :: Ord k => k -> v -> Dm.Map k v -> Dm.Map k v
 insert x v1 f | trace ("insert " ++ (show x) ++ "->" ++ (show v1)) False = undefined
 #endif
 insert x v1 f = Dm.insert x v1 f
-
-
-                                                 
 
 mem2Reg :: forall m . FuelMonad m => FwdRewrite m Node Mem2RegFact
 mem2Reg = mkFRewrite cp

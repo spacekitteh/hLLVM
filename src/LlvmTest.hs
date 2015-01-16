@@ -24,20 +24,17 @@ extractSteps :: [String] -> [Step]
 extractSteps l = map (\x -> case toStep x of
                          Just s -> s
                          Nothing -> error (x ++ " is not step")) l
-                 
 
 data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | Parser { input :: FilePath, output :: Maybe String }
             | Ast2Ir { input :: FilePath, output :: Maybe String }
             | Ir2Ast { input :: FilePath, output :: Maybe String }
             | Pass { input :: FilePath, output :: Maybe String, step :: [String], fuel :: Int }
-            | PhiElim { input :: FilePath, output :: Maybe String, fuel :: Int }
+            | PhiFixUp { input :: FilePath, output :: Maybe String, fuel :: Int }
             | AstCanonic { input :: FilePath, output :: Maybe String }
             deriving (Show, Data, Typeable, Eq)
-                                       
-                     
+
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
-         
 
 dummy = Dummy { input = def &= typ "<INPUT>" &= argPos 0
               , output = outFlags Nothing
@@ -56,9 +53,9 @@ ir2ast = Ir2Ast { input = def &= typ "<INPUT>" &= argPos 0
                 } &= help "Test Ir to Ast conversion"
          
 astcanonic = AstCanonic { input = def &= typ "<INPUT>" &= argPos 0
-                          , output = outFlags Nothing
-                          } &= help "Test Ir to Ast conversion"         
-              
+                        , output = outFlags Nothing
+                        } &= help "Test Ir to Ast conversion"         
+
 pass = Pass { input = def &= typ "<INPUT>" &= argPos 0
             , output = outFlags Nothing
             , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
@@ -66,13 +63,12 @@ pass = Pass { input = def &= typ "<INPUT>" &= argPos 0
             } &= help "Test Optimization pass"
          
 
-phielim = PhiElim { input = def &= typ "<INPUT>" &= argPos 0
-                  , output = outFlags Nothing
-                  , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
-                  } &= help "Test PhiElim pass"
+phifixup = PhiFixUp { input = def &= typ "<INPUT>" &= argPos 0
+                    , output = outFlags Nothing
+                    , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
+                    } &= help "Test PhiFixUp pass"
 
-         
-mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phielim] &= help "Test sub components" 
+mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup] &= help "Test sub components" 
        &= program "Test" &= summary "Test driver v1.0"
        
        
@@ -119,17 +115,17 @@ main = do { sel <- cmdArgsRun mode
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
-            PhiElim ix ox f -> do { inh <- openFile ix ReadMode
-                                ; outh <- openFileOrStdout ox
-                                ; ast <- testParser ix inh
-                                ; let ast1 = S.simplify ast
-                                ; let (m, ir) = testAst2Ir ast1
-                                ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir)
-                                ; let ast2 = testIr2Ast m ir1
-                                ; writeOutLlvm ast2 outh
-                                ; hClose inh
-                                ; closeFileOrStdout ox outh
-                                }
+            PhiFixUp ix ox f -> do { inh <- openFile ix ReadMode
+                                   ; outh <- openFileOrStdout ox
+                                   ; ast <- testParser ix inh
+                                   ; let ast1 = S.simplify ast
+                                   ; let (m, ir) = testAst2Ir ast1
+                                   ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.fixUpPhi ir)
+                                   ; let ast2 = testIr2Ast m ir1
+                                   ; writeOutLlvm ast2 outh
+                                   ; hClose inh
+                                   ; closeFileOrStdout ox outh
+                                   }
             Pass ix ox passes f -> do { inh <- openFile ix ReadMode
                                       ; outh <- openFileOrStdout ox
                                       ; ast <- testParser ix inh
@@ -137,7 +133,7 @@ main = do { sel <- cmdArgsRun mode
                                       ; let (m, ir) = testAst2Ir ast1
                                       ; let applySteps' = applySteps (extractSteps passes) ir
                                       ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f applySteps'
-                                      ; let ir2 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.killphi ir1)
+                                      ; let ir2 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.fixUpPhi ir1)
                                       ; let ast2 = testIr2Ast m ir2
                                       ; writeOutLlvm ast2 outh
                                       ; hClose inh

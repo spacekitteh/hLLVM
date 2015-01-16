@@ -97,7 +97,6 @@ instance AsmPrint (Select TypedConst) where
   toLlvm (Select cnd tc1 tc2) = 
     text "select" <+> parens (commaSepList [toLlvm cnd, toLlvm tc1, toLlvm tc2])
 
-
 instance AsmPrint (Icmp Const) where
   toLlvm (Icmp op t c1 c2) = 
     text "icmp" <+> toLlvm op <+> parens (toLlvm (TypedConst t c1) <> comma <+> toLlvm (TypedConst t c2))
@@ -105,12 +104,10 @@ instance AsmPrint (Icmp Const) where
 instance AsmPrint (Fcmp Const) where
   toLlvm (Fcmp op t c1 c2) = 
     text "fcmp" <+> toLlvm op <+> parens (toLlvm (TypedConst t c1) <> comma <+> toLlvm (TypedConst t c2))
-  
 
 instance AsmPrint (ShuffleVector TypedConst) where
   toLlvm (ShuffleVector tc1 tc2 mask) = 
     text "shufflevector" <+> parens (commaSepList [toLlvm tc1, toLlvm tc2, toLlvm mask])
-
 
 instance AsmPrint (ExtractValue TypedConst) where
   toLlvm (ExtractValue tc indices) = 
@@ -123,12 +120,10 @@ instance AsmPrint (InsertValue TypedConst) where
 instance AsmPrint (ExtractElem TypedConst) where
   toLlvm (ExtractElem tc index) = 
     text "extractelement" <+> parens (toLlvm tc <> comma <+> toLlvm index)
-                                
                                   
 instance AsmPrint (InsertElem TypedConst) where                                  
   toLlvm (InsertElem tc1 tc2 index) = 
     text "insertelement" <+> parens (commaSepList [toLlvm tc1, toLlvm tc2, toLlvm index])
-    
 
 instance AsmPrint TrapFlag where
   toLlvm Nuw = text "nuw"
@@ -213,13 +208,11 @@ instance AsmPrint MemOp where
     hsep [text "cmpxchg", toLlvm wk, toLlvm v, toLlvm p <> comma, toLlvm c <> comma, toLlvm n, toLlvm st, toLlvm sord, toLlvm ford]
   toLlvm (AtomicRmw v op p vl st ord) = 
     hsep [text "atomicrmw", toLlvm v, toLlvm op, toLlvm p <> comma, toLlvm vl, toLlvm st, toLlvm ord]
-                                        
 
 instance AsmPrint Value where
   toLlvm (VgOl i) = toLlvm i
   toLlvm (Ve e) = toLlvm e
   toLlvm (Vc c) = toLlvm c
-
 
 instance AsmPrint TypedValue where
   toLlvm (TypedValue t v) = toLlvm t <+> toLlvm v
@@ -293,7 +286,6 @@ instance AsmPrint Rhs where
   toLlvm (VaArg tv t) = hsep [text "va_arg", toLlvm tv <> comma, toLlvm t]
   toLlvm (LandingPad rt pt tgl b clause) = 
     hsep ([text "landingpad", toLlvm rt, text "personality", toLlvm pt, toLlvm tgl, toLlvm b] ++ (fmap toLlvm clause))
-  
 
 instance AsmPrint ActualParam where
   toLlvm (ActualParam t att1 align v att2) = 
@@ -331,7 +323,6 @@ instance AsmPrint Aliasee where
   toLlvm (AtV tv ) = toLlvm tv
   toLlvm (Ac c) = toLlvm c
   toLlvm (AgEp a) = toLlvm a
-                      
 
 instance AsmPrint FunctionPrototype where
   toLlvm (FunctionPrototype fhLinkage fhVisibility fhCCoonc fhAttr fhRetType fhName fhParams fnd 
@@ -372,8 +363,6 @@ instance AsmPrint Toplevel where
     hsep [text "attributes", char '#' <> (integer n), equals, braces (hsep $ fmap toLlvm l)]
   toLlvm (ToplevelComdat l c) = 
     hsep [toLlvm l, equals, text "comdat", toLlvm c]
-
-
 
 instance AsmPrint Module where 
   toLlvm (Module tops) = vcat $ fmap toLlvm tops

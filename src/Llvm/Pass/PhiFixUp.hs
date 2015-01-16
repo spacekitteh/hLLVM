@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE ScopedTypeVariables, GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE GADTs #-}
 
-module Llvm.Pass.PhiElimination (phiElimination) where
+module Llvm.Pass.PhiFixUp (phiFixUp) where
 
 import Compiler.Hoopl
 import Llvm.VmCore.CoreIr
@@ -12,7 +13,8 @@ import Llvm.Pass.Rewriter
 import Debug.Trace
 #endif 
 
-type LiveLabel = LabelMap Label
+-- | this pass fix up Phi instructions that have the parameters from unreachable code
+type LiveLabel = LabelMap Label -- all the searchable labels
 lattice :: LiveLabel -> DataflowLattice LiveLabel
 lattice live = DataflowLattice { fact_name = "Live Label"
                                , fact_bot = live
@@ -33,11 +35,11 @@ fwdTransfer = mkFTransfer live
     live (Cinst _) f = f 
     live (Tinst n) f  = tinstft n f
     tinstft :: TerminatorInstWithDbg -> LiveLabel -> Fact C LiveLabel
-    tinstft (TerminatorInstWithDbg term _) f =  let targets = targetOf term
-                                                in case targets of
-                                                  [] -> mapEmpty
-                                                  l -> mkFactBase (lattice f)
-                                                       (map (\x -> (getTargetLabel x, f)) l)
+    tinstft (TerminatorInstWithDbg term _) f =  
+      let targets = targetOf term
+      in case targets of
+        [] -> mapEmpty
+        l -> mkFactBase (lattice f) (map (\x -> (getTargetLabel x, f)) l)
                                                      
 
 fwdRewrite :: forall m. FuelMonad m => FwdRewrite m Node LiveLabel
@@ -54,12 +56,13 @@ removePhi x live | trace ("removePhi is called over " ++ show x) False = undefin
 removePhi x live | trace ("removePhi is called with " ++ show live) False = undefined
 removePhi x live | trace ("removePhi is called with " ++ show live) False = undefined
 #endif
-removePhi (PhiInst lhs t ins) live = if liveOperands == ins then
-                                       return $ Nothing
-                                     else if liveOperands == [] then
-                                            return $ Just emptyGraph
-                                          else 
-                                            return $ Just $ nodeToGraph $ Pinst $ PhiInst lhs t liveOperands
+removePhi (PhiInst lhs t ins) live = 
+  if liveOperands == ins then
+    return $ Nothing
+  else if liveOperands == [] then
+         return $ Just emptyGraph
+       else 
+         return $ Just $ nodeToGraph $ Pinst $ PhiInst lhs t liveOperands
    where 
 #ifdef DEBUG
      isAlive x s | trace ("isAlive is called with " ++ show x ++ "  " ++ show s) False = undefined
@@ -69,21 +72,19 @@ removePhi (PhiInst lhs t ins) live = if liveOperands == ins then
      liveOperands = foldl (\p -> \x@(_, PercentLabel li) -> 
                             if isAlive li live then x:p else p) [] (reverse ins)
 
+
 fwdPass :: forall m. FuelMonad m => LiveLabel -> FwdPass m Node LiveLabel
 fwdPass f = FwdPass { fp_lattice = lattice f
                     , fp_transfer = fwdTransfer
                     , fp_rewrite = fwdRewrite
                     }
-                      
-          
-            
-               
-phiElimination :: LabelMap Label -> Label -> Graph Node C C -> CheckingFuelMonad SimpleUniqueMonad (Graph Node C C)
+
+phiFixUp :: LabelMap Label -> Label -> Graph Node C C -> CheckingFuelMonad SimpleUniqueMonad (Graph Node C C)
 #ifdef DEBUG
-phiElimination idom entry graph | trace ("killphi with idom " ++ show idom) False = undefined
-phiElimination idom entry graph | trace ("killphi with entry " ++ show entry) False = undefined
+phiFixUp idom entry graph | trace ("phiFixUp with idom " ++ show idom) False = undefined
+phiFixUp idom entry graph | trace ("phiFixUp with entry " ++ show entry) False = undefined
 #endif
-phiElimination idom entry graph = 
+phiFixUp idom entry graph = 
   let idom0 = mapInsert entry entry idom
       fwd = fwdPass idom0
   in do { (graph0, _, _) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph
