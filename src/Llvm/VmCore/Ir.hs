@@ -57,16 +57,16 @@ getLabel (Ci.TargetLabel (Ci.PercentLabel l)) = Ci.toLabel l
 
 instance H.NonLocal Node where
     entryLabel (Nlabel (Ci.BlockLabel l)) = Ci.toLabel l
-    successors (Tinst (Ci.TerminatorInstWithDbg inst l)) = succ inst
+    successors (Tinst (Ci.TerminatorInstWithDbg inst l)) = suc inst
       where
-        succ (Ci.Unreachable) = []
-        succ (Ci.Return _) = []
-        succ (Ci.Br l) = [getLabel l]
-        succ (Ci.Cbr _ l1 l2) = [getLabel l1, getLabel l2]
-        succ (Ci.IndirectBr c ls) = map getLabel ls
-        succ (Ci.Switch  _ d ls) = (getLabel d):(map (getLabel . snd) ls)
-        succ (Ci.Invoke _  _ l1 l2) = [getLabel l1, getLabel l2]
-        succ (Ci.Resume _) = []
+        suc (Ci.Unreachable) = []
+        suc (Ci.Return _) = []
+        suc (Ci.Br l) = [getLabel l]
+        suc (Ci.Cbr _ l1 l2) = [getLabel l1, getLabel l2]
+        suc (Ci.IndirectBr c ls) = map getLabel ls
+        suc (Ci.Switch  _ d ls) = (getLabel d):(map (getLabel . snd) ls)
+        suc (Ci.Invoke _  _ l1 l2) = [getLabel l1, getLabel l2]
+        suc (Ci.Resume _) = []
 
 
 globalIdOfModule :: Module -> S.Set (Ci.Type, Ci.GlobalId)

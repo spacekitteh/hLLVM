@@ -10,16 +10,16 @@ import Compiler.Hoopl (Label)
 
 -- | We have to keep the original label kinds to map Hoopl labels back to labels that llvm-as likes
 data LabelId = LabelString Label
-             | LabelDqString Label
              | LabelNumber Label
-             | LabelQuoteNumber Label  
+             | LabelDqString Label -- a string enclosed by double quotes
+             | LabelDqNumber Label -- a number enclosed by double quotes
              deriving (Eq, Ord, Show)
                       
 hooplLabelOf :: LabelId -> Label
 hooplLabelOf (LabelString x) = x
 hooplLabelOf (LabelDqString x) = x
 hooplLabelOf (LabelNumber x) = x
-hooplLabelOf (LabelQuoteNumber x) = x
+hooplLabelOf (LabelDqNumber x) = x
 
 data BlockLabel = BlockLabel LabelId deriving (Eq, Ord, Show)
 data PercentLabel = PercentLabel LabelId deriving (Eq, Ord, Show)
@@ -361,4 +361,4 @@ toLabel :: LabelId -> Label
 toLabel (LabelString l) = l
 toLabel (LabelDqString l) = l
 toLabel (LabelNumber l) = l
-toLabel (LabelQuoteNumber l) = l
+toLabel (LabelDqNumber l) = l

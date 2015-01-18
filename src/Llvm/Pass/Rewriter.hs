@@ -11,7 +11,7 @@ import qualified Compiler.Hoopl as H
 
 import Llvm.VmCore.CoreIr
 import Llvm.VmCore.Ir
-import Llvm.VmCore.Converter (maybeM)
+import Llvm.VmCore.Convert (maybeM)
 
 type MaybeChange a = a -> Maybe a
 

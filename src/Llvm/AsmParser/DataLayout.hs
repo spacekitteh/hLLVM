@@ -7,12 +7,11 @@ import Llvm.VmCore.DataLayout
 pLayoutSpec :: P LayoutSpec
 pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                      , char 'E' >> return (DlE BigEndian)
-                     , try (char 's' >> do { n <- integer
-                                      ; aa <- colon >> integer
-                                      ; pa <- colon >> integer
-                                      ; return ((DlS . StackAlign . AlignInBit) n)
-                                      })
-                     , char 's' >> colon >> liftM (DlS . StackAlign . AlignInBit) integer
+                     , try (char 's' >> do { n <- option Nothing (liftM Just integer)
+                                           ; aa <- option Nothing (colon >> liftM Just integer)
+                                           ; pa <- option Nothing (colon >> liftM Just integer)
+                                           ; return (DlLittleS n aa pa)
+                                           })
                      , char 'p' >> do { as <- option (LayoutAddrSpaceUnspecified) (liftM LayoutAddrSpace integer)
                                       ; s <- colon >> liftM SizeInBit integer
                                       ; aa <- colon >> liftM (AbiAlign . AlignInBit) integer
@@ -33,6 +32,7 @@ pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                      , char 'n' >> do { ls <- sepBy1 integer colon
                                       ; return (DlN (fmap SizeInBit ls))
                                       }
+                     , try (symbol "S0" >> return (DlS StackAlignUnspecified))
                      , char 'S' >> liftM ((DlS . StackAlign . AlignInBit)) integer
                      ]
   where prefAlign = option Nothing (colon >> liftM (Just . PrefAlign . AlignInBit) integer)

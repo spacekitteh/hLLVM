@@ -1,4 +1,5 @@
 module Llvm.VmCore.SharedEntity where
+import qualified Data.Map as M
 
 -- | Double Quoted String
 data DqString = DqString String deriving (Eq, Ord, Show)
@@ -6,18 +7,25 @@ data DqString = DqString String deriving (Eq, Ord, Show)
 data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt 
             | IcmpUle | IcmpSgt | IcmpSge | IcmpSlt | IcmpSle
             deriving (Eq,Ord,Show)
-                     
+
 data FcmpOp = FcmpTrue | FcmpFalse
             | FcmpOeq | FcmpOgt | FcmpOge
             | FcmpOlt | FcmpOle | FcmpOne | FcmpOrd
             | FcmpUeq | FcmpUgt | FcmpUge | FcmpUlt
             | FcmpUle | FcmpUne | FcmpUno
             deriving (Eq,Ord,Show)
-                     
+
 data ConvertOp = Trunc | Zext | Sext | FpTrunc | FpExt | FpToUi 
                | FpToSi | UiToFp | SiToFp | PtrToInt | IntToPtr
                | Bitcast | AddrSpaceCast
                deriving (Eq,Ord,Show)
+
+convertOpMap :: M.Map ConvertOp String
+convertOpMap = M.fromList [(Trunc, "trunc"), (Zext, "zext"), (Sext, "sext")
+                          ,(FpTrunc, "fptrunc"), (FpExt, "fpext"), (FpToUi, "fptoui") 
+                          ,(FpToSi, "fptosi"), (UiToFp, "uitofp"), (SiToFp, "sitofp")
+                          ,(PtrToInt, "ptrtoint"), (IntToPtr, "inttoptr"), (Bitcast, "bitcast")
+                          ,(AddrSpaceCast, "addrspacecast")]
 
 -- | Linkage Types <http://llvm.org/releases/3.5.0/docs/LangRef.html#linkage-types>
 data Linkage = LinkagePrivate
@@ -32,37 +40,39 @@ data Linkage = LinkagePrivate
              | LinkageWeakOdr
              | LinkageExternal
              deriving (Eq,Ord,Show)
-               
+
 -- | Calling Conventions <http://llvm.org/releases/3.5.0/docs/LangRef.html#calling-conventions>
 data CallConv = Ccc 
               | CcFast 
               | CcCold 
+              | CcGhc
+              | CcHiPe
               | Cc String
-              | CcWebkitJs
+              | CcWebkit_Js
               | CcAnyReg
               | CcPreserveMost
               | CcPreserveAll
-                -- | the following calling conventions are not documented
-              | CcSpirKernel
-              | CcSpirFunc
-              | CcIntelOclBi
-              | CcX86StdCall
-              | CcX86FastCall
-              | CcX86ThisCall
-              | CcArmApcs
-              | CcArmAapcs
-              | CcArmAapcsVfp
-              | CcMsp430Intr
-              | CcPtxKernel
-              | CcPtxDevice
-              | CcX86_64_Win64
+              | CcFirstTarget
+              | CcX86_StdCall
+              | CcX86_FastCall
+              | CcArm_Apcs
+              | CcArm_Aapcs
+              | CcArm_Aapcs_Vfp
+              | CcMsp430_Intr
+              | CcX86_ThisCall
+              | CcPtx_Kernel
+              | CcPtx_Device
+              | CcSpir_Func
+              | CcSpir_Kernel
+              | CcIntel_Ocl_Bi
               | CcX86_64_SysV
+              | CcX86_64_Win64
+              | CcX86_VectorCall
               deriving (Eq,Ord,Show)
 
 -- | Visibility Styles <http://llvm.org/releases/3.5.0/docs/LangRef.html#visibility-styles>
 data Visibility = VisDefault | VisHidden | VisProtected
                   deriving (Eq,Ord,Show)
-
 
 -- | DLL Storage Classes <http://llvm.org/releases/3.5.0/docs/LangRef.html#dll-storage-classes>              
 data DllStorageClass = DscImport

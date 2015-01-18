@@ -53,10 +53,10 @@ pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
 -- Everything through visibility has already been parsed.
 --
 pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
-pAlias lhs vis dll tlm na = do { link <- option LinkageExternal pAliasLinkage
-                    ; aliasee <- pAliasee
-                    ; return $ ToplevelAlias lhs vis dll tlm na (Just link) aliasee
-                    }
+pAlias lhs vis dll tlm na = do { link <- option Nothing (liftM Just pAliasLinkage)
+                               ; aliasee <- pAliasee
+                               ; return $ ToplevelAlias lhs vis dll tlm na link aliasee
+                               }
     where pAliasee = 
             choice [ liftM AtV pTypedValue
                    , liftM Ac pConstConversion

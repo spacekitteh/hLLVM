@@ -72,7 +72,7 @@ instance IrPrint Label where
 instance IrPrint LabelId where
   printIr (LabelString l) = printIr l
   printIr (LabelNumber l) = printIr l
-  printIr (LabelQuoteNumber l) = printIr l
+  printIr (LabelDqNumber l) = printIr l
   printIr (LabelDqString l) = printIr l
 
 instance IrPrint PercentLabel where

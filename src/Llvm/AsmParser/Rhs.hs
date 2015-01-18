@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.AsmParser.Rhs where
 import Llvm.VmCore.Ast
 import Llvm.AsmParser.Basic
@@ -30,10 +29,6 @@ pAllocate = do { reserved "alloca"
                ; a <- opt (comma >> pAlign)
                ; return $ Alloca ina t n a
                }
-{-            
-pFree :: P MemOp
-pFree = liftM Free (reserved "free" >> pTypedValue)
--}
 
 pLoad :: P MemOp
 pLoad = do { reserved "load"
@@ -178,8 +173,6 @@ pSelect = do { reserved "select"
              ; return $ Select (TypedValue t v) tv2 tv3
              }
 
-
-                  
 pConversion :: P (Conversion TypedValue)
 pConversion = do { op <- pConvertOp
               ; tv <- pTypedValue
@@ -187,8 +180,7 @@ pConversion = do { op <- pConvertOp
               ; t <- pType
               ; return $ Conversion op tv t
               }
-                   
-                   
+
 pGetElemPtr :: P (GetElemPtr TypedValue)
 pGetElemPtr = do { reserved "getelementptr"
                  ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
@@ -197,9 +189,6 @@ pGetElemPtr = do { reserved "getelementptr"
                  ; return $ GetElemPtr ib tc1 idx
                  }
 
-
-                   
-                   
 pExtractElement :: P (ExtractElem TypedValue)
 pExtractElement = reserved "extractelement" >> pTuple pTypedValue >>= return . (uncurry ExtractElem)
                   
@@ -215,8 +204,7 @@ pExtractValue = do { reserved "extractvalue"
                    ; ls <- many (try (comma >> intStrToken))
                    ; return $ ExtractValue tc1 ls
                    }
-                        
-                        
+
 pInsertValue :: P (InsertValue TypedValue)
 pInsertValue = do { reserved "insertvalue"
                   ; (tv1, tv2) <- pTuple pTypedValue
@@ -261,7 +249,7 @@ pCallConversion = do { a <- many pParamAttr
                   ; atts1 <- pFunAttrCollection
                   ; return (not $ isVoidType t, CsConversion a t convert params atts1)
                   }
-               
+
 pCallSite :: P (Bool, CallSite)
 pCallSite = choice [ try pCallFun
                    , try pCallAsm

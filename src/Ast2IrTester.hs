@@ -3,8 +3,8 @@ module Ast2IrTester (testAst2Ir) where
 import Llvm.AsmParser.Basic
 import Llvm.AsmParser.Module
 import Data.List
-import Llvm.VmCore.Ast2Ir
-import Llvm.VmCore.Ir2Ast
+import Llvm.VmCore.Convert (astToIr) --Ast2Ir
+-- import Llvm.VmCore.Ir2Ast
 import qualified Llvm.VmCore.Ast as A
 import qualified Llvm.VmCore.Ir as I
 import Llvm.VmCore.LabelMapM

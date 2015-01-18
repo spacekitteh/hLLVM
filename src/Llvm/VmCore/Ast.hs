@@ -12,16 +12,16 @@ import Llvm.VmCore.DataLayout
 -- | it's still unclear when a quoted verion is used  
 -- | we keep the original format to make llvm-as happy 
 data LabelId = LabelString Lstring
-             | LabelDqString Lstring
+             | LabelDqString Lstring -- a string enclosed by double quotes
              | LabelNumber Integer
-             | LabelQuoteNumber Integer
+             | LabelDqNumber Integer -- a number enclosed by double quotes
              deriving (Eq,Ord,Show)
 
 labelIdToLstring :: LabelId -> Lstring
 labelIdToLstring (LabelString s) = s
 labelIdToLstring (LabelDqString s) = s
 labelIdToLstring (LabelNumber n) = Lstring $ show n
-labelIdToLstring (LabelQuoteNumber n) = Lstring $ show n
+labelIdToLstring (LabelDqNumber n) = Lstring $ show n
 
 data BlockLabel = ExplicitBlockLabel LabelId 
                 | ImplicitBlockLabel (String, Int, Int)

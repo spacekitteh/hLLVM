@@ -1,6 +1,6 @@
 module Llvm.Target.TargetData where
 
-import Llvm.VmCore.AtomicEntity (Type (..), TypePrimitive (..), AddrSpace(..), Packing(..))
+import Llvm.VmCore.SharedEntity (Type (..), TypePrimitive (..), AddrSpace(..), Packing(..))
 import Llvm.VmCore.DataLayout (DataLayoutInfo (..),LayoutAddrSpace(..), AbiAlign (..), PrefAlign(..), SizeInBit(..), AlignType (..), AlignInBit(..), selectAlignment, StackAlign(..))
 import qualified Data.Map as M
 import qualified Data.Bits as B
@@ -11,9 +11,13 @@ data SizeInByte = SizeInByte Integer deriving (Eq, Ord, Show)
 data OffsetInByte = OffsetInByte Integer deriving (Eq, Ord, Show)
 data AlignInByte = AlignInByte Integer deriving (Eq, Ord, Show)
 
-
+fromSizeInBit :: SizeInBit -> SizeInByte
 fromSizeInBit (SizeInBit n) = SizeInByte (n `div` eightBits)
+
+toSizeInBit :: SizeInByte -> SizeInBit
 toSizeInBit (SizeInByte n) = SizeInBit (n * eightBits)
+
+fromAlignInBit :: AlignInBit -> AlignInByte
 fromAlignInBit (AlignInBit n) = AlignInByte (n `div` eightBits)
 
 getTypeAlignment :: DataLayoutInfo -> Type -> AlignType -> AlignInByte
@@ -30,7 +34,7 @@ getTypeAlignment dl t at =
     Tvector i s -> errorX
     Tstruct p tys -> case (p, at) of
       (Packed, AlignAbi)  -> AlignInByte 1
-      _ -> let aa = case M.lookup (SizeInBit 0) (aggregates dl) of
+      _ -> let aa = case M.lookup (Just $ SizeInBit 0) (aggregates dl) of
                  Just (aa, pa) -> selectAlignment at aa pa
                  Nothing -> errorX
            in max (fromAlignInBit aa) (structAlignment $ getStructLayout dl (p,tys))

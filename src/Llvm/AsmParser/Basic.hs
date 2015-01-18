@@ -14,6 +14,7 @@ import Text.Parsec.Language
 import Text.Parsec.Perm
 import Data.Char
 import Data.Functor.Identity (Identity)
+import qualified Data.Map as M
 
 -- dummy state
 -- data DummyState = DummyState
@@ -202,7 +203,7 @@ pLabelId = choice [ do { s <- (many1 (satisfy lblChar))
                        }
                   , do { s <- pQuoteStr
                        ; case readInteger s of
-                           Right x -> return $ LabelQuoteNumber x
+                           Right x -> return $ LabelDqNumber x
                            Left x -> return $ LabelDqString $ Lstring x
                        }
                   ]
@@ -260,20 +261,7 @@ pParamAttr = choice [ reserved "zeroext" >> return PaZeroExt
                     ]
 
 pConvertOp :: P ConvertOp
-pConvertOp = choice [ reserved "trunc" >> return Trunc
-                    , reserved "zext" >> return Zext
-                    , reserved "sext" >> return Sext
-                    , reserved "fptrunc" >> return FpTrunc
-                    , reserved "fpext" >> return FpExt
-                    , reserved "fptoui" >> return FpToUi
-                    , reserved "fptosi" >> return FpToSi
-                    , reserved "uitofp" >> return UiToFp
-                    , reserved "sitofp" >> return SiToFp
-                    , reserved "ptrtoint" >> return PtrToInt
-                    , reserved "inttoptr" >> return IntToPtr
-                    , reserved "bitcast" >> return Bitcast
-                    , reserved "addrspacecast" >> return AddrSpaceCast
-                    ]
+pConvertOp = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList convertOpMap
 
 pCallConv :: P CallConv
 pCallConv = choice [ try (reserved "ccc") >> return Ccc
@@ -281,22 +269,22 @@ pCallConv = choice [ try (reserved "ccc") >> return Ccc
                    , reserved "cc" >> liftM Cc intStrToken
                    , reserved "fastcc" >> return CcFast
                    , reserved "coldcc" >> return CcCold
-                   , reserved "webkit_jscc" >> return CcWebkitJs
+                   , reserved "webkit_jscc" >> return CcWebkit_Js
                    , reserved "anyregcc" >> return CcAnyReg
                    , reserved "preserve_mostcc" >> return CcPreserveMost
                    , reserved "preserve_allcc" >> return CcPreserveAll
-                   , reserved "spir_kernel" >> return CcSpirKernel
-                   , reserved "spir_func" >> return CcSpirFunc
-                   , reserved "intel_ocl_bicc" >> return CcIntelOclBi
-                   , reserved "x86_stdcallcc" >> return CcX86StdCall
-                   , reserved "x86_fastcallcc" >> return CcX86FastCall
-                   , reserved "x86_thiscallcc" >> return CcX86ThisCall
-                   , reserved "arm_apcscc" >> return CcArmApcs
-                   , reserved "arm_aapcscc" >> return CcArmAapcs
-                   , reserved "arm_aapcs_vfpcc" >> return CcArmAapcsVfp
-                   , reserved "msp430_intrcc" >> return CcMsp430Intr
-                   , reserved "ptx_kernel" >> return CcPtxKernel
-                   , reserved "ptx_device" >> return CcPtxDevice
+                   , reserved "spir_kernel" >> return CcSpir_Kernel
+                   , reserved "spir_func" >> return CcSpir_Func
+                   , reserved "intel_ocl_bicc" >> return CcIntel_Ocl_Bi
+                   , reserved "x86_stdcallcc" >> return CcX86_StdCall
+                   , reserved "x86_fastcallcc" >> return CcX86_FastCall
+                   , reserved "x86_thiscallcc" >> return CcX86_ThisCall
+                   , reserved "arm_apcscc" >> return CcArm_Apcs
+                   , reserved "arm_aapcscc" >> return CcArm_Aapcs
+                   , reserved "arm_aapcs_vfpcc" >> return CcArm_Aapcs_Vfp
+                   , reserved "msp430_intrcc" >> return CcMsp430_Intr
+                   , reserved "ptx_kernel" >> return CcPtx_Kernel
+                   , reserved "ptx_device" >> return CcPtx_Device
                    , reserved "x86_64_win64cc" >> return CcX86_64_Win64
                    , reserved "x86_64_sysvcc" >> return CcX86_64_SysV
                    ]

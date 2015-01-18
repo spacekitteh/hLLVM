@@ -1,11 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Llvm.AsmPrinter.SharedEntityPrint where
-import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++))
+import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++),error, show)
 
 import Llvm.AsmPrinter.Common 
 import Llvm.VmCore.DataLayout
 import Llvm.VmCore.SharedEntity
-
+import qualified Data.Map as M
 
 class Print a where
   print :: a -> Doc
@@ -26,7 +26,7 @@ instance Print AlignInBit where
   
 instance Print StackAlign where  
   print (StackAlign n) = print n
-  print StackAlignUnspecified = empty
+  print StackAlignUnspecified = char '0'
   
 instance Print Mangling where
   print x = case x of
@@ -45,26 +45,31 @@ instance Print PrefAlign where
 
 instance Print LayoutSpec where  
   print ls = case ls of
-    DlE x -> print x
-    DlS x -> char 'S' <> (print x)
-    DlP ls s a n -> char 'p' <> (print ls) 
-                    <> char ':' <> (print s) 
-                    <> char ':' <> (print a) 
-                    <> sepMaybe print (char ':' <>) n
-    DlI s a n -> char 'i' <> (print s)
-                 <> char ':' <> (print a)
-                 <> sepMaybe print (char ':' <>) n
-    DlF s a n -> char 'f' <> (print s)
-                 <> char ':' <> (print a)
-                 <> sepMaybe print (char ':' <>) n
-    DlV s a n -> char 'v' <> (print s)
-                 <> char ':' <> (print a)
-                 <> sepMaybe print (char ':' <>) n
-    DlA s a n -> char 'a' <> (maybe empty print s)
-                 <> char ':' <> (print a)
-                 <> sepMaybe print (char ':' <>) n
-    DlM m -> char 'm' <> char ':' <> (print m)
-    DlN l -> char 'n' <> (hcat $ punctuate (char ':') $ fmap print l)
+      DlE x -> print x
+      DlS x -> char 'S' <> (print x)
+      DlLittleS s1 s2 s3 -> char 's' <> (maybe empty integer s1) 
+                            <> sepMaybe integer colonSep s2
+                            <> sepMaybe integer colonSep s3
+      DlP as s a n -> char 'p' <> (print as) 
+                      <> colonSep (print s) 
+                      <> colonSep (print a) 
+                      <> sepMaybe print colonSep n
+      DlI s a n -> char 'i' <> (print s)
+                   <> colonSep (print a)
+                   <> sepMaybe print colonSep n
+      DlF s a n -> char 'f' <> (print s)
+                 <> colonSep (print a)
+                 <> sepMaybe print colonSep n
+      DlV s a n -> char 'v' <> (print s)
+                   <> colonSep (print a)
+                   <> sepMaybe print colonSep n
+      DlA s a n -> char 'a' <> (maybe empty print s)
+                   <> colonSep (print a)
+                   <> sepMaybe print colonSep n
+      DlM m -> char 'm' <> colonSep (print m)
+      DlN l -> char 'n' <> (hcat $ punctuate (char ':') $ fmap print l)
+    where 
+      colonSep = (char ':' <>)
   
 instance Print DataLayout where
   print (DataLayout l) = doubleQuotes (hcat $ punctuate (char '-') $ fmap print l)
@@ -100,19 +105,9 @@ instance Print FcmpOp where
   print FcmpUno = text "uno"
 
 instance Print ConvertOp where
-  print Trunc = text "trunc"
-  print Zext = text "zext"
-  print Sext = text "sext"
-  print FpTrunc = text "fptrunc"
-  print FpExt = text "fpext"
-  print FpToUi = text "fptoui"
-  print FpToSi = text "fptosi"
-  print UiToFp = text "uitofp"
-  print SiToFp = text "sitofp"
-  print PtrToInt = text "ptrtoint"
-  print IntToPtr = text "inttoptr"
-  print Bitcast = text "bitcast"
-  print AddrSpaceCast = text "addrspacecast"
+  print x = case M.lookup x convertOpMap of
+                 Just s -> text s
+                 Nothing -> error $ "irrefutable error " ++ show x ++ " is not added into convertOpMap"
 
 instance Print Linkage where
   print LinkagePrivate = text "private"
@@ -127,29 +122,27 @@ instance Print Linkage where
   print LinkageLinkonceOdr = text "linkonce_odr"
   print LinkageWeakOdr = text "weak_odr"
   
-
-
 instance Print CallConv where
   print Ccc = text "ccc"
   print CcFast = text "fastcc"
   print CcCold = text "coldcc"
-  print CcWebkitJs = text "webkit_jscc"
+  print CcWebkit_Js = text "webkit_jscc"
   print CcAnyReg = text "anyregcc"
   print CcPreserveMost = text "preserve_mostcc"
   print CcPreserveAll = text "preserve_allcc"
   print (Cc s) = text "cc" <> text s
-  print CcSpirKernel = text "spir_kernel"
-  print CcSpirFunc = text "spir_func"
-  print CcIntelOclBi = text "intel_ocl_bicc"
-  print CcX86StdCall = text "x86_stdcallcc"
-  print CcX86FastCall = text "x86_fastcallcc"
-  print CcX86ThisCall = text "x86_thiscallcc"
-  print CcArmApcs = text "arm_apcscc"
-  print CcArmAapcs = text "arm_aapcscc"
-  print CcArmAapcsVfp = text "arm_aapcs_vfpcc"
-  print CcMsp430Intr = text "msp430_intrcc"
-  print CcPtxKernel = text "ptx_kernel"
-  print CcPtxDevice = text "ptx_device"
+  print CcSpir_Kernel = text "spir_kernel"
+  print CcSpir_Func = text "spir_func"
+  print CcIntel_Ocl_Bi = text "intel_ocl_bicc"
+  print CcX86_StdCall = text "x86_stdcallcc"
+  print CcX86_FastCall = text "x86_fastcallcc"
+  print CcX86_ThisCall = text "x86_thiscallcc"
+  print CcArm_Apcs = text "arm_apcscc"
+  print CcArm_Aapcs = text "arm_aapcscc"
+  print CcArm_Aapcs_Vfp = text "arm_aapcs_vfpcc"
+  print CcMsp430_Intr = text "msp430_intrcc"
+  print CcPtx_Kernel = text "ptx_kernel"
+  print CcPtx_Device = text "ptx_device"
   print CcX86_64_Win64 = text "x86_64_win64cc"
   print CcX86_64_SysV = text "x86_64_sysvcc"
 
@@ -236,11 +229,6 @@ instance Print AddrNaming where
 
 instance Print DqString where
   print (DqString x) = doubleQuotes $ text x
-
-{-
-instance Print PlainStr where
-  print (PlainStr x) = text x
--}
 
 instance Print Section where
   print (Section s) = text "section" <+> (print s)

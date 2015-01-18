@@ -7,8 +7,7 @@ import Llvm.VmCore.Ast
 import Llvm.AsmPrinter.LlvmPrint
 import Llvm.AsmPrinter.IrPrint
 import Data.List
-import Llvm.VmCore.Ast2Ir
-import Llvm.VmCore.Ir2Ast
+import Llvm.VmCore.Convert
 
 displayError f s = 
   let sLine = sourceLine $ errorPos s

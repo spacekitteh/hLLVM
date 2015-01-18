@@ -24,7 +24,7 @@ instance AsmPrint a => AsmPrint (Maybe a) where
 instance AsmPrint LabelId where
   toLlvm (LabelString s) = toLlvm s 
   toLlvm (LabelNumber n) = integer n
-  toLlvm (LabelQuoteNumber n) = doubleQuotes $ integer n
+  toLlvm (LabelDqNumber n) = doubleQuotes $ integer n
   toLlvm (LabelDqString s) = doubleQuotes $ toLlvm s
 
 instance AsmPrint PercentLabel where

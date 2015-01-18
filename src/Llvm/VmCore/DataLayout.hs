@@ -25,6 +25,7 @@ data Mangling = ManglingE
                 
 data LayoutSpec = DlE Endianness
                 | DlS StackAlign
+                | DlLittleS (Maybe Integer) (Maybe Integer) (Maybe Integer)
                 | DlP LayoutAddrSpace SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlI SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlF SizeInBit AbiAlign (Maybe PrefAlign)

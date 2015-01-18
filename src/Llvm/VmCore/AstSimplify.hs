@@ -7,7 +7,7 @@ import qualified Data.Set as St
 import qualified Control.Monad.State as S
 import qualified Control.Monad.Reader as R
 import Data.Maybe
-import Llvm.VmCore.Converter
+import Llvm.VmCore.Convert (maybeM)
 import Debug.Trace
 
 {-
@@ -96,7 +96,7 @@ rnDefFparam (FexplicitParam x) = S.liftM FexplicitParam (rnDefLocalId x)
 
 rnLabelId :: LabelId -> MS LabelId
 rnLabelId (LabelNumber i) = return $ LabelString $ Lstring (lbPrefix ++ show i)
-rnLabelId x@(LabelQuoteNumber i) = return x -- return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
+rnLabelId x@(LabelDqNumber i) = return x -- return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
 rnLabelId x@(LabelDqString (Lstring s)) = return x --
 {-
   case reads s :: [(Integer, String)] of
@@ -485,7 +485,7 @@ rnLabelId2 g l@(LabelNumber i) = do { b <- rnNumId2 g i
                                   ; if b then return $ LabelString $ Lstring (lbPrefix ++ show i)
                                     else return l
                                   }
-rnLabelId2 g l@(LabelQuoteNumber i) = return l
+rnLabelId2 g l@(LabelDqNumber i) = return l
                                       {-do { b <- rnNumId2 g i
                                          ; if b then return $ LabelQuoteString $ Lstring (lbPrefix ++ show i)
                                            else return l
