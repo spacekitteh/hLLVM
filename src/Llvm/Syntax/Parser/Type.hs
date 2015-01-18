@@ -1,6 +1,6 @@
-module Llvm.AsmParser.Type where
-import Llvm.VmCore.Ast
-import Llvm.AsmParser.Basic
+module Llvm.Syntax.Parser.Type where
+import Llvm.Data.Ast
+import Llvm.Syntax.Parser.Basic
 
 
 pType :: P Type

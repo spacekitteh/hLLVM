@@ -1,6 +1,6 @@
 module Llvm.Pass.PassManager where
 
-import Llvm.VmCore.Ir
+import Llvm.Data.Ir
 import Llvm.Pass.Mem2Reg
 import Llvm.Pass.Liveness
 import qualified Data.Set as Ds

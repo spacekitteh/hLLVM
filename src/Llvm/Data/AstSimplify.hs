@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -cpp #-}
-module Llvm.VmCore.AstSimplify (simplify) where
+module Llvm.Data.AstSimplify (simplify) where
 
-import Llvm.VmCore.Ast
+import Llvm.Data.Ast
 import qualified Data.Map as M
 import qualified Data.Set as St
 import qualified Control.Monad.State as S
 import qualified Control.Monad.Reader as R
 import Data.Maybe
-import Llvm.VmCore.Convert (maybeM)
+import Llvm.Data.Convert (maybeM)
 import Debug.Trace
 
 {-

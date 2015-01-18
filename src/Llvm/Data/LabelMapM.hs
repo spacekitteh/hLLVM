@@ -5,16 +5,16 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Llvm.VmCore.LabelMapM 
+module Llvm.Data.LabelMapM 
        (IdLabelMap,addAlist,getAlist,labelFor,labelIdFor,appendH2A,LabelMapM(..),runLabelMapM,emptyIdLabelMap)
        where
 import qualified Compiler.Hoopl as H
 import qualified Data.Map as M
-import qualified Llvm.VmCore.Ast as A 
+import qualified Llvm.Data.Ast as A 
 #ifdef DEBUG
 import Debug.Trace
-import Llvm.VmCore.AsmPrint
-import Llvm.VmCore.AstWriter
+import Llvm.Data.AsmPrint
+import Llvm.Data.AstWriter
 #endif 
 {-
 -- LabelMapM monad is a CheckingFuelMonad with a data structure IdLabelMap to track 

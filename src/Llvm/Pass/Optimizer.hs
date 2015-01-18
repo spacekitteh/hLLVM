@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module Llvm.Pass.Optimizer where
 
-import Llvm.VmCore.Ir
+import Llvm.Data.Ir
 import qualified Compiler.Hoopl as H 
 import qualified Data.Set as Ds
 

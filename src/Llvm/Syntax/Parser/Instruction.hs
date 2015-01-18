@@ -1,12 +1,10 @@
 {-# OPTIONS_GHC -Wall #-}
-module Llvm.AsmParser.Instruction where
-import Llvm.VmCore.Ast
-import Llvm.AsmParser.Basic
-import Llvm.AsmParser.Const
-import Llvm.AsmParser.Type
-import Llvm.AsmParser.Rhs
---import Llvm.VmCore.AsmWriter
---import Llvm.VmCore.AstWriter
+module Llvm.Syntax.Parser.Instruction where
+import Llvm.Data.Ast
+import Llvm.Syntax.Parser.Basic
+import Llvm.Syntax.Parser.Const
+import Llvm.Syntax.Parser.Type
+import Llvm.Syntax.Parser.Rhs
 
 pTerminatorInst :: P TerminatorInst
 pTerminatorInst = choice [ pRet

@@ -5,7 +5,7 @@
   This module compute the use, def, and Addr of CoreIr
 -}
 module Llvm.Pass.Uda where
-import Llvm.VmCore.CoreIr
+import Llvm.Data.CoreIr
 import qualified Data.Set as Ds
 import Data.Monoid
 import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Bool(False), undefined)

@@ -1,8 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
-module Llvm.AsmParser.Block where
-import Llvm.VmCore.Ast
-import Llvm.AsmParser.Basic
-import Llvm.AsmParser.Instruction
+module Llvm.Syntax.Parser.Block where
+import Llvm.Data.Ast
+import Llvm.Syntax.Parser.Basic
+import Llvm.Syntax.Parser.Instruction
 
 -------------------------------------------------------------------------------
 pBlocks :: P [Block]

@@ -1,11 +1,11 @@
-module Llvm.AsmParser.Module where
-import Llvm.VmCore.Ast
-import Llvm.AsmParser.Basic
-import Llvm.AsmParser.Type
-import Llvm.AsmParser.Block
-import Llvm.AsmParser.Const
-import Llvm.AsmParser.Rhs
-import Llvm.AsmParser.DataLayout
+module Llvm.Syntax.Parser.Module where
+import Llvm.Data.Ast
+import Llvm.Syntax.Parser.Basic
+import Llvm.Syntax.Parser.Type
+import Llvm.Syntax.Parser.Block
+import Llvm.Syntax.Parser.Const
+import Llvm.Syntax.Parser.Rhs
+import Llvm.Syntax.Parser.DataLayout
 
 
 pModule :: P Module

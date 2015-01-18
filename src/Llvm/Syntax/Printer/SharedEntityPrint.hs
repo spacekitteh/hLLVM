@@ -1,10 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Llvm.AsmPrinter.SharedEntityPrint where
+module Llvm.Syntax.Printer.SharedEntityPrint where
 import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++),error, show)
 
-import Llvm.AsmPrinter.Common 
-import Llvm.VmCore.DataLayout
-import Llvm.VmCore.SharedEntity
+import Llvm.Syntax.Printer.Common 
+import Llvm.Data.Shared
 import Llvm.Util.Mapping (getValOrImplError)
 import qualified Data.Map as M
 

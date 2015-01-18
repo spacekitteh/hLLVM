@@ -1,11 +1,9 @@
-module Llvm.VmCore.Ast 
-       ( module Llvm.VmCore.Ast
-       , module Llvm.VmCore.SharedEntity
-       , module Llvm.VmCore.DataLayout
+module Llvm.Data.Ast 
+       ( module Llvm.Data.Ast
+       , module Llvm.Data.Shared
        ) where
 
-import Llvm.VmCore.SharedEntity
-import Llvm.VmCore.DataLayout
+import Llvm.Data.Shared
 import qualified Data.Map as M
 
 

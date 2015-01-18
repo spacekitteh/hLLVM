@@ -1,8 +1,8 @@
-module Llvm.AsmParser.Rhs where
-import Llvm.VmCore.Ast
-import Llvm.AsmParser.Basic
-import Llvm.AsmParser.Type
-import Llvm.AsmParser.Const
+module Llvm.Syntax.Parser.Rhs where
+import Llvm.Data.Ast
+import Llvm.Syntax.Parser.Basic
+import Llvm.Syntax.Parser.Type
+import Llvm.Syntax.Parser.Const
 
 
 pTypedValue :: P TypedValue

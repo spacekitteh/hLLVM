@@ -11,7 +11,7 @@ import qualified Llvm.Pass.Mem2Reg as M2R
 import qualified Llvm.Pass.Liveness as L
 import Llvm.Pass.PassManager
 import qualified Compiler.Hoopl as H
-import qualified Llvm.VmCore.AstSimplify as S
+import qualified Llvm.Data.AstSimplify as S
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
 

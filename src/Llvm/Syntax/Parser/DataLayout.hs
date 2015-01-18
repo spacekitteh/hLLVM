@@ -1,7 +1,7 @@
-module Llvm.AsmParser.DataLayout where
+module Llvm.Syntax.Parser.DataLayout where
 
-import Llvm.AsmParser.Basic
-import Llvm.VmCore.DataLayout
+import Llvm.Syntax.Parser.Basic
+import Llvm.Data.Shared.DataLayout
 
 
 pLayoutSpec :: P LayoutSpec

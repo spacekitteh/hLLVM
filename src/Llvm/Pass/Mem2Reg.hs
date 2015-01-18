@@ -5,8 +5,7 @@
 module Llvm.Pass.Mem2Reg (mem2reg) where
 
 import Compiler.Hoopl
-import Llvm.VmCore.CoreIr 
-import Llvm.VmCore.Ir
+import Llvm.Data.Ir
 import qualified Data.Map as Dm
 import qualified Data.Set as Ds
 import Control.Monad

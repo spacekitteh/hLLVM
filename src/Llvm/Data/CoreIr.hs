@@ -1,11 +1,9 @@
-module Llvm.VmCore.CoreIr
-       ( module Llvm.VmCore.CoreIr
-       , module Llvm.VmCore.SharedEntity
-       , module Llvm.VmCore.DataLayout
+module Llvm.Data.CoreIr
+       ( module Llvm.Data.CoreIr
+       , module Llvm.Data.Shared
        , Label
        ) where
-import Llvm.VmCore.SharedEntity
-import Llvm.VmCore.DataLayout
+import Llvm.Data.Shared
 import Compiler.Hoopl (Label)
 
 -- | We have to keep the original label kinds to map Hoopl labels back to labels that llvm-as likes
@@ -313,7 +311,6 @@ data ActualParam = ActualParam Type [ParamAttr] (Maybe Alignment) Value [ParamAt
 data Value = VgOl GlobalOrLocalId 
            | Ve Expr
            | Vc Const
-           -- | InlineAsm (Maybe SideEffect) (Maybe AlignStack) String String
            -- | Internal value to make the optimization easier
            | Deref Pointer
            deriving (Eq,Ord,Show)

@@ -1,13 +1,12 @@
 {-# LANGUAGE GADTs #-}
-module Llvm.VmCore.Ir 
-    (module Llvm.VmCore.Ir
-    , module Llvm.VmCore.CoreIr
+module Llvm.Data.Ir 
+    (module Llvm.Data.Ir
+    , module Llvm.Data.CoreIr
     )
     where
-import Llvm.VmCore.CoreIr
-import qualified Llvm.VmCore.CoreIr as Ci
+import Llvm.Data.CoreIr
+import qualified Llvm.Data.CoreIr as Ci
 import qualified Compiler.Hoopl as H
-import qualified Data.Map as M
 import qualified Data.Set as S
 
 {- An intermediate representation that is suitable for Hoopl -}

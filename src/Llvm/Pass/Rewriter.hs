@@ -9,9 +9,9 @@ import Prelude hiding (succ)
 
 import qualified Compiler.Hoopl as H
 
-import Llvm.VmCore.CoreIr
-import Llvm.VmCore.Ir
-import Llvm.VmCore.Convert (maybeM)
+import Llvm.Data.CoreIr
+import Llvm.Data.Ir
+import Llvm.Data.Convert (maybeM)
 
 type MaybeChange a = a -> Maybe a
 

@@ -1,6 +1,6 @@
-module Llvm.AsmParser.Basic
+module Llvm.Syntax.Parser.Basic
     ( module Text.Parsec
-    , module Llvm.AsmParser.Basic
+    , module Llvm.Syntax.Parser.Basic
     , module Control.Monad
     , module Text.Parsec.Perm
     )
@@ -8,7 +8,7 @@ module Llvm.AsmParser.Basic
 
 import Text.Parsec 
 import Control.Monad
-import Llvm.VmCore.Ast
+import Llvm.Data.Ast
 import qualified Text.Parsec.Token as T
 import Text.Parsec.Language
 import Text.Parsec.Perm

@@ -1,13 +1,13 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module ParserTester (testParser, writeOutLlvm, writeOutIr) where
 import System.IO
-import Llvm.AsmParser.Basic
-import Llvm.AsmParser.Module
-import Llvm.VmCore.Ast
-import Llvm.AsmPrinter.LlvmPrint
-import Llvm.AsmPrinter.IrPrint
+import Llvm.Syntax.Parser.Basic
+import Llvm.Syntax.Parser.Module
+import Llvm.Data.Ast
+import Llvm.Syntax.Printer.LlvmPrint
+import Llvm.Syntax.Printer.IrPrint
 import Data.List
-import Llvm.VmCore.Convert
+import Llvm.Data.Convert
 
 displayError f s = 
   let sLine = sourceLine $ errorPos s

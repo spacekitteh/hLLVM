@@ -5,8 +5,7 @@
 module Llvm.Pass.PhiFixUp (phiFixUp) where
 
 import Compiler.Hoopl
-import Llvm.VmCore.CoreIr
-import Llvm.VmCore.Ir
+import Llvm.Data.Ir
 
 import Llvm.Pass.Rewriter
 #ifdef DEBUG

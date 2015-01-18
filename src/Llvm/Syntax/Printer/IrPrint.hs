@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-module Llvm.AsmPrinter.IrPrint 
-       (module Llvm.AsmPrinter.IrPrint
-       ,module Llvm.AsmPrinter.Common
+module Llvm.Syntax.Printer.IrPrint 
+       (module Llvm.Syntax.Printer.IrPrint
+       ,module Llvm.Syntax.Printer.Common
        ) where
 
-import Llvm.VmCore.Ir
+import Llvm.Data.Ir
 
-import Llvm.AsmPrinter.Common
-import qualified Llvm.AsmPrinter.SharedEntityPrint as P
+import Llvm.Syntax.Printer.Common
+import qualified Llvm.Syntax.Printer.SharedEntityPrint as P
 import qualified Compiler.Hoopl as H
 
 class IrPrint a where

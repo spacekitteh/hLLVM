@@ -1,7 +1,7 @@
-module Llvm.AsmParser.Const where
-import Llvm.VmCore.Ast
-import Llvm.AsmParser.Basic
-import Llvm.AsmParser.Type
+module Llvm.Syntax.Parser.Const where
+import Llvm.Data.Ast
+import Llvm.Syntax.Parser.Basic
+import Llvm.Syntax.Parser.Type
 
 
 pConst :: P Const

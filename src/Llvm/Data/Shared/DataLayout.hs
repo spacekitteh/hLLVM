@@ -1,4 +1,4 @@
-module Llvm.VmCore.DataLayout where
+module Llvm.Data.Shared.DataLayout where
 
 import qualified Data.Map as M
 

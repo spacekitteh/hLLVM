@@ -5,14 +5,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs #-}
-module Llvm.VmCore.Convert(astToIr, irToAst, maybeM) where
+module Llvm.Data.Convert(astToIr, irToAst, maybeM) where
 
 import qualified Compiler.Hoopl as H
 import qualified Control.Monad as Md
 import qualified Data.Map as M
-import qualified Llvm.VmCore.Ast as A
-import qualified Llvm.VmCore.Ir as I
-import Llvm.VmCore.LabelMapM 
+import qualified Llvm.Data.Ast as A
+import qualified Llvm.Data.Ir as I
+import Llvm.Data.LabelMapM 
 
 
 class Converter l1 l2 | l1 -> l2 where

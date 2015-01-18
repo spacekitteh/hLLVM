@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Llvm.AsmPrinter.LlvmPrint
-       (module Llvm.AsmPrinter.LlvmPrint
-       ,module Llvm.AsmPrinter.Common
+module Llvm.Syntax.Printer.LlvmPrint
+       (module Llvm.Syntax.Printer.LlvmPrint
+       ,module Llvm.Syntax.Printer.Common
        ) where
 
-import Llvm.AsmPrinter.Common
-import Llvm.VmCore.Ast
-import qualified Llvm.AsmPrinter.SharedEntityPrint as P
+import Llvm.Syntax.Printer.Common
+import Llvm.Data.Ast
+import qualified Llvm.Syntax.Printer.SharedEntityPrint as P
 import Llvm.Util.Mapping (getValOrImplError)
 
 class AsmPrint a where
