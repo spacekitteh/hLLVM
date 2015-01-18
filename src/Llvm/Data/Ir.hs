@@ -56,7 +56,7 @@ getLabel (Ci.TargetLabel (Ci.PercentLabel l)) = Ci.toLabel l
 
 instance H.NonLocal Node where
     entryLabel (Nlabel (Ci.BlockLabel l)) = Ci.toLabel l
-    successors (Tinst (Ci.TerminatorInstWithDbg inst l)) = suc inst
+    successors (Tinst (Ci.TerminatorInstWithDbg inst _)) = suc inst
       where
         suc (Ci.Unreachable) = []
         suc (Ci.Return _) = []
