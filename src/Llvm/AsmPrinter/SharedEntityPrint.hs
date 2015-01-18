@@ -5,6 +5,7 @@ import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++),error, show)
 import Llvm.AsmPrinter.Common 
 import Llvm.VmCore.DataLayout
 import Llvm.VmCore.SharedEntity
+import Llvm.Util.Mapping (getValOrImplError)
 import qualified Data.Map as M
 
 class Print a where
@@ -75,39 +76,13 @@ instance Print DataLayout where
   print (DataLayout l) = doubleQuotes (hcat $ punctuate (char '-') $ fmap print l)
   
 instance Print IcmpOp where
-  print IcmpEq = text "eq"
-  print IcmpNe = text "ne"
-  print IcmpUgt = text "ugt"
-  print IcmpUge = text "uge"
-  print IcmpUlt = text "ult"
-  print IcmpUle = text "ule"
-  print IcmpSgt = text "sgt"
-  print IcmpSge = text "sge"
-  print IcmpSlt = text "slt"
-  print IcmpSle = text "sle"
+  print x = text $ getValOrImplError (icmpOpMap, "icmpOpMap") x
 
 instance Print FcmpOp where
-  print FcmpTrue = text "true"
-  print FcmpFalse = text "false"
-  print FcmpOeq = text "oeq"
-  print FcmpOgt = text "ogt"
-  print FcmpOge = text "oge"
-  print FcmpOlt = text "olt"
-  print FcmpOle = text "ole"
-  print FcmpOne = text "one"
-  print FcmpOrd = text "ord"
-  print FcmpUeq = text "ueq"
-  print FcmpUgt = text "ugt"
-  print FcmpUge = text "uge"
-  print FcmpUlt = text "ult"
-  print FcmpUle = text "ule"
-  print FcmpUne = text "une"
-  print FcmpUno = text "uno"
+  print x = text $ getValOrImplError (fcmpOpMap, "fcmpOpMap") x
 
 instance Print ConvertOp where
-  print x = case M.lookup x convertOpMap of
-                 Just s -> text s
-                 Nothing -> error $ "irrefutable error " ++ show x ++ " is not added into convertOpMap"
+  print x = text $ getValOrImplError (convertOpMap, "convertOpMap") x
 
 instance Print Linkage where
   print LinkagePrivate = text "private"
@@ -217,11 +192,7 @@ instance Print FunAttr where
   print (FaGroup n) = char '#'<> (integer n)
   
 instance Print SelectionKind where  
-  print Any = text "any"
-  print ExactMatch = text "exactmatch"
-  print Largest = text "largest"
-  print NoDuplicates = text "noduplicates"
-  print SameSize = text "samesize"
+  print x = text $ getValOrImplError (selectionKindMap, "selectionKindMap") x
    
 instance Print AddrNaming where
   print UnnamedAddr = text "unnamed_addr"
@@ -275,7 +246,6 @@ instance Print GlobalId where
   print (GlobalIdAlphaNum s) = char '@'<>print s
   print (GlobalIdDqString s) = char '@'<> (doubleQuotes $ print s)
 
-  
 instance Print SimpleConstant where
   print x = case x of
     CpInt i -> text i
@@ -291,26 +261,10 @@ instance Print SimpleConstant where
     CpStr s -> char 'c'<> (doubleQuotes $ text s)
                           
 instance Print AtomicMemoryOrdering where
-  print AmoAcquire = text "acquire"
-  print AmoRelease = text "release"
-  print AmoAcqRel =  text "acq_rel"
-  print AmoSeqCst = text "seq_cst"
-  print AmoUnordered = text "unordered"
-  print AmoMonotonic = text "monotonic"
-
+  print x = text $ getValOrImplError (atomicMemoryOrderingMap, "atomicMemoryOrderingMap") x
 
 instance Print AtomicOp where
-    print AoXchg = text "xchg"
-    print AoAdd = text "add"
-    print AoSub = text "sub"
-    print AoAnd = text "and"
-    print AoNand = text "nand"
-    print AoOr = text "or"
-    print AoXor = text "xor"
-    print AoMax = text "max"
-    print AoMin = text "min"
-    print AoUmax = text "umax"
-    print AoUmin = text "umin"                   
+  print x = text $ getValOrImplError (atomicOpMap, "atomicOpMap") x
     
 instance Print AddrSpace where
   print (AddrSpace n) = text "addrspace" <+> (parens $ integer n)
@@ -397,16 +351,9 @@ instance Print DollarId where
                         
 instance Print Comdat where
   print (Comdat l) = text "comdat" <+> (maybe empty print l)
-  
-  
-instance Print FastMathFlag where  
-  print x = let s = case x of
-                   Fmfnnan -> "nnan"
-                   Fmfninf -> "ninf"
-                   Fmfnsz -> "nsz"
-                   Fmfarcp -> "arcp"
-                   Fmffast -> "fast"
-             in text s
+    
+instance Print FastMathFlag where
+  print x = text $ getValOrImplError (fastMathFlagMap, "fastMathFlagMap") x 
                 
 instance Print FastMathFlags where                
   print (FastMathFlags l) = hsep $ fmap print l

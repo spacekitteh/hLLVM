@@ -6,6 +6,7 @@ module Llvm.VmCore.Ast
 
 import Llvm.VmCore.SharedEntity
 import Llvm.VmCore.DataLayout
+import qualified Data.Map as M
 
 
 -- | quotation does not change a label value
@@ -30,20 +31,32 @@ data BlockLabel = ExplicitBlockLabel LabelId
 data PercentLabel = PercentLabel LabelId deriving (Eq, Ord, Show)
 data TargetLabel = TargetLabel PercentLabel deriving (Eq,Ord,Show)
 
-data IbinaryOperator = Add | Sub | Mul | Udiv 
-                     | Sdiv | Urem | Srem 
-                     | Shl | Lshr | Ashr | And | Or | Xor
-                     deriving (Eq,Ord,Show)
+data IbinOp = Add | Sub | Mul | Udiv 
+            | Sdiv | Urem | Srem 
+            | Shl | Lshr | Ashr | And | Or | Xor
+            deriving (Eq,Ord,Show)
+                     
+ibinOpMap :: M.Map IbinOp String
+ibinOpMap = M.fromList [(Add, "add"), (Sub, "sub"), (Mul, "mul"), (Udiv, "udiv"), (Sdiv, "sdiv")
+                       ,(Urem, "urem"), (Srem, "srem")
+                       , (Shl, "shl"), (Lshr, "lshr"), (Ashr, "ashr")
+                       ,(And, "and"), (Or, "or"), (Xor, "xor") 
+                       ]
 
-data FbinaryOperator = Fadd | Fsub | Fmul | Fdiv | Frem
-                     deriving (Eq,Ord,Show)
+data FbinOp = Fadd | Fsub | Fmul | Fdiv | Frem
+            deriving (Eq,Ord,Show)
 
+fbinOpMap :: M.Map FbinOp String
+fbinOpMap = M.fromList [(Fadd, "fadd"), (Fsub, "fsub"), (Fmul, "fmul"), (Fdiv, "fdiv"), (Frem, "frem")]
 
 data TrapFlag = Nuw | Nsw | Exact deriving (Eq,Ord,Show)
 
+trapFlagMap :: M.Map TrapFlag String
+trapFlagMap = M.fromList [(Nuw, "nuw"), (Nsw, "nsw"), (Exact, "exact")]
+
 -- | Binary Operations <http://llvm.org/releases/3.0/docs/LangRef.html#binaryops>
-data IbinExpr v = IbinExpr IbinaryOperator [TrapFlag] Type v v deriving (Eq,Ord,Show)
-data FbinExpr v = FbinExpr FbinaryOperator FastMathFlags Type v v deriving (Eq,Ord,Show)
+data IbinExpr v = IbinExpr IbinOp [TrapFlag] Type v v deriving (Eq,Ord,Show)
+data FbinExpr v = FbinExpr FbinOp FastMathFlags Type v v deriving (Eq,Ord,Show)
 data BinExpr v = Ie (IbinExpr v)
                | Fe (FbinExpr v)
                deriving (Eq, Ord, Show)

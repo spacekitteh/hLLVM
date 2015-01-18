@@ -7,6 +7,7 @@ module Llvm.AsmPrinter.LlvmPrint
 import Llvm.AsmPrinter.Common
 import Llvm.VmCore.Ast
 import qualified Llvm.AsmPrinter.SharedEntityPrint as P
+import Llvm.Util.Mapping (getValOrImplError)
 
 class AsmPrint a where
   toLlvm :: a -> Doc
@@ -47,28 +48,11 @@ instance AsmPrint ComplexConstant where
   toLlvm (Cvector ts) = char '<' <+> (commaSepList $ fmap toLlvm ts) <+> char '>'
   toLlvm (Carray ts) = brackets $ commaSepList $ fmap toLlvm ts
 
-instance AsmPrint IbinaryOperator where
-  toLlvm Add = text "add"
-  toLlvm Sub = text "sub"
-  toLlvm Mul = text "mul"
-  toLlvm Udiv = text "udiv"
-  toLlvm Sdiv = text "sdiv"
-  toLlvm Urem = text "urem"
-  toLlvm Srem = text "srem"
-  toLlvm Shl = text "shl"
-  toLlvm Lshr = text "lshr"
-  toLlvm Ashr = text "ashr"
-  toLlvm And = text "and"
-  toLlvm Or = text "or"
-  toLlvm Xor = text "xor"
+instance AsmPrint IbinOp where
+  toLlvm x = text $ getValOrImplError (ibinOpMap, "ibinOpMap") x 
 
-
-instance AsmPrint FbinaryOperator where
-  toLlvm Fadd = text "fadd"
-  toLlvm Fsub = text "fsub"
-  toLlvm Fmul = text "fmul"
-  toLlvm Fdiv = text "fdiv"
-  toLlvm Frem = text "frem"
+instance AsmPrint FbinOp where
+  toLlvm x = text $ getValOrImplError (fbinOpMap, "fbinOpMap") x
 
 instance AsmPrint (BinExpr Const) where
   toLlvm (Ie v) = toLlvm v

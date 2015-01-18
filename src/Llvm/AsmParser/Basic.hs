@@ -323,63 +323,17 @@ optCommaSep p = opt (try (comma >> p))
 
 
 
-pIbinaryOperator :: P IbinaryOperator
-pIbinaryOperator = choice [ reserved "add" >> return Add
-                          , reserved "sub" >> return Sub
-                          , reserved "mul" >> return Mul
-                          , reserved "udiv" >> return Udiv
-                          , reserved "sdiv" >> return Sdiv
-                          , reserved "urem" >> return Urem
-                          , reserved "srem" >> return Srem
-                          , reserved "shl" >> return Shl
-                          , reserved "lshr" >> return Lshr
-                          , reserved "ashr" >> return Ashr
-                          , reserved "and" >> return And
-                          , reserved "or" >> return Or
-                          , reserved "xor" >> return Xor
-                          ]
+pIbinaryOperator :: P IbinOp
+pIbinaryOperator = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList ibinOpMap
 
-pFbinaryOperator :: P FbinaryOperator
-pFbinaryOperator = choice [ reserved "fadd" >> return Fadd
-                          , reserved "fsub" >> return Fsub
-                          , reserved "fmul" >> return Fmul
-                          , reserved "fdiv" >> return Fdiv
-                          , reserved "frem" >> return Frem
-                          ]
-
+pFbinaryOperator :: P FbinOp
+pFbinaryOperator = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList fbinOpMap
 
 pIcmpOp :: P IcmpOp
-pIcmpOp = choice [ reserved "eq" >> return IcmpEq
-                 , reserved "ne" >> return IcmpNe
-                 , reserved "slt" >> return IcmpSlt
-                 , reserved "sgt" >> return IcmpSgt
-                 , reserved "sle" >> return IcmpSle
-                 , reserved "sge" >> return IcmpSge
-                 , reserved "ult" >> return IcmpUlt
-                 , reserved "ugt" >> return IcmpUgt
-                 , reserved "ule" >> return IcmpUle
-                 , reserved "uge" >> return IcmpUge
-                 ]
-
+pIcmpOp = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList icmpOpMap
 
 pFcmpOp :: P FcmpOp
-pFcmpOp = choice [ reserved "oeq" >> return FcmpOeq
-                 , reserved "one" >> return FcmpOne
-                 , reserved "olt" >> return FcmpOlt
-                 , reserved "ogt" >> return FcmpOgt
-                 , reserved "ole" >> return FcmpOle
-                 , reserved "oge" >> return FcmpOge
-                 , reserved "ord" >> return FcmpOrd
-                 , reserved "uno" >> return FcmpUno
-                 , reserved "ueq" >> return FcmpUeq
-                 , reserved "une" >> return FcmpUne
-                 , reserved "ult" >> return FcmpUlt
-                 , reserved "ugt" >> return FcmpUgt
-                 , reserved "ule" >> return FcmpUle
-                 , reserved "uge" >> return FcmpUge
-                 , reserved "true" >> return FcmpTrue
-                 , reserved "false" >> return FcmpFalse
-                 ]
+pFcmpOp = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList fcmpOpMap
 
 
 pAliasLinkage :: P Linkage
@@ -411,11 +365,6 @@ pTailCall :: P TailCall
 pTailCall = choice [ reserved "tail" >> return TcTailCall
                    , reserved "musttail" >> return TcMustTailCall
                    ]
-{-
-allLinkage :: P Either Linkage DllStorage
-allLinkage = pExternalLinkage <|> pLinkage
--}
-
 pFunAttr :: P FunAttr
 pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens decimal)
                    , reserved "alwaysinline" >> return FaAlwaysInline
@@ -450,10 +399,8 @@ pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens decimal
                    ]
 
 pCarry :: P TrapFlag
-pCarry = choice [ reserved "nuw" >> return Nuw
-                , reserved "nsw" >> return Nsw
-                , reserved "exact" >> return Exact
-                ]
+pCarry = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList trapFlagMap
+
 
 pAlign :: P Alignment
 pAlign = reserved "align" >> liftM Alignment decimal
@@ -473,14 +420,8 @@ pNonnull = char '!' >> reserved "nonnull" >> char '!' >> liftM Nonnull decimal
 pSection :: P Section
 pSection =  reserved "section" >> liftM (Section . DqString) pQuoteStr
 
-
 pSelectionKind :: P SelectionKind
-pSelectionKind = choice [ reserved "any" >> return Any
-                        , reserved "exactmatch" >> return ExactMatch
-                        , reserved "largest" >> return Largest
-                        , reserved "noduplicates" >> return NoDuplicates
-                        , reserved "samesize" >> return SameSize
-                        ]
+pSelectionKind = choice $ fmap (\(x, y) -> reserved y >> return x) $ M.toList selectionKindMap 
 
 pAddrSpace :: P AddrSpace
 pAddrSpace = reserved "addrspace" >> liftM AddrSpace (parens decimal)
@@ -490,36 +431,16 @@ pGlobalType = choice [ reserved "constant" >> return (GlobalType "constant")
                      , reserved "global" >> return (GlobalType "global")
                      ]
 
-
 pFenceOrder :: P AtomicMemoryOrdering
-pFenceOrder = choice [ reserved "acquire" >> return AmoAcquire
-                     , reserved "release" >> return AmoRelease
-                     , reserved "acq_rel" >> return AmoAcqRel
-                     , reserved "seq_cst" >> return AmoSeqCst
-                     , reserved "unordered" >> return AmoUnordered
-                     , reserved "monotonic" >> return AmoMonotonic
-                     ]
+pFenceOrder =  choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList atomicMemoryOrderingMap
 
 pAtomicOp :: P AtomicOp
-pAtomicOp = choice [ reserved "xchg" >> return AoXchg
-                   , reserved "add" >> return AoAdd
-                   , reserved "sub" >> return AoSub
-                   , reserved "and" >> return AoAnd
-                   , reserved "nand" >> return AoAnd
-                   , reserved "or" >> return AoOr
-                   , reserved "xor" >> return AoXor
-                   , reserved "max" >> return AoMax
-                   , reserved "min" >> return AoMin
-                   , reserved "umax" >> return AoUmax
-                   , reserved "umin" >> return AoUmin
-                   ]
+pAtomicOp = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList atomicOpMap
 
 pFunAttrCollection :: P [FunAttr] -- Collection          
 pFunAttrCollection = many $ choice [ char '#' >> liftM FaGroup decimal
                                    , pFunAttr
                                    ]
-
-
 
 pTuple2 :: P a -> P b -> P (a, b)
 pTuple2 p1 p2 = do { a1 <- p1
@@ -548,14 +469,8 @@ uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a1, b1, c1) = f a1 b1 c1
     
                           
-                          
 pFastMathFlag :: P FastMathFlag
-pFastMathFlag = choice [ reserved "nnan" >> return Fmfnnan
-                       , reserved "ninf" >> return Fmfninf
-                       , reserved "nsz" >> return Fmfnsz
-                       , reserved "arcp" >> return Fmfarcp
-                       , reserved "fast" >> return Fmffast
-                       ]
+pFastMathFlag =  choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList fastMathFlagMap
                 
 pFastMathFlags :: P FastMathFlags                
 pFastMathFlags = liftM FastMathFlags (many pFastMathFlag)

@@ -8,12 +8,24 @@ data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt
             | IcmpUle | IcmpSgt | IcmpSge | IcmpSlt | IcmpSle
             deriving (Eq,Ord,Show)
 
+icmpOpMap :: M.Map IcmpOp String
+icmpOpMap = M.fromList [(IcmpEq, "eq"), (IcmpNe, "ne"), (IcmpUgt, "ugt"),(IcmpUge, "uge"), (IcmpUlt, "ult")
+                       ,(IcmpUle, "ule") ,(IcmpSgt, "sgt"), (IcmpSge, "sge"), (IcmpSlt, "slt"),(IcmpSle, "sle")]
+
 data FcmpOp = FcmpTrue | FcmpFalse
             | FcmpOeq | FcmpOgt | FcmpOge
             | FcmpOlt | FcmpOle | FcmpOne | FcmpOrd
             | FcmpUeq | FcmpUgt | FcmpUge | FcmpUlt
             | FcmpUle | FcmpUne | FcmpUno
             deriving (Eq,Ord,Show)
+
+fcmpOpMap :: M.Map FcmpOp String
+fcmpOpMap = M.fromList [(FcmpTrue, "true"), (FcmpFalse, "false")
+                       ,(FcmpOeq, "oeq"), (FcmpOgt, "ogt"), (FcmpOge, "oge")
+                       ,(FcmpOlt, "olt"), (FcmpOle, "ole"), (FcmpOne, "one"), (FcmpOrd, "ord")
+                       ,(FcmpUeq, "ueq"), (FcmpUgt, "ugt"), (FcmpUge, "uge"), (FcmpUlt, "ult") 
+                       ,(FcmpUle, "ule"), (FcmpUne, "une"), (FcmpUno, "uno") 
+                       ]
 
 data ConvertOp = Trunc | Zext | Sext | FpTrunc | FpExt | FpToUi 
                | FpToSi | UiToFp | SiToFp | PtrToInt | IntToPtr
@@ -145,6 +157,8 @@ data SelectionKind = Any
                    | SameSize
                    deriving (Eq, Ord, Show)
 
+selectionKindMap :: M.Map  SelectionKind String
+selectionKindMap = M.fromList [(Any, "any"), (ExactMatch, "exactmatch"), (Largest, "largest"), (NoDuplicates, "noduplicates"), (SameSize, "samesize")]
 
 data Section = Section DqString deriving (Eq,Ord,Show)
 
@@ -206,11 +220,20 @@ globalIdToLstring (GlobalIdDqString s) = s
 data AtomicMemoryOrdering = AmoAcquire | AmoRelease | AmoAcqRel | AmoSeqCst 
                           | AmoUnordered | AmoMonotonic
                           deriving (Eq,Ord,Show)
+                                   
+atomicMemoryOrderingMap :: M.Map AtomicMemoryOrdering String                                   
+atomicMemoryOrderingMap = M.fromList [(AmoAcquire, "acquire"), (AmoRelease, "release"), (AmoAcqRel, "acq_rel"), (AmoSeqCst, "seq_cst")
+                                     ,(AmoUnordered, "unordered"), (AmoMonotonic, "monotonic")] 
 
 -- | atomicrmw operation <http://llvm.org/releases/3.5.0/docs/LangRef.html#id175>
 data AtomicOp = AoXchg | AoAdd | AoSub | AoAnd | AoNand | AoOr | AoXor 
               | AoMax | AoMin | AoUmax | AoUmin
               deriving (Eq,Ord,Show)
+                       
+atomicOpMap :: M.Map AtomicOp String                       
+atomicOpMap = M.fromList [(AoXchg, "xchg"), (AoAdd, "add"), (AoSub, "sub"), (AoAnd, "and"), (AoNand, "nand"), (AoOr, "or"), (AoXor, "xor")
+                         ,(AoMax, "max"), (AoMin, "min"), (AoUmax, "umax"), (AoUmin, "umin")]
+                                                                                                                            
                          
 {- syntatical representation: c"...." -}                         
 {-- data Cstring = Cstring String deriving (Eq,Ord,Show) -}
@@ -305,6 +328,9 @@ data FastMathFlag = Fmfnnan
                   | Fmfarcp
                   | Fmffast
                   deriving (Eq, Ord, Show)
+                           
+fastMathFlagMap :: M.Map FastMathFlag String
+fastMathFlagMap = M.fromList [(Fmfnnan, "nnan"), (Fmfninf, "ninf"), (Fmfnsz, "nsz"), (Fmfarcp, "arcp"), (Fmffast, "fast")]
 
 data FastMathFlags = FastMathFlags [FastMathFlag] deriving (Eq, Ord, Show)
 
@@ -320,3 +346,5 @@ data AlignStack = AlignStack deriving (Eq, Ord, Show)
 data VarArgParam = VarArgParam deriving (Eq, Ord, Show)
 
 data Cleanup = Cleanup deriving (Eq, Ord, Show)
+
+

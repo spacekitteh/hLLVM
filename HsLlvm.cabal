@@ -33,6 +33,7 @@ Library
                      Llvm.VmCore.Convert,
                      Llvm.VmCore.CoreIr,
                      Llvm.VmCore.Ir,
+                     Llvm.Util.Mapping, 
                      Llvm.AsmPrinter.Common,
                      Llvm.AsmPrinter.SharedEntityPrint,
                      Llvm.AsmPrinter.IrPrint,
