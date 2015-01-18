@@ -5,28 +5,20 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs #-}
-module Llvm.Data.Convert
-       (module Llvm.Data.Convert.AstSimplify
-       ,module Llvm.Data.Convert.AstIrConvert
-       ,module Llvm.Data.Convert.LabelMapM
-       ) where
+module Llvm.Data.Convert.AstIrConvert(astToIr, irToAst, maybeM) where
 
-import Llvm.Data.Convert.AstSimplify
-import Llvm.Data.Convert.AstIrConvert
-import Llvm.Data.Convert.LabelMapM 
-{-
 import qualified Compiler.Hoopl as H
 import qualified Control.Monad as Md
 import qualified Data.Map as M
 import qualified Llvm.Data.Ast as A
 import qualified Llvm.Data.Ir as I
-import Llvm.Data.LabelMapM 
+import Llvm.Data.Convert.LabelMapM 
 
 
 class Converter l1 l2 | l1 -> l2 where
   convert :: l1 -> l2
 
-{-
+
 maybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
 maybeM f a = case a of
                Just a' -> f a' >>= return . Just
@@ -38,7 +30,7 @@ pairM c1 c2 (v, l) = do { v' <- c1 v
                         ; return $ (v', l')
                         }
                      
--}                     
+                     
 type MyLabelMapM = LabelMapM H.SimpleUniqueMonad
                      
 
@@ -952,4 +944,3 @@ irToAst :: IdLabelMap -> I.Module -> H.SimpleUniqueMonad A.Module
 irToAst m (I.Module ts) = do { x <- runLabelMapM m $ Md.liftM A.Module (mapM toplevel2Ast ts)
                              ; return $ snd x
                              }
--}

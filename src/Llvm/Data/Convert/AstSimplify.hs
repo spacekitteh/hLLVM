@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp #-}
-module Llvm.Data.AstSimplify (simplify) where
+module Llvm.Data.Convert.AstSimplify (simplify) where
 
 import Llvm.Data.Ast
 import qualified Data.Map as M
@@ -7,7 +7,7 @@ import qualified Data.Set as St
 import qualified Control.Monad.State as S
 import qualified Control.Monad.Reader as R
 import Data.Maybe
-import Llvm.Data.Convert (maybeM)
+import Llvm.Util.Monadic (maybeM)
 import Debug.Trace
 
 {-

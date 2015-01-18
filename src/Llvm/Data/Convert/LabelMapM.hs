@@ -5,7 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Llvm.Data.LabelMapM 
+module Llvm.Data.Convert.LabelMapM 
        (IdLabelMap,addAlist,getAlist,labelFor,labelIdFor,appendH2A,LabelMapM(..),runLabelMapM,emptyIdLabelMap)
        where
 import qualified Compiler.Hoopl as H
