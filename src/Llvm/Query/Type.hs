@@ -1,7 +1,7 @@
-module Llvm.Target.TargetData where
+module Llvm.Query.Type where
 
-import Llvm.VmCore.SharedEntity (Type (..), TypePrimitive (..), AddrSpace(..), Packing(..))
-import Llvm.VmCore.DataLayout (DataLayoutInfo (..),LayoutAddrSpace(..), AbiAlign (..), PrefAlign(..), SizeInBit(..), AlignType (..), AlignInBit(..), selectAlignment, StackAlign(..))
+import Llvm.Data.Shared (Type (..), TypePrimitive (..), AddrSpace(..), Packing(..))
+import Llvm.Data.Shared.DataLayout (DataLayoutInfo (..),LayoutAddrSpace(..), AbiAlign (..), PrefAlign(..), SizeInBit(..), AlignType (..), AlignInBit(..), selectAlignment, StackAlign(..))
 import qualified Data.Map as M
 import qualified Data.Bits as B
 

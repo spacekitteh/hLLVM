@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
 module Llvm.Pass.Rewriter where
@@ -9,9 +8,8 @@ import Prelude hiding (succ)
 
 import qualified Compiler.Hoopl as H
 
-import Llvm.Data.CoreIr
 import Llvm.Data.Ir
-import Llvm.Data.Convert (maybeM)
+import Llvm.Util.Monadic (maybeM)
 
 type MaybeChange a = a -> Maybe a
 

@@ -7,7 +7,7 @@ import Llvm.Data.Ast
 import Llvm.Syntax.Printer.LlvmPrint
 import Llvm.Syntax.Printer.IrPrint
 import Data.List
-import Llvm.Data.Convert
+import Llvm.Data.Conversion
 
 displayError f s = 
   let sLine = sourceLine $ errorPos s

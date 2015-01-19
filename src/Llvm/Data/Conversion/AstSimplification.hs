@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp #-}
-module Llvm.Data.Convert.AstSimplify (simplify) where
+module Llvm.Data.Conversion.AstSimplification (simplify) where
 
 import Llvm.Data.Ast
 import qualified Data.Map as M
