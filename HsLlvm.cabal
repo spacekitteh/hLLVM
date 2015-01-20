@@ -61,9 +61,7 @@ Library
                      Llvm.Pass.PhiFixUp,
                      Llvm.Pass.Rewriter,
                      Llvm.Pass.Uda,
-                     ParserTester,
-                     Ast2IrTester,
-                     Ir2AstTester
+                     ParserTester
 --  ghc-options:       -Wall -fno-warn-name-shadowing
   Extensions:        CPP 
   hs-source-dirs:    src
