@@ -134,7 +134,7 @@ rnDefLabel x@(ExplicitBlockLabel i) = return x -- S.liftM ExplicitBlockLabel (rn
 
 rnBlock :: Block -> MS Block
 rnBlock (Block lbl phi comp term) = do { lbl' <- rnDefLabel lbl
-                                       ; phi' <- mapM rnPhi phi
+                                       ; phi' <- mapM rnPhiInstWithDbg phi
                                        ; comp' <- mapM rnComputingInstWithDbg comp
                                        ; term' <- rnTerminatorInstWithDbg term
                                        ; return (Block lbl' phi' comp' term')
@@ -155,6 +155,8 @@ rnLhs lhs@(GolL localId) = do { checkImpCount lhs
                               }
 rnLhs x = return x
 
+rnPhiInstWithDbg :: PhiInstWithDbg -> MS PhiInstWithDbg
+rnPhiInstWithDbg (PhiInstWithDbg ins dbgs) = S.liftM (\x -> PhiInstWithDbg x dbgs) (rnPhi ins)
 
 rnPhi :: PhiInst -> MS PhiInst
 rnPhi (PhiInst lhs t ins) = do { -- maybe (return ()) checkImpCount lhs

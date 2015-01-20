@@ -13,7 +13,8 @@ import qualified Data.Set as S
 
 data Toplevel = ToplevelTriple Ci.DqString
               | ToplevelDataLayout Ci.DataLayout
-              | ToplevelAlias Ci.GlobalId (Maybe Ci.Visibility) (Maybe Ci.DllStorageClass) (Maybe Ci.ThreadLocalStorage) AddrNaming (Maybe Ci.Linkage) Ci.Aliasee
+              | ToplevelAlias Ci.GlobalId (Maybe Ci.Visibility) (Maybe Ci.DllStorageClass) 
+                (Maybe Ci.ThreadLocalStorage) AddrNaming (Maybe Ci.Linkage) Ci.Aliasee
               | ToplevelDbgInit String Integer
               | ToplevelStandaloneMd String Ci.TypedValue
               | ToplevelNamedMd Ci.MdVar [Ci.MdNode]
@@ -46,7 +47,7 @@ data Module = Module [Toplevel]
 -- each instruction represents a node
 data Node e x where
     Nlabel :: Ci.BlockLabel -> Node H.C H.O
-    Pinst  :: Ci.PhiInst -> Node H.O H.O
+    Pinst  :: Ci.PhiInstWithDbg -> Node H.O H.O
     Cinst  :: Ci.ComputingInstWithDbg -> Node H.O H.O
     Tinst  :: Ci.TerminatorInstWithDbg -> Node H.O H.C
 
@@ -62,7 +63,7 @@ instance H.NonLocal Node where
         suc (Ci.Return _) = []
         suc (Ci.Br l) = [getLabel l]
         suc (Ci.Cbr _ l1 l2) = [getLabel l1, getLabel l2]
-        suc (Ci.IndirectBr c ls) = map getLabel ls
+        suc (Ci.IndirectBr _ ls) = map getLabel ls
         suc (Ci.Switch  _ d ls) = (getLabel d):(map (getLabel . snd) ls)
         suc (Ci.Invoke _  _ l1 l2) = [getLabel l1, getLabel l2]
         suc (Ci.Resume _) = []

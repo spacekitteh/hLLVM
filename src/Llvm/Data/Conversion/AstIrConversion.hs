@@ -315,6 +315,9 @@ instance Conversion A.TerminatorInst (MyLabelMapM I.TerminatorInst) where
 instance Conversion A.Dbg (MyLabelMapM I.Dbg) where
   convert (A.Dbg mv mc) = Md.liftM2 I.Dbg (convert mv) (convert mc)
 
+instance Conversion A.PhiInstWithDbg (MyLabelMapM I.PhiInstWithDbg) where
+  convert (A.PhiInstWithDbg ins dbgs) = Md.liftM2 I.PhiInstWithDbg (convert ins) (mapM convert dbgs)
+
 instance Conversion A.ComputingInstWithDbg (MyLabelMapM I.ComputingInstWithDbg) where
   convert (A.ComputingInstWithDbg ins dbgs) = Md.liftM2 I.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
     
@@ -335,7 +338,7 @@ toSingleNodeGraph (A.Block f  phi ms l) =
 toFirst :: A.BlockLabel -> MyLabelMapM (I.Node H.C H.O)
 toFirst x = Md.liftM I.Nlabel (convert x)
 
-toPhi :: A.PhiInst -> MyLabelMapM (I.Node H.O H.O)
+toPhi :: A.PhiInstWithDbg -> MyLabelMapM (I.Node H.O H.O)
 toPhi phi = Md.liftM I.Pinst (convert phi)
 
 toMid :: A.ComputingInstWithDbg -> MyLabelMapM (I.Node H.O H.O)
@@ -726,6 +729,9 @@ instance Conversion I.TerminatorInst (MyLabelMapM A.TerminatorInst) where
 instance Conversion I.Dbg (MyLabelMapM A.Dbg) where
     convert (I.Dbg mv mc) = Md.liftM2 A.Dbg (convert mv) (convert mc)
 
+instance Conversion I.PhiInstWithDbg (MyLabelMapM A.PhiInstWithDbg) where
+  convert (I.PhiInstWithDbg ins dbgs) = Md.liftM2 A.PhiInstWithDbg (convert ins) (mapM convert dbgs)
+
 instance Conversion I.ComputingInstWithDbg (MyLabelMapM A.ComputingInstWithDbg) where
     convert (I.ComputingInstWithDbg ins dbgs) = Md.liftM2 A.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
 
@@ -733,7 +739,7 @@ instance Conversion I.TerminatorInstWithDbg (MyLabelMapM A.TerminatorInstWithDbg
     convert (I.TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
     
     
-type Pblock = (A.BlockLabel, [A.PhiInst], [A.ComputingInstWithDbg])
+type Pblock = (A.BlockLabel, [A.PhiInstWithDbg], [A.ComputingInstWithDbg])
 
 getLabelId :: A.BlockLabel -> A.Lstring
 getLabelId (A.ImplicitBlockLabel _) = error "ImplicitBlockLabel should be normalized"

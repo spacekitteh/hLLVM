@@ -220,19 +220,20 @@ uDofTerminatorInst (Resume v) = uDofTypedValue v
 uDofTerminatorInst Unreachable = mempty
 uDofTerminatorInst Unwind = mempty
 
-
-
-
 uDofTerminatorInstWithDbg :: TerminatorInstWithDbg -> UDA
 uDofTerminatorInstWithDbg (TerminatorInstWithDbg i _) = uDofTerminatorInst i
 
+u1ofPinstWithDbg :: PhiInstWithDbg -> Ds.Set GlobalOrLocalId
+u1ofPinstWithDbg (PhiInstWithDbg n dbgs) = u1ofPinst n
+
+d1ofPinstWithDbg :: PhiInstWithDbg -> Ds.Set GlobalOrLocalId
+d1ofPinstWithDbg (PhiInstWithDbg n dbgs) = d1ofPinst n
 
 u1ofPinst :: PhiInst -> Ds.Set GlobalOrLocalId
 u1ofPinst = u1 . uDofPhiInst
 
 d1ofPinst :: PhiInst -> Ds.Set GlobalOrLocalId
 d1ofPinst = d1 . uDofPhiInst
-
 
 u1ofComputingInstWithDbg :: ComputingInstWithDbg -> Ds.Set GlobalOrLocalId
 u1ofComputingInstWithDbg = u1 . uDofComputingInstWithDbg

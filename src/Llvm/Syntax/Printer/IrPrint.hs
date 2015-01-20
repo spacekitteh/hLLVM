@@ -397,9 +397,12 @@ instance IrPrint TerminatorInst where
   printIr (Resume a) = text "resume" <+> printIr a
   printIr Unwind = text "unwind"
              
+
+instance IrPrint PhiInstWithDbg where
+  printIr (PhiInstWithDbg ins dbgs) = commaSepList ((printIr ins):fmap printIr dbgs)
+
 instance IrPrint TerminatorInstWithDbg where
   printIr (TerminatorInstWithDbg ins dbgs) = commaSepList ((printIr ins):fmap printIr dbgs)
-
 
 instance IrPrint ComputingInstWithDbg where
   printIr (ComputingInstWithDbg ins dbgs) = commaSepList ((printIr ins):fmap printIr dbgs)

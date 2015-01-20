@@ -54,13 +54,6 @@ data Instruction = Comp ComputingInst
 
 data InstructionWithDbg = InstructionWithDbg Instruction [Dbg]
 
-{-
-instance AsmWriter Instruction where
-    toLlvm (Comp x) = toLlvm x
-    toLlvm (Term x) = toLlvm x
-    toLlvm (Phi x) = toLlvm x
--}
-
 pInstruction :: P Instruction
 pInstruction = do { lhs <- opt (do { x <- pGlobalOrLocalId
                                    ; ignore (chartok '=')

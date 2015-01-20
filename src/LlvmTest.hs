@@ -4,8 +4,8 @@ import System.IO
 import System.Console.CmdArgs
 import ParserTester
 import Llvm.Pass.Optimizer ()
-import qualified Llvm.Pass.Mem2Reg as M2R
-import qualified Llvm.Pass.Liveness as L
+import qualified Llvm.Pass.Mem2Reg as M2R ()
+import qualified Llvm.Pass.Liveness as L ()
 import qualified Llvm.Data.Ir as I
 import Llvm.Pass.PassManager
 import qualified Compiler.Hoopl as H

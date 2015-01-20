@@ -273,6 +273,8 @@ data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
 -- | PhiInst (d1) [u1]
 data PhiInst = PhiInst (Maybe GlobalOrLocalId) Type [(Value, PercentLabel)] deriving (Eq,Show)
     
+data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg] deriving (Eq,Show)
+
 -- | ComputingInst (d1) Rhs
 data ComputingInst = ComputingInst (Maybe GlobalOrLocalId) Rhs deriving (Eq,Show)
                               

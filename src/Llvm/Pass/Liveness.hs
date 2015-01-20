@@ -27,7 +27,7 @@ liveness = H.mkBTransfer live
   where
     live :: Node e x -> H.Fact x Live -> Live
     live (Nlabel _) f = f
-    live (Pinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofPinst n) `Ds.difference` (filterOutGlobalId $ d1ofPinst n)
+    live (Pinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofPinstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofPinstWithDbg n)
     -- | FIXME
     -- | this is a very simplistic implementation and it does not consider function calls might have side effects. 
     -- | we need to distinguish the uses of a possible side effect computation from the uses of a pure computation.

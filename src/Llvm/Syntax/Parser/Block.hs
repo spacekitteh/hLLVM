@@ -13,12 +13,12 @@ pBlocks = try (many block)
               ; restInsts (Block n) [] []
               }
 
-restInsts :: ([PhiInst] -> [ComputingInstWithDbg] -> TerminatorInstWithDbg -> Block) -> 
-             [PhiInst] -> [ComputingInstWithDbg] -> P Block 
+restInsts :: ([PhiInstWithDbg] -> [ComputingInstWithDbg] -> TerminatorInstWithDbg -> Block) -> 
+             [PhiInstWithDbg] -> [ComputingInstWithDbg] -> P Block 
 restInsts bf phis insts = do { instOrTerm <- pInstructionWithDbg
                              ; case instOrTerm of
                                  InstructionWithDbg (Phi inst) dbgs ->
-                                     restInsts bf (inst:phis) insts
+                                     restInsts bf ((PhiInstWithDbg inst dbgs):phis) insts
                                  InstructionWithDbg (Comp inst) dbgs -> 
                                      restInsts bf phis ((ComputingInstWithDbg inst dbgs):insts)
                                  InstructionWithDbg (Term x) dbgs -> 

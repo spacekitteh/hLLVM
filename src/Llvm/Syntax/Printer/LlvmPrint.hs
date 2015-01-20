@@ -297,6 +297,9 @@ instance AsmPrint TerminatorInst where
   toLlvm Unreachable = text "unreachable"
   toLlvm (Resume a) = text "resume" <+> toLlvm a
              
+instance AsmPrint PhiInstWithDbg where
+  toLlvm (PhiInstWithDbg ins dbgs) = commaSepList ((toLlvm ins):fmap toLlvm dbgs)
+
 instance AsmPrint TerminatorInstWithDbg where
   toLlvm (TerminatorInstWithDbg ins dbgs) = commaSepList ((toLlvm ins):fmap toLlvm dbgs)
 

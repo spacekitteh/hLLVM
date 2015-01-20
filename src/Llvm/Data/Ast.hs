@@ -180,6 +180,9 @@ data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
 data PhiInst = PhiInst (Maybe GlobalOrLocalId) Type 
                [(Value, PercentLabel)] deriving (Eq,Show)
     
+data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg]
+                      deriving (Eq, Show)
+                               
 data ComputingInst = ComputingInst (Maybe GlobalOrLocalId) Rhs
                      deriving (Eq,Show)
                               
@@ -281,7 +284,7 @@ data Toplevel = ToplevelTriple DqString
               | ToplevelComdat DollarId SelectionKind
               deriving (Eq,Show)
                        
-data Block = Block BlockLabel [PhiInst] [ComputingInstWithDbg] TerminatorInstWithDbg deriving (Eq,Show)
+data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg deriving (Eq,Show)
 
 blockLabel :: Block -> BlockLabel
 blockLabel (Block v _ _ _) = v
