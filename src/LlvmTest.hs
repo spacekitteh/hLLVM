@@ -2,13 +2,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 import System.IO
 import System.Console.CmdArgs
-import Data.Maybe
 import ParserTester
-import Ast2IrTester
-import Ir2AstTester
-import Llvm.Pass.Optimizer
+import Llvm.Pass.Optimizer ()
 import qualified Llvm.Pass.Mem2Reg as M2R
 import qualified Llvm.Pass.Liveness as L
+import qualified Llvm.Data.Ir as I
 import Llvm.Pass.PassManager
 import qualified Compiler.Hoopl as H
 import qualified Llvm.Data.Conversion as S
@@ -100,7 +98,7 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = S.simplify ast
-                               ; let (m, ir) = testAst2Ir ast'
+                               ; let (m, ir) = H.runSimpleUniqueMonad $ S.astToIr {-testAst2Ir-} ast'
                                ; writeOutIr ir outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -120,7 +118,7 @@ main = do { sel <- cmdArgsRun mode
                                    ; ast <- testParser ix inh
                                    ; let ast1 = S.simplify ast
                                    ; let (m, ir) = testAst2Ir ast1
-                                   ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.fixUpPhi ir)
+                                   ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f ((O.optModule1 () N.fixUpPhi ir):: H.SimpleFuelMonad I.Module)
                                    ; let ast2 = testIr2Ast m ir1
                                    ; writeOutLlvm ast2 outh
                                    ; hClose inh
@@ -132,8 +130,8 @@ main = do { sel <- cmdArgsRun mode
                                       ; let ast1 = S.simplify ast
                                       ; let (m, ir) = testAst2Ir ast1
                                       ; let applySteps' = applySteps (extractSteps passes) ir
-                                      ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f applySteps'
-                                      ; let ir2 = H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.fixUpPhi ir1)
+                                      ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f (applySteps' :: H.SimpleFuelMonad I.Module)
+                                      ; let ir2 = H.runSimpleUniqueMonad $ H.runWithFuel f ((O.optModule1 () N.fixUpPhi ir1) :: H.SimpleFuelMonad I.Module)
                                       ; let ast2 = testIr2Ast m ir2
                                       ; writeOutLlvm ast2 outh
                                       ; hClose inh
@@ -141,6 +139,10 @@ main = do { sel <- cmdArgsRun mode
                                       }
             _ -> error $ "unexpected option " ++ show sel
           }
+   where 
+      testAst2Ir e = H.runSimpleUniqueMonad $ S.astToIr e
+      testIr2Ast m e = H.runSimpleUniqueMonad $ S.irToAst m e
+
 
 
 openFileOrStdout :: Maybe FilePath -> IO Handle

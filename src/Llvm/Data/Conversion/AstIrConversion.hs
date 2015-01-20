@@ -5,7 +5,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs #-}
-module Llvm.Data.Conversion.AstIrConversion(astToIr, irToAst, maybeM) where
+module Llvm.Data.Conversion.AstIrConversion(astToIr, irToAst) where
 
 import qualified Compiler.Hoopl as H
 import qualified Control.Monad as Md
@@ -40,7 +40,7 @@ instance Conversion A.TargetLabel (MyLabelMapM I.TargetLabel) where
   convert (A.TargetLabel tl) = Md.liftM I.TargetLabel (convert tl)
 
 instance Conversion A.BlockLabel (MyLabelMapM I.BlockLabel) where
-  convert (A.ImplicitBlockLabel p) = error $ "ImplicitBlockLabel @" ++ show p ++ " should be normalized in AstSimplify, and should not be leaked to Ast2Ir."
+  convert (A.ImplicitBlockLabel p) = error $ "ImplicitBlockLabel @" ++ show p ++ " should be normalized away in AstSimplification, and should not be leaked to Ast2Ir."
   convert (A.ExplicitBlockLabel b) = Md.liftM I.BlockLabel (convert b)
 
 instance Conversion A.TypedConst (MyLabelMapM I.TypedConst) where
@@ -415,7 +415,6 @@ astToIr :: A.Module -> H.SimpleUniqueMonad (IdLabelMap, I.Module)
 astToIr (A.Module ts) = runLabelMapM emptyIdLabelMap $ Md.liftM I.Module (mapM toplevel2Ir ts)
 
 
-
 {- Ir to Ast conversion -}
 
 instance Conversion I.LabelId (MyLabelMapM A.LabelId) where
@@ -769,8 +768,6 @@ graphToBlocks g = do { (bs, Nothing) <- H.foldGraphNodes convertNode g (return (
                      ; return bs
                      }
 
-
-
 toplevel2Ast :: I.Toplevel -> MyLabelMapM A.Toplevel
 toplevel2Ast (I.ToplevelTriple q) = return $ A.ToplevelTriple q
 toplevel2Ast (I.ToplevelDataLayout q) = return $ A.ToplevelDataLayout q
@@ -802,6 +799,5 @@ toplevel2Ast (I.ToplevelAttribute n c) = return $ A.ToplevelAttribute n c
 -- toplevel2Ast x = error $ "unhandled toplevel " ++ show x
 
 irToAst :: IdLabelMap -> I.Module -> H.SimpleUniqueMonad A.Module
-irToAst m (I.Module ts) = do { x <- runLabelMapM m $ Md.liftM A.Module (mapM toplevel2Ast ts)
-                             ; return $ snd x
-                             }
+irToAst iLm (I.Module ts) = Md.liftM snd (runLabelMapM iLm $ Md.liftM A.Module (mapM toplevel2Ast ts))
+

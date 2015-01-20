@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -cpp #-}
-{-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-
   This module compute the use, def, and Addr of CoreIr
@@ -171,7 +170,7 @@ uDofPersFn (PersFnId g) = mempty { u1 = Ds.singleton g }
 uDofPersFn (PersFnCast c) = uDofConversion (\(_,x) -> mempty {u1 = Ds.singleton x}) c
 uDofPersFn PersFnUndef = mempty
 uDofPersFn PersFnNull = mempty
-uDofPersFn (PersFnConst c) = mempty
+uDofPersFn (PersFnConst _) = mempty
 
 uDofSimpleConstant :: SimpleConstant -> UDA
 uDofSimpleConstant (CpGlobalAddr g) = mempty { addr = Ds.singleton $ GolG g }

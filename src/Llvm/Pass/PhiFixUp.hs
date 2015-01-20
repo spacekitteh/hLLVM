@@ -78,7 +78,7 @@ fwdPass f = FwdPass { fp_lattice = lattice f
                     , fp_rewrite = fwdRewrite
                     }
 
-phiFixUp :: LabelMap Label -> Label -> Graph Node C C -> CheckingFuelMonad SimpleUniqueMonad (Graph Node C C)
+phiFixUp :: (CheckpointMonad m, FuelMonad m) => LabelMap Label -> Label -> Graph Node C C -> m (Graph Node C C)
 #ifdef DEBUG
 phiFixUp idom entry graph | trace ("phiFixUp with idom " ++ show idom) False = undefined
 phiFixUp idom entry graph | trace ("phiFixUp with entry " ++ show entry) False = undefined

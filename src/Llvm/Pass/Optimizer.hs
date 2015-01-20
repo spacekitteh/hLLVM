@@ -1,13 +1,12 @@
-{-# OPTIONS_GHC -Wall #-}
 module Llvm.Pass.Optimizer where
 
 import Llvm.Data.Ir
 import qualified Compiler.Hoopl as H 
 import qualified Data.Set as Ds
 
-type Optimization a = a -> H.Label -> H.Graph Node H.C H.C -> H.CheckingFuelMonad H.SimpleUniqueMonad (H.Graph Node H.C H.C)
+type Optimization m a = a -> H.Label -> H.Graph Node H.C H.C -> m (H.Graph Node H.C H.C)
   
-opt :: a -> Optimization a -> Toplevel -> H.CheckingFuelMonad H.SimpleUniqueMonad Toplevel
+opt :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a -> Toplevel -> m Toplevel
 opt _ _ (ToplevelTriple s) = return $ ToplevelTriple s
 opt _ _ (ToplevelDataLayout s) = return $ ToplevelDataLayout s
 opt _ _ (ToplevelAlias m1 m2 m3 m4 m5 m6 m7) = return $ ToplevelAlias m1 m2 m3 m4 m5 m6 m7
@@ -28,14 +27,11 @@ opt _ _ (ToplevelComdat l s) = return $ ToplevelComdat l s
 opt _ _ (ToplevelAttribute l s) = return $ ToplevelAttribute l s
 
 
-
-optModule :: Optimization (Ds.Set (Type, GlobalId)) -> Module -> H.CheckingFuelMonad H.SimpleUniqueMonad Module
+optModule :: (H.CheckpointMonad m, H.FuelMonad m) => Optimization m (Ds.Set (Type, GlobalId)) -> Module -> m Module
 optModule f (Module l) = 
   let gs = globalIdOfModule (Module l)
-  in
-   mapM (opt gs f) l >>= return . Module
+  in mapM (opt gs f) l >>= return . Module
 
-
-optModule1 :: a -> Optimization a -> Module -> H.CheckingFuelMonad H.SimpleUniqueMonad Module
+optModule1 :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a -> Module -> m Module
 optModule1 a f (Module l) = 
   mapM (opt a f) l >>= return . Module

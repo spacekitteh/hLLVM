@@ -61,17 +61,16 @@ addAlist :: H.UniqueMonad m => A.FunctionPrototype -> [A.Lstring] -> LabelMapM m
 #ifdef DEBUG
 addAlist fn al | trace ("addAlist " ++ toLlvm fn ++ " -> " ++ (show al)) False = undefined
 #endif
-addAlist fn al = LabelMapM (\m -> return (m { alist= M.insert fn al (alist m) }, ()))
+addAlist fn al = LabelMapM $ \iLm -> return (iLm { alist = M.insert fn al (alist iLm) }, ())
 
 
 getAlist :: H.UniqueMonad m => A.FunctionPrototype -> LabelMapM m [A.Lstring]
-getAlist fn = LabelMapM f
-  where f m = case M.lookup fn (alist m) of
-                Just fn' -> return (m, fn')
-                Nothing -> error "irrefutable"
+getAlist fn = LabelMapM $ \iLm -> case M.lookup fn (alist iLm) of
+                Just fn0 -> return (iLm, fn0)
+                Nothing -> error "irrefutable:getAlist"
 
 appendH2A :: H.UniqueMonad m => LabelMapM m ()
-appendH2A = LabelMapM (\m -> return (m{h2a = (h2a m) `M.union`  (invertMap $ a2h m) }, ()))
+appendH2A = LabelMapM $ \iLm -> return (iLm { h2a = (h2a iLm) `M.union`  (invertMap $ a2h iLm) }, ())
      where invertMap :: forall a. M.Map a H.Label -> M.Map H.Label a
            invertMap = M.foldlWithKey (\p k b -> M.insert b k p) M.empty
 
@@ -80,26 +79,17 @@ appendH2A = LabelMapM (\m -> return (m{h2a = (h2a m) `M.union`  (invertMap $ a2h
 {-- so we cannot get the original order of block --}
 {-- we will populate alist and h2a in a deterministic way later --}
 labelFor :: H.UniqueMonad m => A.Lstring -> LabelMapM m H.Label
-labelFor al = LabelMapM f
-  where f m = case M.lookup al (a2h m) of
-          Just hl -> return (m, hl)
-          Nothing -> do { hl <- H.freshLabel
-                        ; let a2h' = (M.insert al hl (a2h m))
-                        ; return (m {a2h = a2h'}, hl)
-                        }
+labelFor al = LabelMapM $ \iLm -> case M.lookup al (a2h iLm) of
+                                    Just hl -> return (iLm, hl)
+                                    Nothing -> do { hl <- H.freshLabel
+                                                  ; let a2h' = M.insert al hl (a2h iLm)
+                                                  ; return (iLm {a2h = a2h'}, hl)
+                                                  }
 
 labelIdFor :: H.UniqueMonad m => H.Label -> LabelMapM m A.Lstring
-labelIdFor l = LabelMapM f
-  where f m = case M.lookup l (h2a m) of
-               Just l' -> return (m, l')
-               Nothing -> error "this cannot happen"
-
-
-mapBlockLabel :: A.BlockLabel -> A.BlockLabel
-mapBlockLabel x = x
-                  {-(Just x) = x
-mapBlockLabel Nothing = A.BlockLabel (A.LabelString "")
--}
+labelIdFor l = LabelMapM $ \iLm -> case M.lookup l (h2a iLm) of
+  Just l0 -> return (iLm, l0)
+  Nothing -> error "this cannot happen"
 
 
 revertMap :: A.LabelId -> A.BlockLabel
@@ -111,6 +101,6 @@ emptyIdLabelMap = (IdLabelMap { a2h = M.empty, h2a = M.empty, alist = M.empty})
 
 
 runLabelMapM :: H.UniqueMonad m => IdLabelMap -> LabelMapM m a -> m (IdLabelMap, a)
-runLabelMapM imap (LabelMapM f) = f imap --
+runLabelMapM iLm (LabelMapM f) = f iLm
 
 

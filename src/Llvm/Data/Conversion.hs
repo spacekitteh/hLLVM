@@ -6,4 +6,4 @@ module Llvm.Data.Conversion
 
 import Llvm.Data.Conversion.AstSimplification
 import Llvm.Data.Conversion.AstIrConversion
-import Llvm.Data.Conversion.LabelMapM 
+import Llvm.Data.Conversion.LabelMapM (IdLabelMap)

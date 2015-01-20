@@ -106,7 +106,7 @@ dcePass = H.BwdPass { H.bp_lattice = liveLattice
                     , H.bp_rewrite = deadAsstElim
                     }
 
-dce :: Ds.Set (Type, GlobalId) -> Label -> H.Graph Node H.C H.C -> H.CheckingFuelMonad H.SimpleUniqueMonad (H.Graph Node H.C H.C)
+dce :: (H.CheckpointMonad m, H.FuelMonad m) => Ds.Set (Type, GlobalId) -> Label -> H.Graph Node H.C H.C -> m (H.Graph Node H.C H.C)
 dce _ entry graph = 
   do { (graph', _, _) <- H.analyzeAndRewriteBwd bwd (H.JustC [entry]) graph
                          H.mapEmpty       
