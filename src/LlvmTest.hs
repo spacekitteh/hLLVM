@@ -12,6 +12,7 @@ import qualified Compiler.Hoopl as H
 import qualified Llvm.Data.Conversion as S
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
+import qualified Llvm.Control.Context as C
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -118,7 +119,7 @@ main = do { sel <- cmdArgsRun mode
                                    ; ast <- testParser ix inh
                                    ; let ast1 = S.simplify ast
                                    ; let (m, ir) = testAst2Ir ast1
-                                   ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f ((O.optModule1 () N.fixUpPhi ir):: H.SimpleFuelMonad I.Module)
+                                   ; let ir1 =  C.runContextWithSnR (H.runWithFuel f ((O.optModule1 () N.fixUpPhi ir):: C.CheckingFuelContextMonad () () I.Module)) () ()
                                    ; let ast2 = testIr2Ast m ir1
                                    ; writeOutLlvm ast2 outh
                                    ; hClose inh

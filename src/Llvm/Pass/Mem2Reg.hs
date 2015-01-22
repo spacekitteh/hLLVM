@@ -32,13 +32,6 @@ mem2RegLattice = DataflowLattice { fact_name = "Mem 2 Reg"
       = if new == old then (NoChange, PElem new)
         else (SomeChange, Top)
 
-
-{-
-initFact :: Ds.Set (Type, GlobalId) -> Mem2RegFact
-initFact vars = Dm.empty
--}
-
-
 isReg :: FwdTransfer Node Mem2RegFact
 isReg = mkFTransfer ft
 
@@ -89,12 +82,18 @@ insert x v1 f | trace ("insert " ++ (show x) ++ "->" ++ (show v1)) False = undef
 #endif
 insert x v1 f = Dm.insert x v1 f
 
+badAss :: Monad m => (Value -> Maybe Value) -> Node e x -> m (Maybe (Node e x))
+badAss f node = return (rwNode f node)
+
+
 mem2Reg :: forall m . FuelMonad m => FwdRewrite m Node Mem2RegFact
 mem2Reg = mkFRewrite cp
     where
       -- each node is rewritten to a one node graph.
       cp :: FuelMonad m => Node e x -> Mem2RegFact -> m (Maybe (Graph Node e x))
-      cp node f = return $ liftM nodeToGraph $ rwNode (lookup f) node
+      cp node f = do { x <- badAss (lookup f) node
+                     ; return $ liftM {-Maybe-} nodeToGraph x
+                     }
 
       lookup :: Mem2RegFact -> Value -> Maybe Value
       lookup f x = do { x' <- case x of

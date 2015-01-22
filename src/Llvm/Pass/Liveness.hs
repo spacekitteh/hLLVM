@@ -18,7 +18,7 @@ liveLattice = H.DataflowLattice
               , H.fact_join = add
               }
     where add _ (H.OldFact old) (H.NewFact new) = (ch, j)
-              where 
+              where
                 j = new `Ds.union` old
                 ch= H.changeIf (Ds.size j > Ds.size old)
 
@@ -29,9 +29,9 @@ liveness = H.mkBTransfer live
     live (Nlabel _) f = f
     live (Pinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofPinstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofPinstWithDbg n)
     -- | FIXME
-    -- | this is a very simplistic implementation and it does not consider function calls might have side effects. 
+    -- | this is a very simplistic implementation and it does not consider function calls might have side effects.
     -- | we need to distinguish the uses of a possible side effect computation from the uses of a pure computation.
-    live (Cinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofComputingInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofComputingInstWithDbg n) 
+    live (Cinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofComputingInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofComputingInstWithDbg n)
     live x@(Tinst n) f = let bs = H.successors x
                              f' = foldl (\p -> \l -> p `Ds.union` (fact f l)) Ds.empty bs
                        in f' `Ds.union` (filterOutGlobalId $ u1ofTerminatorInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofTerminatorInstWithDbg n)
@@ -84,7 +84,7 @@ isDeadAP live ap  = let u = filterOutGlobalId $ u1 $ uDofActualParam ap
                     in dif == Ds.empty
 
 deadCallSite :: forall m. H.FuelMonad m => CallSite -> H.Fact H.O Live -> m (Maybe (H.Graph Node H.O H.O))
-deadCallSite (CsFun _ _ _ fn ap _) live | isDeclare fn = 
+deadCallSite (CsFun _ _ _ fn ap _) live | isDeclare fn =
   if L.all (isDeadAP live) ap then return $ Just H.emptyGraph
   else return Nothing
 deadCallSite _ _ = return Nothing
@@ -95,9 +95,9 @@ filterOutGlobalId :: Ds.Set GlobalOrLocalId -> Ds.Set LocalId
 filterOutGlobalId s = Ds.foldl (\a b -> case b of
                                          GolL l -> Ds.insert l a
                                          _ -> a) Ds.empty s
-                      
-                      
-                      
+
+
+
 
 
 dcePass :: forall m. H.FuelMonad m => H.BwdPass m Node Live
@@ -107,9 +107,9 @@ dcePass = H.BwdPass { H.bp_lattice = liveLattice
                     }
 
 dce :: (H.CheckpointMonad m, H.FuelMonad m) => Ds.Set (Type, GlobalId) -> Label -> H.Graph Node H.C H.C -> m (H.Graph Node H.C H.C)
-dce _ entry graph = 
+dce _ entry graph =
   do { (graph', _, _) <- H.analyzeAndRewriteBwd bwd (H.JustC [entry]) graph
-                         H.mapEmpty       
+                         H.mapEmpty
      ; return graph'
      }
   where bwd = dcePass
