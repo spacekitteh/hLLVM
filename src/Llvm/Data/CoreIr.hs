@@ -12,7 +12,7 @@ data LabelId = LabelString Label
              | LabelDqString Label -- a string enclosed by double quotes
              | LabelDqNumber Label -- a number enclosed by double quotes
              deriving (Eq, Ord, Show)
-                      
+
 hooplLabelOf :: LabelId -> Label
 hooplLabelOf (LabelString x) = x
 hooplLabelOf (LabelDqString x) = x
@@ -22,19 +22,19 @@ hooplLabelOf (LabelDqNumber x) = x
 data BlockLabel = BlockLabel LabelId deriving (Eq, Ord, Show)
 data PercentLabel = PercentLabel LabelId deriving (Eq, Ord, Show)
 data TargetLabel = TargetLabel PercentLabel deriving (Eq,Ord,Show)
- 
-                                                     
-data NoWrap = 
+
+
+data NoWrap =
   -- | No Signed Wrap
-  Nsw 
+  Nsw
   -- | No Unsigned Wrap
-  | Nuw 
+  | Nuw
   -- | No Signed and Unsigned Wrap
   | Nsuw deriving (Eq,Ord,Show)
 
 data Exact = Exact deriving (Eq,Ord,Show)
 
-data IbinExpr v = Add (Maybe NoWrap) Type v v 
+data IbinExpr v = Add (Maybe NoWrap) Type v v
                 | Sub (Maybe NoWrap) Type v v
                 | Mul (Maybe NoWrap) Type v v
                 | Udiv (Maybe Exact) Type v v
@@ -83,8 +83,8 @@ operandOfFbinExpr e = case e of
   Fmul _ _ v1 v2 -> (v1, v2)
   Fdiv _ _ v1 v2 -> (v1, v2)
   Frem _ _ v1 v2 -> (v1, v2)
-                  
-operandOfBinExpr :: BinExpr v -> (v, v)                    
+
+operandOfBinExpr :: BinExpr v -> (v, v)
 operandOfBinExpr (Ie x) = operandOfIbinExpr x
 operandOfBinExpr (Fe x) = operandOfFbinExpr x
 
@@ -103,7 +103,7 @@ operatorOfIbinExpr e = case e of
   And  _ _ _ -> "and"
   Or  _ _ _ -> "or"
   Xor _ _ _ -> "xor"
-                     
+
 operatorOfFbinExpr :: FbinExpr v -> String
 operatorOfFbinExpr e = case e of
   Fadd _ _ _ _ -> "fadd"
@@ -115,7 +115,7 @@ operatorOfFbinExpr e = case e of
 
 operatorOfBinExpr :: BinExpr v -> String
 operatorOfBinExpr (Ie e) = operatorOfIbinExpr e
-operatorOfBinExpr (Fe e) = operatorOfFbinExpr e                           
+operatorOfBinExpr (Fe e) = operatorOfFbinExpr e
 
 
 typeOfIbinExpr :: IbinExpr v -> Type
@@ -133,7 +133,7 @@ typeOfIbinExpr e = case e of
   And  t _ _ -> t
   Or  t _ _ -> t
   Xor t _ _ -> t
-              
+
 typeOfFbinExpr :: FbinExpr v -> Type
 typeOfFbinExpr e = case e of
   Fadd _ t _ _ -> t
@@ -167,11 +167,13 @@ typeOfFcmp :: Fcmp v -> Type
 typeOfFcmp (Fcmp _ t _ _) = t
 
 
-data ComplexConstant = Cstruct Packing [TypedConst] 
+data ComplexConstant = Cstruct Packing [TypedConst]
                      | Cvector [TypedConst]
+                     | CvectorN Integer TypedConst -- repeat the same const N times
                      | Carray [TypedConst]
-                       deriving (Eq,Ord,Show)
-                           
+                     | CarrayN Integer TypedConst -- repeat the same const N times
+                     deriving (Eq, Ord, Show)
+
 data Const = Ccp SimpleConstant
            | Cca ComplexConstant
            | CmL LocalId
@@ -190,7 +192,7 @@ data Const = Ccp SimpleConstant
            | CiE (InsertElem TypedConst)
            | CmC MetaConst
            deriving (Eq,Ord,Show)
-                    
+
 data MdVar = MdVar String deriving (Eq,Ord,Show)
 data MdNode = MdNode String deriving (Eq,Ord,Show)
 data MetaConst = MdConst Const
@@ -199,11 +201,11 @@ data MetaConst = MdConst Const
                | McMv MdVar
                | MdRef LocalId
                deriving (Eq,Ord,Show)
-                        
+
 data Expr = EgEp (GetElemPtr TypedValue)
           | EiC (Icmp Value)
           | EfC (Fcmp Value)
-          | Eb (BinExpr Value) 
+          | Eb (BinExpr Value)
           | Ec (Conversion TypedValue)
           | Es (Select TypedValue)
           -- | Internal value to make the optimization easier
@@ -214,9 +216,9 @@ data Expr = EgEp (GetElemPtr TypedValue)
 typeOfExpr :: Expr -> Type
 typeOfExpr (Ev (TypedValue t _)) = t
 typeOfExpr x = error ("unexpected parameter " ++ (show x) ++ " is passed to typeOfExpr.")
-                   
+
 {-   (element type, element number, align) -}
-data MemOp = 
+data MemOp =
   -- | allocate m t s:u1 align
   Allocate (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Alignment)
   -- | load a addr:u1u2 align
@@ -224,26 +226,26 @@ data MemOp =
   | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Alignment)
   -- | store v:u1 addr:u1d2 align
   | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
-  | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) 
-  -- | fence 
+  | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment)
+  -- | fence
   | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
-  -- | cmpxchg v1:u1u2d2 v2:u1 v3:u1 
+  -- | cmpxchg v1:u1u2d2 v2:u1 v3:u1
   | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
-  -- | atomicrmw v1:u1u2d2 v2:u1 
+  -- | atomicrmw v1:u1u2d2 v2:u1
   | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering
   deriving (Eq,Ord,Show)
-                         
-data FunName = 
+
+data FunName =
   -- | fn:u1
   FunNameGlobal GlobalOrLocalId
   | FunNameString String
     deriving (Eq,Ord,Show)
-             
+
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr] 
+              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
               | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
-                       
+
 data Clause = Catch TypedValue -- u1
             | Filter TypedConst -- u1
             | Cco (Conversion TypedValue)
@@ -253,34 +255,34 @@ data PersFn = PersFnId GlobalOrLocalId -- u1
             | PersFnCast (Conversion (Type, GlobalOrLocalId))
             | PersFnUndef
             | PersFnNull
-            | PersFnConst Const          
+            | PersFnConst Const
             deriving (Eq, Ord, Show)
-                     
+
 data Rhs = RmO MemOp
          | Re Expr
          | Call TailCall CallSite
          | ReE (ExtractElem TypedValue)
          | RiE (InsertElem TypedValue)
          | RsV (ShuffleVector TypedValue)
-         | ReV (ExtractValue TypedValue) 
+         | ReV (ExtractValue TypedValue)
          | RiV (InsertValue TypedValue)
          | VaArg TypedValue Type
-         | LandingPad Type Type PersFn (Maybe Cleanup) [Clause] 
+         | LandingPad Type Type PersFn (Maybe Cleanup) [Clause]
          deriving (Eq,Ord,Show)
-              
+
 data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
 
 -- | PhiInst (d1) [u1]
 data PhiInst = PhiInst (Maybe GlobalOrLocalId) Type [(Value, PercentLabel)] deriving (Eq,Show)
-    
+
 data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg] deriving (Eq,Show)
 
 -- | ComputingInst (d1) Rhs
 data ComputingInst = ComputingInst (Maybe GlobalOrLocalId) Rhs deriving (Eq,Show)
-                              
+
 data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
                           deriving (Eq,Show)
-                                     
+
 data TerminatorInst = Unreachable
                     | Return [TypedValue] -- u1
                     | Br TargetLabel
@@ -292,9 +294,9 @@ data TerminatorInst = Unreachable
                     | Resume TypedValue
                     | Unwind
                     deriving (Eq,Show)
-                             
-                             
-targetOf :: TerminatorInst -> [TargetLabel]                             
+
+
+targetOf :: TerminatorInst -> [TargetLabel]
 targetOf (Unreachable) = []
 targetOf (Return _) = []
 targetOf (Br t) = [t]
@@ -308,9 +310,9 @@ targetOf Unwind = []
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg] deriving (Eq,Show)
 
 data ActualParam = ActualParam Type [ParamAttr] (Maybe Alignment) Value [ParamAttr] deriving (Eq,Ord,Show)
-                          
-                                            
-data Value = VgOl GlobalOrLocalId 
+
+
+data Value = VgOl GlobalOrLocalId
            | Ve Expr
            | Vc Const
            -- | Internal value to make the optimization easier
@@ -318,20 +320,20 @@ data Value = VgOl GlobalOrLocalId
            deriving (Eq,Ord,Show)
 
 data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
-data TypedConst = TypedConst Type Const 
+data TypedConst = TypedConst Type Const
                 | TypedConstNull deriving (Eq,Ord,Show)
-                                          
+
 
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
 data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
 
-                                                
+
 data Aliasee = AtV TypedValue -- u1
              | Ac (Conversion TypedConst)
              | AgEp (GetElemPtr TypedConst)
              deriving (Eq,Show)
-                        
-data FunctionPrototype = FunctionPrototype 
+
+data FunctionPrototype = FunctionPrototype
                          (Maybe Linkage)
                          (Maybe Visibility)
                          (Maybe CallConv)
@@ -339,7 +341,7 @@ data FunctionPrototype = FunctionPrototype
                          Type
                          GlobalId
                          FormalParamList
-                         (Maybe AddrNaming)                       
+                         (Maybe AddrNaming)
                          [FunAttr]
                          (Maybe Section)
                          (Maybe Comdat)
@@ -350,14 +352,15 @@ data FunctionPrototype = FunctionPrototype
                        deriving (Eq,Ord,Show)
 
 data Prefix = Prefix TypedConst deriving (Eq, Ord, Show)
-data Prologue = Prologue TypedConst deriving (Eq, Ord, Show)                                
+data Prologue = Prologue TypedConst deriving (Eq, Ord, Show)
 
 getTargetLabel :: TargetLabel -> Label
 getTargetLabel (TargetLabel (PercentLabel l)) = toLabel l
 
 
-toLabel :: LabelId -> Label 
+toLabel :: LabelId -> Label
 toLabel (LabelString l) = l
 toLabel (LabelDqString l) = l
 toLabel (LabelNumber l) = l
 toLabel (LabelDqNumber l) = l
+
