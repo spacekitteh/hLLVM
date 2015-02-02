@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 module Llvm.Data.CoreIr
        ( module Llvm.Data.CoreIr
        , module Llvm.Data.Shared
@@ -167,11 +168,11 @@ typeOfFcmp :: Fcmp v -> Type
 typeOfFcmp (Fcmp _ t _ _) = t
 
 
-data ComplexConstant = Cstruct Packing [TypedConst]
-                     | Cvector [TypedConst]
-                     | CvectorN Integer TypedConst -- repeat the same const N times
-                     | Carray [TypedConst]
-                     | CarrayN Integer TypedConst -- repeat the same const N times
+data ComplexConstant = Cstruct Packing [(Typed Const)]
+                     | Cvector [(Typed Const)]
+                     | CvectorN Integer (Typed Const) -- repeat the same const N times
+                     | Carray [(Typed Const)]
+                     | CarrayN Integer (Typed Const) -- repeat the same const N times
                      deriving (Eq, Ord, Show)
 
 data Const = Ccp SimpleConstant
@@ -180,16 +181,16 @@ data Const = Ccp SimpleConstant
            | Cl LabelId
            | CblockAddress GlobalId PercentLabel
            | Cb (BinExpr Const)
-           | Cconv (Conversion TypedConst)
-           | CgEp (GetElemPtr TypedConst)
-           | Cs (Select TypedConst)
+           | Cconv (Conversion (Typed Const))
+           | CgEp (GetElemPtr (Typed Const))
+           | Cs (Select (Typed Const))
            | CiC (Icmp Const)
            | CfC (Fcmp Const)
-           | CsV (ShuffleVector TypedConst)
-           | CeV (ExtractValue TypedConst)
-           | CiV (InsertValue TypedConst)
-           | CeE (ExtractElem TypedConst)
-           | CiE (InsertElem TypedConst)
+           | CsV (ShuffleVector (Typed Const))
+           | CeV (ExtractValue (Typed Const))
+           | CiV (InsertValue (Typed Const))
+           | CeE (ExtractElem (Typed Const))
+           | CiE (InsertElem (Typed Const))
            | CmC MetaConst
            deriving (Eq,Ord,Show)
 
@@ -202,37 +203,37 @@ data MetaConst = MdConst Const
                | MdRef LocalId
                deriving (Eq,Ord,Show)
 
-data Expr = EgEp (GetElemPtr TypedValue)
+data Expr = EgEp (GetElemPtr (Typed Value))
           | EiC (Icmp Value)
           | EfC (Fcmp Value)
           | Eb (BinExpr Value)
-          | Ec (Conversion TypedValue)
-          | Es (Select TypedValue)
+          | Ec (Conversion (Typed Value))
+          | Es (Select (Typed Value))
           -- | Internal value to make the optimization easier
-          | Ev TypedValue
+          | Ev (Typed Value)
           deriving (Eq,Ord,Show)
 
 
 typeOfExpr :: Expr -> Type
-typeOfExpr (Ev (TypedValue t _)) = t
+typeOfExpr (Ev (TypedData t _)) = t
 typeOfExpr x = error ("unexpected parameter " ++ (show x) ++ " is passed to typeOfExpr.")
 
 {-   (element type, element number, align) -}
 data MemOp =
   -- | allocate m t s:u1 align
-  Allocate (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Alignment)
+  Allocate (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe Alignment)
   -- | load a addr:u1u2 align
-  | Load (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
-  | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Alignment)
+  | Load (IsOrIsNot Volatile) (Typed Pointer) (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+  | LoadAtomic Atomicity (IsOrIsNot Volatile) (Typed Pointer) (Maybe Alignment)
   -- | store v:u1 addr:u1d2 align
-  | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
-  | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment)
+  | Store (IsOrIsNot Volatile) (Typed Value) (Typed Pointer) (Maybe Alignment) (Maybe Nontemporal)
+  | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Typed Pointer) (Maybe Alignment)
   -- | fence
   | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
   -- | cmpxchg v1:u1u2d2 v2:u1 v3:u1
-  | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
+  | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) (Typed Pointer) (Typed Value) (Typed Value) (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
   -- | atomicrmw v1:u1u2d2 v2:u1
-  | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering
+  | AtomicRmw (IsOrIsNot Volatile) AtomicOp (Typed Pointer) (Typed Value) (IsOrIsNot SingleThread) AtomicMemoryOrdering
   deriving (Eq,Ord,Show)
 
 data FunName =
@@ -243,12 +244,12 @@ data FunName =
 
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
               | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
-              | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
+              | CsConversion [ParamAttr] Type (Conversion (Typed Const)) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
 
-data Clause = Catch TypedValue -- u1
-            | Filter TypedConst -- u1
-            | Cco (Conversion TypedValue)
+data Clause = Catch (Typed Value) -- u1
+            | Filter (Typed Const) -- u1
+            | Cco (Conversion (Typed Value))
             deriving (Eq,Ord,Show)
 
 data PersFn = PersFnId GlobalOrLocalId -- u1
@@ -261,12 +262,12 @@ data PersFn = PersFnId GlobalOrLocalId -- u1
 data Rhs = RmO MemOp
          | Re Expr
          | Call TailCall CallSite
-         | ReE (ExtractElem TypedValue)
-         | RiE (InsertElem TypedValue)
-         | RsV (ShuffleVector TypedValue)
-         | ReV (ExtractValue TypedValue)
-         | RiV (InsertValue TypedValue)
-         | VaArg TypedValue Type
+         | ReE (ExtractElem (Typed Value))
+         | RiE (InsertElem (Typed Value))
+         | RsV (ShuffleVector (Typed Value))
+         | ReV (ExtractValue (Typed Value))
+         | RiV (InsertValue (Typed Value))
+         | VaArg (Typed Value) Type
          | LandingPad Type Type PersFn (Maybe Cleanup) [Clause]
          deriving (Eq,Ord,Show)
 
@@ -284,14 +285,14 @@ data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
                           deriving (Eq,Show)
 
 data TerminatorInst = Unreachable
-                    | Return [TypedValue] -- u1
+                    | Return [(Typed Value)] -- u1
                     | Br TargetLabel
                     | Cbr Value TargetLabel TargetLabel -- u1
-                    | IndirectBr TypedValue [TargetLabel]
-                    | Switch TypedValue TargetLabel [(TypedValue, TargetLabel)]
+                    | IndirectBr (Typed Value) [TargetLabel]
+                    | Switch (Typed Value) TargetLabel [((Typed Value), TargetLabel)]
                     -- | invoke d1 callsite t1 t2
                     | Invoke (Maybe GlobalOrLocalId) CallSite TargetLabel TargetLabel
-                    | Resume TypedValue
+                    | Resume (Typed Value)
                     | Unwind
                     deriving (Eq,Show)
 
@@ -319,18 +320,41 @@ data Value = VgOl GlobalOrLocalId
            | Deref Pointer
            deriving (Eq,Ord,Show)
 
+data Typed v where
+  TypedData :: Type -> v -> Typed v 
+  UntypedNull :: Typed Const
+
+instance Eq v => Eq (Typed v) where
+  (==) (TypedData t1 v1) (TypedData t2 v2) = (t1 == t2) && (v1 == v2)
+  (==) UntypedNull UntypedNull = undefined
+  (==) _ _ = False
+  
+instance Show v => Show (Typed v) where  
+  show (TypedData t1 v1) = "TypedData " ++ (show t1) ++ " " ++ (show v1)
+  show UntypedNull = "UntypedNull"
+  
+instance Ord v => Ord (Typed v) where  
+  compare (TypedData t1 v1) (TypedData t2 v2) = let e1 = compare t1 t2
+                                                in if e1 == EQ then compare v1 v2
+                                                   else e1                                                        
+  compare UntypedNull UntypedNull = undefined
+  compare UntypedNull _ = LT
+
+{-
+data Typed v = Typed Type v deriving (Eq, Ord, Show)
 data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
 data TypedConst = TypedConst Type Const
                 | TypedConstNull deriving (Eq,Ord,Show)
+-}
 
 
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
-data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
+-- data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
 
 
-data Aliasee = AtV TypedValue -- u1
-             | Ac (Conversion TypedConst)
-             | AgEp (GetElemPtr TypedConst)
+data Aliasee = AtV (Typed Value) -- u1
+             | Ac (Conversion (Typed Const))
+             | AgEp (GetElemPtr (Typed Const))
              deriving (Eq,Show)
 
 data FunctionPrototype = FunctionPrototype
@@ -351,8 +375,8 @@ data FunctionPrototype = FunctionPrototype
                          (Maybe Prologue)
                        deriving (Eq,Ord,Show)
 
-data Prefix = Prefix TypedConst deriving (Eq, Ord, Show)
-data Prologue = Prologue TypedConst deriving (Eq, Ord, Show)
+data Prefix = Prefix (Typed Const) deriving (Eq, Ord, Show)
+data Prologue = Prologue (Typed Const) deriving (Eq, Ord, Show)
 
 getTargetLabel :: TargetLabel -> Label
 getTargetLabel (TargetLabel (PercentLabel l)) = toLabel l

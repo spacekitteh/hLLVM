@@ -16,7 +16,7 @@ data Toplevel = ToplevelTriple Ci.DqString
               | ToplevelAlias Ci.GlobalId (Maybe Ci.Visibility) (Maybe Ci.DllStorageClass) 
                 (Maybe Ci.ThreadLocalStorage) AddrNaming (Maybe Ci.Linkage) Ci.Aliasee
               | ToplevelDbgInit String Integer
-              | ToplevelStandaloneMd String Ci.TypedValue
+              | ToplevelStandaloneMd String (Ci.Typed Ci.Value)
               | ToplevelNamedMd Ci.MdVar [Ci.MdNode]
               | ToplevelDeclare Ci.FunctionPrototype
               | ToplevelDefine Ci.FunctionPrototype H.Label (H.Graph Node H.C H.C)

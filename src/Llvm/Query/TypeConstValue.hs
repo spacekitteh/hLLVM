@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 module Llvm.Query.TypeConstValue where
 
 
@@ -53,6 +54,7 @@ getTypeAlignment dl t at =
     Tfunction t tpl fas -> errorX
     Tderef t -> errorX
   where
+    errorX :: MonadError Qerror m => m a
     errorX = throwError $ QerrWithInfo $ "getTypedAlignment:unsupported " ++ show t
     getTpAlignment dl tp = case tp of
       TpI n -> case M.lookup (SizeInBit n) (ints dl) of 
@@ -254,7 +256,7 @@ getPrimitiveSizeInBits x = case x of
   
   
 
-getGetElemtPtrIndexedType :: MonadError Qerror m => Type -> [TypedValue] -> m Type
+getGetElemtPtrIndexedType :: MonadError Qerror m => Type -> [Typed Value] -> m Type
 getGetElemtPtrIndexedType x is = case getScalarType x of
   Tpointer et _ -> if length is == 0 then
                      return et
@@ -267,7 +269,7 @@ getGetElemtPtrIndexedType x is = case getScalarType x of
                              }
 
 
-getTypeAtIndex :: MonadError Qerror m => Type -> TypedConst -> m Type
+getTypeAtIndex :: MonadError Qerror m => Type -> Typed Const -> m Type
 getTypeAtIndex x@(Tpointer _ _) _ = throwError (QerrWithInfo $ "Invalid base type " ++ show x)
 getTypeAtIndex t idx = 
   do { ii <- getUniqueInteger idx
@@ -318,53 +320,49 @@ assertCast op src dest = if castIsValid op src dest then return ()
                          else throwError (QerrWithInfo $ "Invalid cast:" ++ show op ++ " " ++ show src ++ " to " ++ show dest)
 
 {- Const -}
-getGetElementPtr :: TypedConst -> [TypedConst] -> IsOrIsNot InBounds -> Const
+getGetElementPtr :: Typed Const -> [Typed Const] -> IsOrIsNot InBounds -> Const
 getGetElementPtr c indices isB = CgEp (GetElemPtr isB c indices)
 
-getBitCast :: MonadError Qerror m => TypedConst -> Type -> m TypedConst
-getBitCast x@(TypedConst t c) dt = if dt == t then return x
-                                   else do { _ <- assertCast Bitcast t dt 
-                                           ; return (TypedConst dt (Cconv $ Conversion Bitcast x dt))
-                                           }
+getBitCast :: MonadError Qerror m => Typed Const -> Type -> m (Typed Const)
+getBitCast x@(TypedData t c) dt = if dt == t then return x
+                                  else do { _ <- assertCast Bitcast t dt 
+                                          ; return (TypedData dt (Cconv $ Conversion Bitcast x dt))
+                                          }
 
-getSplatValue :: TypedConst -> Maybe TypedConst
-getSplatValue (TypedConst _ (Cca (Cvector l))) = if all (\x -> x == head l) l then Just $ head l
-                                                 else Nothing                              
+getSplatValue :: Typed Const -> Maybe (Typed Const)
+getSplatValue (TypedData _ (Cca (Cvector l))) = if all (\x -> x == head l) l then Just $ head l
+                                                else Nothing                              
 
-isNullValue :: TypedConst -> Bool                                                      
-isNullValue (TypedConst _ (Ccp CpNull)) = True 
+isNullValue :: Typed Const -> Bool                                                      
+isNullValue (TypedData _ (Ccp CpNull)) = True 
+isNullValue UntypedNull = True
 isNullValue _ = False
 
-isUndef :: TypedConst -> Bool
-isUndef (TypedConst _ (Ccp CpUndef)) = True
+isUndef :: Typed Const -> Bool
+isUndef (TypedData _ (Ccp CpUndef)) = True
 isUndef _ = False
 
 
-{-
-getUndefinedValue :: Type -> TypedConst
-getUndefinedValue t = TypedConst t (Cca Cundef)
--}
-
-getConstArray :: MonadError Qerror m => Type -> [TypedConst] -> m TypedConst
-getConstArray t@(Tarray n el) [] = return (TypedConst t (Cca (Carray $ fmap (\x -> TypedConst el (Ccp CpZero)) [1..n])))
-getConstArray t@(Tarray n el) l = if or $ fmap (\(TypedConst vt _) -> vt /= el) l then
+getConstArray :: MonadError Qerror m => Type -> [Typed Const] -> m (Typed Const)
+getConstArray t@(Tarray n el) [] = return (TypedData t (Cca (Carray $ fmap (\x -> TypedData el (Ccp CpZero)) [1..n])))
+getConstArray t@(Tarray n el) l = if or $ fmap (\(TypedData vt _) -> vt /= el) l then
                                     throwError $ QerrWithInfo "type mismatch"
                                   else
-                                    return (TypedConst t (Cca (Carray l)))
+                                    return (TypedData t (Cca (Carray l)))
 getConstArray t _ = throwError $ QerrWithInfo "type mismatch"
 
 
-getTypedConst :: MonadError Qerror m => (TypePrimitive -> m SimpleConstant) -> Type -> m TypedConst
+getTypedConst :: MonadError Qerror m => (TypePrimitive -> m SimpleConstant) -> Type -> m (Typed Const)
 getTypedConst f t = case t of
-  Tprimitive tp -> f tp >>= \x -> return (TypedConst t (Ccp x)) 
+  Tprimitive tp -> f tp >>= \x -> return (TypedData t (Ccp x)) 
   Tvector n et -> do { ev <- getTypedConst f et
-                     ; return $ TypedConst t (Cca (CvectorN n ev))
+                     ; return $ TypedData t (Cca (CvectorN n ev))
                      }
   Tarray n et -> do { ev <- getTypedConst f et
-                    ; return $ TypedConst t (Cca (CarrayN n ev))
+                    ; return $ TypedData t (Cca (CarrayN n ev))
                     }
   Tstruct pk ts -> do { evs <- mapM (getTypedConst f) ts
-                      ; return $ TypedConst t (Cca (Cstruct pk evs))
+                      ; return $ TypedData t (Cca (Cstruct pk evs))
                       }
   Tfunction _ _ _ -> throwError $ QerrWithInfo $ show t ++ " has no const value"
   Tmetadata -> throwError $ QerrWithInfo $ show t ++ " has no const value"
@@ -374,19 +372,22 @@ getTypedConst f t = case t of
   Tno _ -> throwError $ QerrWithInfo $ show t ++ " has no const value"
   TupRef _ -> throwError $ QerrWithInfo $ show t ++ " has no const value"
   Tderef _ -> throwError $ QerrWithInfo $ show t ++ " has no const value"
-  
-  
+
 getNullValue :: MonadError Qerror m => TypePrimitive -> m SimpleConstant
 getNullValue t = case t of
   TpVoid -> throwError $ QerrWithInfo $ show t ++ " has no null const value"
   TpNull -> throwError $ QerrWithInfo $ show t ++ " has no null const value"
   TpLabel -> throwError $ QerrWithInfo $ show t ++ " has no null const value"
   _ -> return CpZero
-  
-  
+
 getUndefValue :: MonadError Qerror m => TypePrimitive -> m SimpleConstant  
 getUndefValue t = case t of
   TpVoid -> throwError $ QerrWithInfo $ show t ++ " has no undef const value"
   TpNull -> throwError $ QerrWithInfo $ show t ++ " has no undef const value"
   TpLabel -> throwError $ QerrWithInfo $ show t ++ " has no undef const value"
   _ -> return CpUndef 
+
+createPointerCast :: MonadError Qerror m => Typed Value -> Type -> m (Typed Value)
+createPointerCast tv@(TypedData ts v) td = do { assertCast PtrToInt ts td
+                                              ; return (TypedData td (Ve $ Ec $ Conversion PtrToInt tv td))
+                                              }

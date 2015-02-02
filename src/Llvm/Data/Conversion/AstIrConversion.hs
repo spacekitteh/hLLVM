@@ -43,15 +43,20 @@ instance Conversion A.BlockLabel (MyLabelMapM I.BlockLabel) where
   convert (A.ImplicitBlockLabel p) = error $ "ImplicitBlockLabel @" ++ show p ++ " should be normalized away in AstSimplification, and should not be leaked to Ast2Ir."
   convert (A.ExplicitBlockLabel b) = Md.liftM I.BlockLabel (convert b)
 
-instance Conversion A.TypedConst (MyLabelMapM I.TypedConst) where
-  convert (A.TypedConst t c) = Md.liftM (I.TypedConst t) (convert c)
-  convert A.TypedConstNull = return I.TypedConstNull
+{-
+instance Conversion u v => Conversion (A.Typed u) (MyLabelMapM (I.Typed v)) where
+  convert (A.TypedData t x) = Md.liftM (I.TypedData t) (convert x)
+-}
 
-instance Conversion A.TypedValue (MyLabelMapM I.TypedValue) where
-  convert (A.TypedValue t v) = Md.liftM (I.TypedValue t) (convert v)
+instance Conversion (A.Typed A.Const) (MyLabelMapM (I.Typed I.Const)) where
+  convert (A.TypedData t c) = Md.liftM (I.TypedData t) (convert c)
+  convert A.UntypedNull = return I.UntypedNull
 
-instance Conversion A.TypedPointer (MyLabelMapM I.TypedPointer) where
-  convert (A.TypedPointer t v) = Md.liftM (I.TypedPointer t) (convert v)
+instance Conversion (A.Typed A.Value) (MyLabelMapM (I.Typed I.Value)) where
+  convert (A.TypedData t v) = Md.liftM (I.TypedData t) (convert v)
+
+instance Conversion (A.Typed A.Pointer) (MyLabelMapM (I.Typed I.Pointer)) where
+  convert (A.TypedData t v) = Md.liftM (I.TypedData t) (convert v)
 
 instance Conversion A.ComplexConstant (MyLabelMapM I.ComplexConstant) where
   convert (A.Cstruct b fs) = Md.liftM (I.Cstruct b) (mapM convert fs)
@@ -441,23 +446,29 @@ instance Conversion I.TargetLabel (MyLabelMapM A.TargetLabel) where
 instance Conversion I.BlockLabel (MyLabelMapM A.BlockLabel) where
   convert (I.BlockLabel b) = Md.liftM A.ExplicitBlockLabel (convert b)
 
-instance Conversion I.TypedConst (MyLabelMapM A.TypedConst) where
-  convert (I.TypedConst t c) = Md.liftM (A.TypedConst t) (convert c)
-  convert I.TypedConstNull = return A.TypedConstNull
+{-
+instance Conversion u v => Conversion (I.Typed u) (MyLabelMapM (A.Typed v)) where
+  convert (I.TypedData t x) = Md.liftM (A.TypedData t) (convert x)
+-}
 
-instance Conversion I.TypedValue (MyLabelMapM A.TypedValue) where
-  convert (I.TypedValue t v) = Md.liftM (A.TypedValue t) (convert v)
 
-instance Conversion I.TypedPointer (MyLabelMapM A.TypedPointer) where
-  convert (I.TypedPointer t v) = Md.liftM (A.TypedPointer t) (convert v)
+instance Conversion (I.Typed I.Const) (MyLabelMapM (A.Typed A.Const)) where
+  convert (I.TypedData t c) = Md.liftM (A.TypedData t) (convert c)
+  convert I.UntypedNull = return A.UntypedNull
+
+instance Conversion (I.Typed I.Value) (MyLabelMapM (A.Typed A.Value)) where
+  convert (I.TypedData t v) = Md.liftM (A.TypedData t) (convert v)
+
+instance Conversion (I.Typed I.Pointer) (MyLabelMapM (A.Typed A.Pointer)) where
+  convert (I.TypedData t v) = Md.liftM (A.TypedData t) (convert v)
 
 instance Conversion I.Pointer (MyLabelMapM A.Pointer) where
   convert (I.Pointer v) = Md.liftM A.Pointer (convert v)
 
 instance Conversion I.ComplexConstant (MyLabelMapM A.ComplexConstant) where
-    convert (I.Cstruct b fs) = Md.liftM (A.Cstruct b) (mapM convert fs)
-    convert (I.Cvector fs) = Md.liftM A.Cvector (mapM convert fs)
-    convert (I.Carray fs) = Md.liftM A.Carray (mapM convert fs)
+  convert (I.Cstruct b fs) = Md.liftM (A.Cstruct b) (mapM convert fs)
+  convert (I.Cvector fs) = Md.liftM A.Cvector (mapM convert fs)
+  convert (I.Carray fs) = Md.liftM A.Carray (mapM convert fs)
 
 instance Conversion v1 (MyLabelMapM v2) => Conversion (I.IbinExpr v1) (MyLabelMapM (A.IbinExpr v2)) where
     convert e = let (u1, u2) = I.operandOfIbinExpr e
@@ -591,8 +602,8 @@ instance Conversion I.Expr (MyLabelMapM A.Expr) where
     convert (I.Eb a) = Md.liftM A.Eb (convert a)
     convert (I.Ec a) = Md.liftM A.Ec (convert a)
     convert (I.Es a) = Md.liftM A.Es (convert a)
-    convert (I.Ev tv) = do { (A.TypedValue t' v') <- convert tv
-                           ; return $ A.Ec $ A.Conversion A.Bitcast (A.TypedValue t' v') t'
+    convert (I.Ev tv) = do { tv1@(A.TypedData t' _) <- convert tv
+                           ; return $ A.Ec $ A.Conversion A.Bitcast tv1 t'
                            }
 
 

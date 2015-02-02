@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 module Llvm.Syntax.Parser.Rhs where
 import Llvm.Data.Ast
 import Llvm.Syntax.Parser.Basic
@@ -5,8 +6,8 @@ import Llvm.Syntax.Parser.Type
 import Llvm.Syntax.Parser.Const
 
 
-pTypedValue :: P TypedValue
-pTypedValue = liftM2 TypedValue pType pValue
+pTypedValue :: P (Typed Value)
+pTypedValue = liftM2 TypedData pType pValue
 
 pValue :: P Value
 pValue = choice [ (liftM VgOl pGlobalOrLocalId)
@@ -14,8 +15,8 @@ pValue = choice [ (liftM VgOl pGlobalOrLocalId)
                 , (liftM Ve pExpr) 
                 ]
 
-pTypedPointer :: P TypedPointer
-pTypedPointer = liftM2 TypedPointer pType pPointer
+pTypedPointer :: P (Typed Pointer)
+pTypedPointer = liftM2 TypedData pType pPointer
 
 pPointer :: P Pointer
 pPointer = choice [liftM Pointer pValue]
@@ -164,16 +165,16 @@ pFcmp = do { reserved "fcmp"
                 
 
                         
-pSelect :: P (Select TypedValue)
+pSelect :: P (Select (Typed Value))
 pSelect = do { reserved "select"
              ; t <- pSelTy
              ; v <- pValue
              ; ignore comma
              ; (tv2, tv3) <- pTuple pTypedValue
-             ; return $ Select (TypedValue t v) tv2 tv3
+             ; return $ Select (TypedData t v) tv2 tv3
              }
 
-pConversion :: P (Conversion TypedValue)
+pConversion :: P (Conversion (Typed Value))
 pConversion = do { op <- pConvertOp
               ; tv <- pTypedValue
               ; reserved "to"
@@ -181,7 +182,7 @@ pConversion = do { op <- pConvertOp
               ; return $ Conversion op tv t
               }
 
-pGetElemPtr :: P (GetElemPtr TypedValue)
+pGetElemPtr :: P (GetElemPtr (Typed Value))
 pGetElemPtr = do { reserved "getelementptr"
                  ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
                  ; tc1 <- pTypedValue
@@ -189,23 +190,23 @@ pGetElemPtr = do { reserved "getelementptr"
                  ; return $ GetElemPtr ib tc1 idx
                  }
 
-pExtractElement :: P (ExtractElem TypedValue)
+pExtractElement :: P (ExtractElem (Typed Value))
 pExtractElement = reserved "extractelement" >> pTuple pTypedValue >>= return . (uncurry ExtractElem)
                   
-pInsertElement :: P (InsertElem TypedValue)
+pInsertElement :: P (InsertElem (Typed Value))
 pInsertElement = reserved "insertelement" >> pTriple pTypedValue >>= return . (uncurry3 InsertElem)
 
-pShuffleVector :: P (ShuffleVector TypedValue)
+pShuffleVector :: P (ShuffleVector (Typed Value))
 pShuffleVector = reserved "shufflevector" >> pTriple pTypedValue >>= return . (uncurry3 ShuffleVector)
                      
-pExtractValue :: P (ExtractValue TypedValue)
+pExtractValue :: P (ExtractValue (Typed Value))
 pExtractValue = do { reserved "extractvalue"
                    ; tc1 <- pTypedValue
                    ; ls <- many (try (comma >> intStrToken))
                    ; return $ ExtractValue tc1 ls
                    }
 
-pInsertValue :: P (InsertValue TypedValue)
+pInsertValue :: P (InsertValue (Typed Value))
 pInsertValue = do { reserved "insertvalue"
                   ; (tv1, tv2) <- pTuple pTypedValue
                   ; ls <- many (try (comma >> intStrToken))

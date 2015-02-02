@@ -98,9 +98,8 @@ rwFcmp f (Fcmp op t v1 v2) = do { (v1', v2') <- f2 f (v1, v2)
                                 ; return $ Fcmp op t v1' v2'
                                 }
 
-
-tv2v :: MaybeChange Value -> MaybeChange TypedValue
-tv2v f (TypedValue t x) = liftM (TypedValue t) (f x)
+tv2v :: MaybeChange Value -> MaybeChange (Typed Value)
+tv2v f (TypedData t x) = liftM (TypedData t) (f x)
 
 rwExpr :: MaybeChange Value -> MaybeChange Expr
 rwExpr f (EgEp gep) = rwGetElemPtr (tv2v f) gep >>= return . EgEp
@@ -116,12 +115,12 @@ rwMemOp :: MaybeChange Value -> MaybeChange Rhs
 rwMemOp f (RmO (Allocate m t ms ma)) = do { ms' <- maybeM (tv2v f) ms
                                           ; return $ RmO $ Allocate m t ms' ma
                                           }
-rwMemOp f (RmO (Load _ (TypedPointer (Tpointer t _) ptr) _ _ _ _)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
-                                                                        ; return $ Re $ Ev tv
-                                                                        }
-rwMemOp f (RmO (LoadAtomic _ _ (TypedPointer (Tpointer t _) ptr) _)) = do { tv <- (tv2v f) (TypedValue t (Deref ptr))
-                                                                          ; return $ Re $ Ev tv
-                                                                          }
+rwMemOp f (RmO (Load _ (TypedData (Tpointer t _) ptr) _ _ _ _)) = do { tv <- (tv2v f) (TypedData t (Deref ptr))
+                                                                     ; return $ Re $ Ev tv
+                                                                     }
+rwMemOp f (RmO (LoadAtomic _ _ (TypedData (Tpointer t _) ptr) _)) = do { tv <- (tv2v f) (TypedData t (Deref ptr))
+                                                                       ; return $ Re $ Ev tv
+                                                                       }
 -- rwMemOp f (RmO (Free tv)) = (tv2v f) tv >>= return . RmO . Free 
 rwMemOp f (RmO (Store a tv1 tv2 ma nt)) = do { tv1' <- (tv2v f) tv1
                                              ; return $ RmO $ Store a tv1' tv2 ma nt

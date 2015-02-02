@@ -40,7 +40,7 @@ Library
                      Llvm.Data.Conversion.LabelMapM,
                      Llvm.Util.Mapping, 
                      Llvm.Util.Monadic, 
-                     Llvm.Query.Type,
+                     Llvm.Query.TypeConstValue,
                      Llvm.Syntax.Printer.Common,
                      Llvm.Syntax.Printer.SharedEntityPrint,
                      Llvm.Syntax.Printer.IrPrint,

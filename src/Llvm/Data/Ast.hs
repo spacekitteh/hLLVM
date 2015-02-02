@@ -1,4 +1,5 @@
-module Llvm.Data.Ast 
+{-# LANGUAGE GADTs #-}
+module Llvm.Data.Ast
        ( module Llvm.Data.Ast
        , module Llvm.Data.Shared
        ) where
@@ -77,9 +78,9 @@ data InsertValue v = InsertValue v v [String] deriving (Eq,Ord,Show)
 data Conversion v = Conversion ConvertOp v Type deriving (Eq,Ord,Show)
 
 -- | Complex Constants <http://llvm.org/releases/3.0/docs/LangRef.html#complexconstants>  
-data ComplexConstant = Cstruct Packing [TypedConst] 
-                     | Carray [TypedConst]
-                     | Cvector [TypedConst]
+data ComplexConstant = Cstruct Packing [(Typed Const)] 
+                     | Carray [(Typed Const)]
+                     | Cvector [(Typed Const)]
                        deriving (Eq,Ord,Show)
                          
 -- | Constants <http://llvm.org/releases/3.5.0/docs/LangRef.html#constant-expressions>
@@ -90,21 +91,22 @@ data Const = Ccp SimpleConstant
            -- | Addresses of Basic Block <http://llvm.org/releases/3.0/docs/LangRef.html#blockaddress>
            | CblockAddress GlobalId PercentLabel
            | Cb (BinExpr Const)
-           | Cconv (Conversion TypedConst)
-           | CgEp (GetElemPtr TypedConst)
-           | Cs (Select TypedConst)
+           | Cconv (Conversion (Typed Const))
+           | CgEp (GetElemPtr (Typed Const))
+           | Cs (Select (Typed Const))
            | CiC (Icmp Const)
            | CfC (Fcmp Const)
-           | CsV (ShuffleVector TypedConst)
-           | CeV (ExtractValue TypedConst)
-           | CiV (InsertValue TypedConst)
-           | CeE (ExtractElem TypedConst)
-           | CiE (InsertElem TypedConst)
+           | CsV (ShuffleVector (Typed Const))
+           | CeV (ExtractValue (Typed Const))
+           | CiV (InsertValue (Typed Const))
+           | CeE (ExtractElem (Typed Const))
+           | CiE (InsertElem (Typed Const))
            | CmC MetaConst
+           | Cnull
            deriving (Eq,Ord,Show)
                     
-data Prefix = Prefix TypedConst deriving (Eq, Ord, Show)
-data Prologue = Prologue TypedConst deriving (Eq, Ord, Show)
+data Prefix = Prefix (Typed Const) deriving (Eq, Ord, Show)
+data Prologue = Prologue (Typed Const) deriving (Eq, Ord, Show)
 
 data MdVar = MdVar String deriving (Eq,Ord,Show)
 data MdNode = MdNode String deriving (Eq,Ord,Show)
@@ -115,31 +117,31 @@ data MetaConst = MdConst Const
                | MdRef LocalId
                deriving (Eq,Ord,Show)
                         
-data GetResult = GetResult TypedValue String deriving (Eq, Ord, Show)
+data GetResult = GetResult (Typed Value) String deriving (Eq, Ord, Show)
 
 
-data Expr = EgEp (GetElemPtr TypedValue)
+data Expr = EgEp (GetElemPtr (Typed Value))
           | EiC (Icmp Value)
           | EfC (Fcmp Value)
           | Eb (BinExpr Value) 
-          | Ec (Conversion TypedValue)
-          | Es (Select TypedValue)
+          | Ec (Conversion (Typed Value))
+          | Es (Select (Typed Value))
           deriving (Eq,Ord,Show)
                    
 
 -- | Memory Access and Addressing Operations <http://llvm.org/releases/3.5.0/docs/LangRef.html#memory-access-and-addressing-operations>
-data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe TypedValue) (Maybe Alignment)
-           | Load (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
-           | LoadAtomic Atomicity (IsOrIsNot Volatile) TypedPointer (Maybe Alignment) 
-           | Store (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment) (Maybe Nontemporal)
-           | StoreAtomic Atomicity (IsOrIsNot Volatile) TypedValue TypedPointer (Maybe Alignment)
+data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe Alignment)
+           | Load (IsOrIsNot Volatile) (Typed Pointer) (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+           | LoadAtomic Atomicity (IsOrIsNot Volatile) (Typed Pointer) (Maybe Alignment) 
+           | Store (IsOrIsNot Volatile) (Typed Value) (Typed Pointer) (Maybe Alignment) (Maybe Nontemporal)
+           | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Typed Pointer) (Maybe Alignment)
            | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
-           | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) TypedPointer TypedValue TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
-           | AtomicRmw (IsOrIsNot Volatile) AtomicOp TypedPointer TypedValue (IsOrIsNot SingleThread) AtomicMemoryOrdering deriving (Eq,Ord,Show)
+           | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) (Typed Pointer) (Typed Value) (Typed Value) (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
+           | AtomicRmw (IsOrIsNot Volatile) AtomicOp (Typed Pointer) (Typed Value) (IsOrIsNot SingleThread) AtomicMemoryOrdering deriving (Eq,Ord,Show)
 
 
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
-data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
+-- data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
                          
 data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameString String
@@ -147,12 +149,12 @@ data FunName = FunNameGlobal GlobalOrLocalId
              
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
               | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr] 
-              | CsConversion [ParamAttr] Type (Conversion TypedConst) [ActualParam] [FunAttr]
+              | CsConversion [ParamAttr] Type (Conversion (Typed Const)) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
-data Clause = Catch TypedValue
-            | Filter TypedConst
-            | Cco (Conversion TypedValue)
+data Clause = Catch (Typed Value)
+            | Filter (Typed Const)
+            | Cco (Conversion (Typed Value))
             deriving (Eq,Ord,Show)
 
 data PersFn = PersFnId GlobalOrLocalId
@@ -166,12 +168,12 @@ data PersFn = PersFnId GlobalOrLocalId
 data Rhs = RmO MemOp
          | Re Expr
          | Call TailCall CallSite
-         | ReE (ExtractElem TypedValue)
-         | RiE (InsertElem TypedValue)
-         | RsV (ShuffleVector TypedValue)
-         | ReV (ExtractValue TypedValue) 
-         | RiV (InsertValue TypedValue)
-         | VaArg TypedValue Type
+         | ReE (ExtractElem (Typed Value))
+         | RiE (InsertElem (Typed Value))
+         | RsV (ShuffleVector (Typed Value))
+         | ReV (ExtractValue (Typed Value)) 
+         | RiV (InsertValue (Typed Value))
+         | VaArg (Typed Value) Type
          | LandingPad Type Type PersFn (Maybe Cleanup) [Clause] 
          deriving (Eq,Ord,Show)
               
@@ -192,21 +194,21 @@ data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
 -- | Terminator Instructions <http://llvm.org/releases/3.0/docs/LangRef.html#terminators>      
 data TerminatorInst = 
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_ret>
-    Return [TypedValue]
+    Return [(Typed Value)]
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_br>
     | Br TargetLabel
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_br>
     | Cbr Value TargetLabel TargetLabel
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_switch>
-    | Switch TypedValue TargetLabel [(TypedValue, TargetLabel)]
+    | Switch (Typed Value) TargetLabel [((Typed Value), TargetLabel)]
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_indirectbr>
-    | IndirectBr TypedValue [TargetLabel]
+    | IndirectBr (Typed Value) [TargetLabel]
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_invoke>
     | Invoke (Maybe GlobalOrLocalId) CallSite TargetLabel TargetLabel
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_unwind>
     | Unwind
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_resume>
-    | Resume TypedValue
+    | Resume (Typed Value)
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_unreachable>
     | Unreachable
       deriving (Eq,Show)
@@ -223,15 +225,40 @@ data Value = VgOl GlobalOrLocalId
            | Vc Const
            deriving (Eq,Ord,Show)
 
-data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
+{-
+data Typed v = Typed (Maybe Type) v deriving (Eq, Ord, Show)
+-}
+
+data Typed v where
+  TypedData :: Type -> v -> Typed v 
+  UntypedNull :: Typed Const
+
+instance Eq v => Eq (Typed v) where
+  (==) (TypedData t1 v1) (TypedData t2 v2) = (t1 == t2) && (v1 == v2)
+  (==) UntypedNull UntypedNull = undefined
+  (==) _ _ = False
+  
+instance Show v => Show (Typed v) where  
+  show (TypedData t1 v1) = "TypedData " ++ (show t1) ++ " " ++ (show v1)
+  show UntypedNull = "UntypedNull"
+  
+instance Ord v => Ord (Typed v) where  
+  compare (TypedData t1 v1) (TypedData t2 v2) = let e1 = compare t1 t2
+                                                in if e1 == EQ then compare v1 v2
+                                                   else e1                                                        
+  compare UntypedNull UntypedNull = undefined
+  compare UntypedNull _ = LT
+-- data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
+{-
 data TypedConst = TypedConst Type Const 
                 | TypedConstNull 
                 deriving (Eq,Ord,Show)
+-}
         
                                                 
-data Aliasee = AtV TypedValue
-             | Ac (Conversion TypedConst)
-             | AgEp (GetElemPtr TypedConst)
+data Aliasee = AtV (Typed Value)
+             | Ac (Conversion (Typed Const))
+             | AgEp (GetElemPtr (Typed Const))
              deriving (Eq,Show)
                         
 data FunctionPrototype = FunctionPrototype
@@ -257,7 +284,7 @@ data Toplevel = ToplevelTriple DqString
               | ToplevelDataLayout DataLayout
               | ToplevelAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage) AddrNaming (Maybe Linkage) Aliasee
               | ToplevelDbgInit String Integer
-              | ToplevelStandaloneMd String TypedValue
+              | ToplevelStandaloneMd String (Typed Value)
               | ToplevelNamedMd MdVar [MdNode]
               | ToplevelDeclare FunctionPrototype
               | ToplevelDefine FunctionPrototype [Block]

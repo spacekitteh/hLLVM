@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -cpp #-}
+{-# LANGUAGE GADTs #-}
 module Llvm.Data.Conversion.AstSimplification (simplify) where
 
 import Llvm.Data.Ast
@@ -209,8 +210,8 @@ rnValue (Vc x) = S.liftM Vc (rnConst x)
 rnValue (Ve x) = S.liftM Ve (rnExpr x)
 
                                          
-rnTypedValue :: TypedValue -> MS TypedValue
-rnTypedValue (TypedValue t v) = S.liftM (TypedValue t) (rnValue v)
+rnTypedValue :: Typed Value -> MS (Typed Value)
+rnTypedValue (TypedData t v) = S.liftM (TypedData t) (rnValue v)
                                          
 
 checkImpCount :: GlobalOrLocalId -> MS ()
@@ -259,8 +260,8 @@ rnMemOp (AtomicRmw b1 ao tp tv b2 mf) =
   (rnTypedPointer tp)
   (rnTypedValue tv)
 
-rnTypedPointer :: TypedPointer -> MS TypedPointer
-rnTypedPointer (TypedPointer t p) = S.liftM (TypedPointer t) (rnPointer p)
+rnTypedPointer :: Typed Pointer -> MS (Typed Pointer)
+rnTypedPointer (TypedData t p) = S.liftM (TypedData t) (rnPointer p)
 
 rnPointer :: Pointer -> MS Pointer
 rnPointer (Pointer v) = S.liftM Pointer (rnValue v)
@@ -412,10 +413,9 @@ rnComplexConstant (Cstruct b l) = S.liftM (Cstruct b) (S.mapM rnTypedConst l)
 rnComplexConstant (Carray l) = S.liftM Carray (S.mapM rnTypedConst l)
 rnComplexConstant (Cvector l) = S.liftM Cvector (S.mapM rnTypedConst l)
                                   
-rnTypedConst :: TypedConst -> MS TypedConst                                  
-rnTypedConst (TypedConst t c) = S.liftM (TypedConst t) (rnConst c)
-rnTypedConst TypedConstNull = return $ TypedConstNull
-
+rnTypedConst :: Typed Const -> MS (Typed Const)                                  
+rnTypedConst (TypedData t c) = S.liftM (TypedData t) (rnConst c)
+rnTypedConst UntypedNull = return UntypedNull
 
 rnPrefix :: Maybe Prefix -> MS (Maybe Prefix)
 rnPrefix (Just (Prefix n)) = S.liftM (Just . Prefix) (rnTypedConst n)
@@ -469,9 +469,9 @@ rnComplexConstant2 (Cstruct b l) = S.liftM (Cstruct b) (S.mapM rnTypedConst2 l)
 rnComplexConstant2 (Carray l) = S.liftM Carray (S.mapM rnTypedConst2 l)
 rnComplexConstant2 (Cvector l) = S.liftM Cvector (S.mapM rnTypedConst2 l)
                                   
-rnTypedConst2 :: TypedConst -> RD TypedConst                                  
-rnTypedConst2 (TypedConst t c) = S.liftM (TypedConst t) (rnConst2 c)
-rnTypedConst2 TypedConstNull = return $ TypedConstNull
+rnTypedConst2 :: Typed Const -> RD (Typed Const)                                  
+rnTypedConst2 (TypedData t c) = S.liftM (TypedData t) (rnConst2 c)
+rnTypedConst2 UntypedNull = return UntypedNull
 
 rnMetaConst2 :: MetaConst -> RD MetaConst
 rnMetaConst2 (MdRef l) = return $ MdRef l -- S.liftM MdRef (rnLocalId2 l)
@@ -511,8 +511,8 @@ rnNumId2 g i = do { r <- R.ask
                   }
 
 
-rnTypedPointer2 :: TypedPointer -> RD TypedPointer
-rnTypedPointer2 (TypedPointer t p) = S.liftM (TypedPointer t) (rnPointer2 p)
+rnTypedPointer2 :: Typed Pointer -> RD (Typed Pointer)
+rnTypedPointer2 (TypedData t p) = S.liftM (TypedData t) (rnPointer2 p)
 
 rnPointer2 :: Pointer -> RD Pointer
 rnPointer2 (Pointer v) = S.liftM Pointer (rnValue2 v)
@@ -560,8 +560,8 @@ rnValue2 (VgOl x) = S.liftM VgOl (rnGlobalOrLocalId2 x)
 rnValue2 (Vc x) = S.liftM Vc (rnConst2 x)
 rnValue2 (Ve x) = S.liftM Ve (rnExpr2 x)
 
-rnTypedValue2 :: TypedValue -> RD TypedValue
-rnTypedValue2 (TypedValue t v) = S.liftM (TypedValue t) (rnValue2 v)
+rnTypedValue2 :: Typed Value -> RD (Typed Value)
+rnTypedValue2 (TypedData t v) = S.liftM (TypedData t) (rnValue2 v)
 
 
 rnGlobalOrLocalId2 :: GlobalOrLocalId -> RD GlobalOrLocalId

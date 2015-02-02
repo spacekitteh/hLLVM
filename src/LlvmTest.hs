@@ -119,7 +119,7 @@ main = do { sel <- cmdArgsRun mode
                                    ; ast <- testParser ix inh
                                    ; let ast1 = S.simplify ast
                                    ; let (m, ir) = testAst2Ir ast1
-                                   ; let ir1 =  C.runContextWithSnR (H.runWithFuel f ((O.optModule1 () N.fixUpPhi ir):: C.CheckingFuelContextMonad () () I.Module)) () ()
+                                   ; let (Right (ir1,_)) = C.runContextWithSnR (H.runWithFuel f ((O.optModule1 () N.fixUpPhi ir):: C.CheckingFuelContextMonad () () String I.Module)) () ()
                                    ; let ast2 = testIr2Ast m ir1
                                    ; writeOutLlvm ast2 outh
                                    ; hClose inh

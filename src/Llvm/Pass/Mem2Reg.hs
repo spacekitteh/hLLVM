@@ -55,7 +55,7 @@ cinstft (ComputingInstWithDbg (ComputingInst lhs rhs) _) f = cinstft' lhs rhs f
 
 cinstft' :: Maybe GlobalOrLocalId -> Rhs -> Mem2RegFact -> Fact O Mem2RegFact
 cinstft' lhs (RmO m) f = memOp lhs m f
-cinstft' lhs (Re (Ev tv)) f = maybe f (\a -> let TypedValue _ v = tv in
+cinstft' lhs (Re (Ev tv)) f = maybe f (\a -> let TypedData _ v = tv in
                                         case a of
                                           GolG _ -> f
                                           GolL s -> Dm.insert (Ref $ localIdToLstring s) (PElem v) f) lhs
@@ -65,11 +65,11 @@ cinstft' _ _ f = f
 
 memOp :: Maybe GlobalOrLocalId -> MemOp -> Mem2RegFact -> Fact O Mem2RegFact
 memOp (Just (GolL lhs)) (Allocate _ _ Nothing _) f = insert (Mem $ localIdToLstring lhs) Top f
-memOp _ (Store _ (TypedValue _ v1) (TypedPointer _ (Pointer (VgOl (GolL ptr)))) _ _) f =
+memOp _ (Store _ (TypedData _ v1) (TypedData _ (Pointer (VgOl (GolL ptr)))) _ _) f =
     let x = Mem $ localIdToLstring ptr
     in if (x `Dm.member` f) then insert x (PElem v1) f
        else f
-memOp _ (StoreAtomic _ _ (TypedValue _ v1) (TypedPointer _ (Pointer (VgOl (GolL ptr)))) _) f =
+memOp _ (StoreAtomic _ _ (TypedData _ v1) (TypedData _ (Pointer (VgOl (GolL ptr)))) _) f =
     let x = Mem $ localIdToLstring ptr
     in if (x `Dm.member` f) then insert x (PElem v1) f
        else f

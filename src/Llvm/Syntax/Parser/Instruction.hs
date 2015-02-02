@@ -22,9 +22,9 @@ pRet = do { reserved "ret"
           ; case t of
               Tprimitive TpVoid -> return (Return [])
               _    -> do { v <- pValue
-                        ; option (Return $ [TypedValue t v])
+                        ; option (Return $ [TypedData t v])
                           (do { ls <- many (try (comma >> pTypedValue))
-                              ; return (Return ((TypedValue t v):ls))
+                              ; return (Return ((TypedData t v):ls))
                               }
                           )
                         }

@@ -62,10 +62,10 @@ deadCi (ComputingInst lhsOpt _) live = case lhsOpt of
 
 deadRmo :: forall m. H.FuelMonad m => MemOp -> H.Fact H.O Live -> m (Maybe (H.Graph Node H.O H.O))
 deadRmo inst live = case inst of
-  (Store _ _ (TypedPointer _ (Pointer v)) _ _) -> case localIdOfValue v of
+  (Store _ _ (TypedData _ (Pointer v)) _ _) -> case localIdOfValue v of
     Just x | not (x `Ds.member` live) -> return $ Just H.emptyGraph
     _ -> return Nothing
-  (StoreAtomic _ _ _ (TypedPointer _ (Pointer v)) _) -> case localIdOfValue v of
+  (StoreAtomic _ _ _ (TypedData _ (Pointer v)) _) -> case localIdOfValue v of
     Just x | not (x `Ds.member` live) -> return $ Just H.emptyGraph
     _ -> return Nothing
   _ -> return Nothing

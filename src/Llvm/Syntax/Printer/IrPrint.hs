@@ -116,7 +116,7 @@ instance IrPrint (IbinExpr Const) where
                         Lshr x _ _ _ -> printIr x
                         Ashr x _ _ _ -> printIr x
                         _ -> empty
-              in text op <+> cs <+> parens (printIr (TypedConst t c1) <> comma <+> printIr (TypedConst t c2))
+              in text op <+> cs <+> parens (printIr (TypedData t c1) <> comma <+> printIr (TypedData t c2))
 
 
 instance IrPrint (FbinExpr Const) where  
@@ -129,48 +129,48 @@ instance IrPrint (FbinExpr Const) where
                     Fdiv x _ _ _ -> printIr x
                     Frem x _ _ _ -> printIr x
                     _ -> empty
-              in text op <+> cs <+> parens (printIr (TypedConst t c1) <> comma <+> printIr (TypedConst t c2))
+              in text op <+> cs <+> parens (printIr (TypedData t c1) <> comma <+> printIr (TypedData t c2))
 
 
 instance IrPrint (BinExpr Const) where  
   printIr (Ie e) = printIr e
   printIr (Fe e) = printIr e
 
-instance IrPrint (Conversion TypedConst) where
+instance IrPrint (Conversion (Typed Const)) where
   printIr (Conversion op tc t) = printIr op <+> parens (printIr tc <+> text "to" <+> printIr t)
 
-instance IrPrint (GetElemPtr TypedConst) where
+instance IrPrint (GetElemPtr (Typed Const)) where
   printIr (GetElemPtr b base indices) = 
     hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
                                        
-instance IrPrint (Select TypedConst) where
+instance IrPrint (Select (Typed Const)) where
   printIr (Select cnd tc1 tc2) = text "select" <+> (parens (commaSepList [printIr cnd, printIr tc1, printIr tc2]))
 
 instance IrPrint (Icmp Const) where
   printIr (Icmp op t c1 c2) = 
-    text "icmp" <+> printIr op <+> parens (commaSepList [printIr (TypedConst t c1), printIr (TypedConst t c2)])
+    text "icmp" <+> printIr op <+> parens (commaSepList [printIr (TypedData t c1), printIr (TypedData t c2)])
   
 instance IrPrint (Fcmp Const) where
   printIr (Fcmp op t c1 c2) = 
-    text "fcmp" <+> printIr op <+> parens (commaSepList [printIr (TypedConst t c1), printIr (TypedConst t c2)])
+    text "fcmp" <+> printIr op <+> parens (commaSepList [printIr (TypedData t c1), printIr (TypedData t c2)])
   
-instance IrPrint (ShuffleVector TypedConst) where
+instance IrPrint (ShuffleVector (Typed Const)) where
   printIr (ShuffleVector tc1 tc2 mask) = 
     text "shufflevector" <+> parens (commaSepList [printIr tc1, printIr tc2, printIr mask])
 
-instance IrPrint (ExtractValue TypedConst) where
+instance IrPrint (ExtractValue (Typed Const)) where
   printIr (ExtractValue tc indices) = 
     hsep [text "extractvalue", parens (commaSepList ((printIr tc:(fmap text indices))))]
                                    
-instance IrPrint (InsertValue TypedConst) where
+instance IrPrint (InsertValue (Typed Const)) where
   printIr (InsertValue vect tc indices) = 
     hsep [text "insertvalue", parens (commaSepList ((printIr vect:printIr tc:(fmap text indices))))]
                                        
-instance IrPrint (ExtractElem TypedConst) where
+instance IrPrint (ExtractElem (Typed Const)) where
   printIr (ExtractElem tc index) = 
     hsep [text "extractelement", parens (printIr tc <> comma <+> printIr index)]
                                 
-instance IrPrint (InsertElem TypedConst) where                                  
+instance IrPrint (InsertElem (Typed Const)) where                                  
   printIr (InsertElem tc1 tc2 index) = 
     hsep [text "insertelement", parens (printIr tc1 <> comma <+> printIr tc2 <> comma <+> printIr index)]
                                           
@@ -207,7 +207,7 @@ instance IrPrint MetaConst where
   printIr (McMv v) = printIr v
   printIr (MdRef s) = text $ show s
                         
-instance IrPrint (GetElemPtr TypedValue) where
+instance IrPrint (GetElemPtr (Typed Value)) where
   printIr (GetElemPtr ib tv tcs) = 
     hsep [text "getelementptr", printIr ib, printIr tv, (commaSepList $ fmap printIr tcs)]
   
@@ -256,10 +256,10 @@ instance IrPrint (Icmp Value) where
 instance IrPrint (Fcmp Value) where  
   printIr (Fcmp op t v1 v2) = hsep [text "fcmp", printIr op, printIr t, printIr v1 <> comma, printIr v2]
   
-instance IrPrint (Conversion TypedValue) where  
+instance IrPrint (Conversion (Typed Value)) where  
   printIr (Conversion op tv t) = hsep [printIr op, printIr tv, text "to", printIr t]
   
-instance IrPrint (Select TypedValue) where  
+instance IrPrint (Select (Typed Value)) where  
   printIr (Select c t f) = text "select" <+> (commaSepList [printIr c, printIr t, printIr f])
 
 instance IrPrint Expr where
@@ -293,15 +293,15 @@ instance IrPrint Value where
   printIr (Ve e) = printIr e
   printIr (Vc c) = printIr c
 
-instance IrPrint TypedValue where
-  printIr (TypedValue t v) = printIr t <+> printIr v
+instance IrPrint (Typed Value) where
+  printIr (TypedData t v) = printIr t <+> printIr v
   
-instance IrPrint TypedConst where  
-  printIr (TypedConst t c) = printIr t <+> printIr c
-  printIr TypedConstNull = text "null"
+instance IrPrint (Typed Const) where  
+  printIr (TypedData t c) = printIr t <+> printIr c
+  printIr UntypedNull = text "null"
 
-instance IrPrint TypedPointer where
-    printIr (TypedPointer t v) = printIr t <+> printIr v
+instance IrPrint (Typed Pointer) where
+    printIr (TypedData t v) = printIr t <+> printIr v
 
 instance IrPrint Pointer where
     printIr (Pointer v) = printIr v
@@ -334,22 +334,22 @@ instance IrPrint PersFn where
     printIr (PersFnConst c) = printIr c
 
 
-instance IrPrint (ExtractElem TypedValue) where
+instance IrPrint (ExtractElem (Typed Value)) where
   printIr (ExtractElem tv1 tv2) = hsep [text "extractelement", printIr tv1 <> comma, printIr tv2]
   
-instance IrPrint (InsertElem TypedValue) where  
+instance IrPrint (InsertElem (Typed Value)) where  
   printIr (InsertElem vect tv idx) = 
     hsep [text "insertelement", printIr vect <> comma, printIr tv <> comma, printIr idx]
   
-instance IrPrint (ShuffleVector TypedValue) where  
+instance IrPrint (ShuffleVector (Typed Value)) where  
   printIr (ShuffleVector vect1 vect2 mask) = 
     hsep [text "shufflevector", printIr vect1 <> comma, printIr vect2 <> comma, printIr mask]
   
-instance IrPrint (ExtractValue TypedValue) where  
+instance IrPrint (ExtractValue (Typed Value)) where  
   printIr (ExtractValue tv idxs) = 
     hsep [text "extractvalue", printIr tv <> comma, (commaSepList $ fmap text idxs)]
                                   
-instance IrPrint (InsertValue TypedValue) where  
+instance IrPrint (InsertValue (Typed Value)) where  
   printIr (InsertValue vect tv idx) = text "insertvalue" <+> hsep (punctuate comma ((printIr vect):(printIr tv):(fmap text idx)))
 
 instance IrPrint Rhs where

@@ -8,8 +8,8 @@ strToApInt s = case ((read s)::[(Integer,String)]) of
   [(n,"")] -> return n
   _ -> throwError (QerrIsNotInteger s)
 
-typedValueToTypedConst :: MonadError Qerror m => TypedValue -> m TypedConst  
-typedValueToTypedConst (TypedValue t (Vc c)) = return $ (TypedConst t c) 
+typedValueToTypedConst :: MonadError Qerror m => Typed Value -> m (Typed Const)  
+typedValueToTypedConst (TypedData t (Vc c)) = return $ (TypedData t c) 
 typedValueToTypedConst x = throwError (QerrIsNotConst $ show x)
 
 
@@ -22,8 +22,8 @@ castToStructType (Tstruct p ts) = return (p, ts)
 castToStructType x = throwError (QerrWithInfo $ (show x) ++ " is not a struct type")
 
 
-getUniqueInteger :: MonadError Qerror m => TypedConst -> m Integer
-getUniqueInteger (TypedConst _ (Ccp (CpInt s)))  = strToApInt s
+getUniqueInteger :: MonadError Qerror m => Typed Const -> m Integer
+getUniqueInteger (TypedData _ (Ccp (CpInt s)))  = strToApInt s
 getUniqueInteger x = throwError (QerrIsNotInteger $ show x)
 
 

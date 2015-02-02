@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 module Llvm.Syntax.Parser.Const where
 import Llvm.Data.Ast
 import Llvm.Syntax.Parser.Basic
@@ -22,18 +23,18 @@ pConst = choice [ liftM Ccp pSimpleConstant
                 , liftM CmC pMetaConst
                 ]
          
-pTypedConst :: P TypedConst
+pTypedConst :: P (Typed Const)
 pTypedConst = do { t <- pType
                  ; case t of 
-                   Tprimitive TpNull -> return TypedConstNull
-                   _ -> liftM (TypedConst t) pConst 
+                   Tprimitive TpNull -> return UntypedNull
+                   _ -> liftM (TypedData t) pConst 
                  }
 
-pTypedConst1 :: P TypedConst
+pTypedConst1 :: P (Typed Const)
 pTypedConst1 = do { t <- pType
                   ; case t of 
-                    Tprimitive TpNull -> return TypedConstNull
-                    _ -> (choice [pConst, liftM CmL pLocalId] >>= return . (TypedConst t))
+                    Tprimitive TpNull -> return UntypedNull
+                    _ -> (choice [pConst, liftM CmL pLocalId] >>= return . (TypedData t))
                   }
 
 
@@ -132,16 +133,16 @@ pConstBinaryOperation :: P (BinExpr Const)
 pConstBinaryOperation = choice [liftM Ie pConstIbinaryOperation, liftM Fe pConstFbinaryOperation]
 
               
-getType :: TypedConst -> TypedConst -> Type
-getType (TypedConst t1 _) (TypedConst t2 _) = if t1 == t2 then t1 
-                                              else error "t1 != t2"
-getType (TypedConstNull) (TypedConst t2 _) = t2
-getType (TypedConst t1 _) TypedConstNull = t1
-getType TypedConstNull TypedConstNull = error "unexpected case"
+getType :: (Typed Const) -> (Typed Const) -> Type
+getType (TypedData t1 _) (TypedData t2 _) = if t1 == t2 then t1 
+                                            else error "t1 != t2"
+getType UntypedNull (TypedData t2 _) = t2
+getType (TypedData t1 _) UntypedNull = t1
+getType UntypedNull UntypedNull = error "unexpected case"
 
-getConst :: TypedConst -> Const
-getConst TypedConstNull = Ccp CpNull
-getConst (TypedConst _ c) = c
+getConst :: Typed Const -> Const
+getConst UntypedNull = Ccp CpNull
+getConst (TypedData _ c) = c
               
 pConstIcmp :: P (Icmp Const)
 pConstIcmp = do { reserved "icmp"
@@ -159,29 +160,29 @@ pConstFcmp = do { reserved "fcmp"
                 
                 
 
-pConstExtractElement :: P (ExtractElem TypedConst)
+pConstExtractElement :: P (ExtractElem (Typed Const))
 pConstExtractElement = reserved "extractelement" >> parens (pTuple pTypedConst) >>= return . (uncurry ExtractElem)
                   
-pConstInsertElement :: P (InsertElem TypedConst)
+pConstInsertElement :: P (InsertElem (Typed Const))
 pConstInsertElement = do { reserved "insertelement"
                          ; (tc1, tc2, idx) <- parens (pTriple3 pTypedConst pTypedConst pConst)
-                         ; return $ InsertElem tc1 tc2 (TypedConst (Tprimitive (TpI 32)) idx)
+                         ; return $ InsertElem tc1 tc2 (TypedData (Tprimitive (TpI 32)) idx)
                          }
 
-pConstShuffleVector :: P (ShuffleVector TypedConst)
+pConstShuffleVector :: P (ShuffleVector (Typed Const))
 pConstShuffleVector = reserved "shufflevector" >> parens (pTriple pTypedConst) >>= return . (uncurry3 ShuffleVector)
                      
-pConstExtractValue :: P (ExtractValue TypedConst)
+pConstExtractValue :: P (ExtractValue (Typed Const))
 pConstExtractValue = reserved "extractvalue" >> parens (pTuple2 pTypedConst (sepBy intStrToken comma)) >>= return . (uncurry ExtractValue)
                         
-pConstInsertValue :: P (InsertValue TypedConst)
+pConstInsertValue :: P (InsertValue (Typed Const))
 pConstInsertValue = reserved "insertvalue" >> parens (pTriple3 pTypedConst pTypedConst (sepBy intStrToken comma)) >>= return . (uncurry3 InsertValue)
                         
                         
-pConstSelect :: P (Select TypedConst)
+pConstSelect :: P (Select (Typed Const))
 pConstSelect = reserved "select" >> parens (pTriple pTypedConst) >>= return . (uncurry3 Select)
                   
-pConstConversion :: P (Conversion TypedConst)
+pConstConversion :: P (Conversion (Typed Const))
 pConstConversion = do { op <- pConvertOp
                    ; ignore (chartok '(')
                    ; tc <- pTypedConst
@@ -192,7 +193,7 @@ pConstConversion = do { op <- pConvertOp
                    }
                    
                    
-pConstGetElemPtr :: P (GetElemPtr TypedConst)
+pConstGetElemPtr :: P (GetElemPtr (Typed Const))
 pConstGetElemPtr = do { reserved "getelementptr"
                       ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
                       ; ignore (chartok '(')

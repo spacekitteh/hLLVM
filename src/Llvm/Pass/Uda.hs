@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -cpp #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE GADTs #-}
 {-
   This module compute the use, def, and Addr of CoreIr
 -}
@@ -57,11 +58,11 @@ uDofMemOp (CmpXchg _ _ ptr v1 v2 _ _ _) = (uDofTypedPointer ptr)
 uDofMemOp (AtomicRmw _ _ ptr v1 _ _) = (uDofTypedPointer ptr) `mappend` (uDofTypedValue v1)
 
 
-uDofTypedValue :: TypedValue -> UDA
-uDofTypedValue (TypedValue _ v) = uDofValue v
+uDofTypedValue :: Typed Value -> UDA
+uDofTypedValue (TypedData _ v) = uDofValue v
 
-uDofTypedPointer :: TypedPointer -> UDA
-uDofTypedPointer (TypedPointer _ ptr) = uDofPointer ptr
+uDofTypedPointer :: Typed Pointer -> UDA
+uDofTypedPointer (TypedData _ ptr) = uDofPointer ptr
 
 uDofPointer :: Pointer -> UDA
 uDofPointer (Pointer g) = uDofValue g
@@ -136,9 +137,9 @@ uDofActualParam :: ActualParam -> UDA
 uDofActualParam (ActualParam _ _ _ v _) = uDofValue v
 
 
-uDofTypedConst :: TypedConst -> UDA
-uDofTypedConst (TypedConst _ v) = uDofConst v
-uDofTypedConst TypedConstNull = mempty
+uDofTypedConst :: Typed Const -> UDA
+uDofTypedConst (TypedData _ v) = uDofConst v
+uDofTypedConst UntypedNull = mempty
   
 uDofConst :: Const -> UDA
 uDofConst (Ccp s) = uDofSimpleConstant s

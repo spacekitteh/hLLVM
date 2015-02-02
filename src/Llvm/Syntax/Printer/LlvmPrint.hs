@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 module Llvm.Syntax.Printer.LlvmPrint
        (module Llvm.Syntax.Printer.LlvmPrint
        ,module Llvm.Syntax.Printer.Common
@@ -64,48 +65,48 @@ instance AsmPrint (BinExpr Value) where
 
 instance AsmPrint (IbinExpr Const) where
   toLlvm (IbinExpr op cs t c1 c2) = 
-    toLlvm op <+> (hsep $ fmap toLlvm cs) <+> parens (toLlvm (TypedConst t c1) <> comma <+> toLlvm (TypedConst t c2))
+    toLlvm op <+> (hsep $ fmap toLlvm cs) <+> parens (toLlvm (TypedData t c1) <> comma <+> toLlvm (TypedData t c2))
   
 instance AsmPrint (FbinExpr Const) where
   toLlvm (FbinExpr op cs t c1 c2) = 
-    toLlvm op <+> toLlvm cs <+> parens (toLlvm (TypedConst t c1) <> comma <+> toLlvm (TypedConst t c2))
+    toLlvm op <+> toLlvm cs <+> parens (toLlvm (TypedData t c1) <> comma <+> toLlvm (TypedData t c2))
 
-instance AsmPrint (Conversion TypedConst) where
+instance AsmPrint (Conversion (Typed Const)) where
   toLlvm (Conversion op tc t) = toLlvm op <+> parens (toLlvm tc <+> text "to" <+> toLlvm t)
 
-instance AsmPrint (GetElemPtr TypedConst) where
+instance AsmPrint (GetElemPtr (Typed Const)) where
   toLlvm (GetElemPtr b base indices) = 
     text "getelementptr" <+> toLlvm b <+> parens (commaSepList ((toLlvm base):fmap toLlvm indices))
 
-instance AsmPrint (Select TypedConst) where
+instance AsmPrint (Select (Typed Const)) where
   toLlvm (Select cnd tc1 tc2) = 
     text "select" <+> parens (commaSepList [toLlvm cnd, toLlvm tc1, toLlvm tc2])
 
 instance AsmPrint (Icmp Const) where
   toLlvm (Icmp op t c1 c2) = 
-    text "icmp" <+> toLlvm op <+> parens (toLlvm (TypedConst t c1) <> comma <+> toLlvm (TypedConst t c2))
+    text "icmp" <+> toLlvm op <+> parens (toLlvm (TypedData t c1) <> comma <+> toLlvm (TypedData t c2))
 
 instance AsmPrint (Fcmp Const) where
   toLlvm (Fcmp op t c1 c2) = 
-    text "fcmp" <+> toLlvm op <+> parens (toLlvm (TypedConst t c1) <> comma <+> toLlvm (TypedConst t c2))
+    text "fcmp" <+> toLlvm op <+> parens (toLlvm (TypedData t c1) <> comma <+> toLlvm (TypedData t c2))
 
-instance AsmPrint (ShuffleVector TypedConst) where
+instance AsmPrint (ShuffleVector (Typed Const)) where
   toLlvm (ShuffleVector tc1 tc2 mask) = 
     text "shufflevector" <+> parens (commaSepList [toLlvm tc1, toLlvm tc2, toLlvm mask])
 
-instance AsmPrint (ExtractValue TypedConst) where
+instance AsmPrint (ExtractValue (Typed Const)) where
   toLlvm (ExtractValue tc indices) = 
     text "extractvalue" <+> parens (commaSepList ((toLlvm tc):fmap text indices))
                                    
-instance AsmPrint (InsertValue TypedConst) where
+instance AsmPrint (InsertValue (Typed Const)) where
   toLlvm (InsertValue vect tc indices) = 
     text "insertvalue" <+> parens (commaSepList ((toLlvm vect):(toLlvm tc):fmap text indices)) 
                                        
-instance AsmPrint (ExtractElem TypedConst) where
+instance AsmPrint (ExtractElem (Typed Const)) where
   toLlvm (ExtractElem tc index) = 
     text "extractelement" <+> parens (toLlvm tc <> comma <+> toLlvm index)
-                                  
-instance AsmPrint (InsertElem TypedConst) where                                  
+
+instance AsmPrint (InsertElem (Typed Const)) where                                  
   toLlvm (InsertElem tc1 tc2 index) = 
     text "insertelement" <+> parens (commaSepList [toLlvm tc1, toLlvm tc2, toLlvm index])
 
@@ -147,7 +148,7 @@ instance AsmPrint MetaConst where
   toLlvm (McMv v) = toLlvm v
   toLlvm (MdRef s) = text $ show s
                         
-instance AsmPrint (GetElemPtr TypedValue) where
+instance AsmPrint (GetElemPtr (Typed Value)) where
   toLlvm (GetElemPtr ib tv tcs) = 
     text "getelementptr" <+> toLlvm ib <+> (commaSepList ((toLlvm tv):fmap toLlvm tcs))
   
@@ -163,10 +164,10 @@ instance AsmPrint (Icmp Value) where
 instance AsmPrint (Fcmp Value) where  
   toLlvm (Fcmp op t v1 v2) = hsep [text "fcmp", toLlvm op, toLlvm t, toLlvm v1 <> comma, toLlvm v2]
   
-instance AsmPrint (Conversion TypedValue) where
+instance AsmPrint (Conversion (Typed Value)) where
   toLlvm (Conversion op tv t) = hsep [toLlvm op, toLlvm tv, text "to", toLlvm t]
   
-instance AsmPrint (Select TypedValue) where
+instance AsmPrint (Select (Typed Value)) where
   toLlvm (Select c t f) = hsep [text "select", toLlvm c <> comma, toLlvm t <> comma, toLlvm f]
 
 instance AsmPrint Expr where
@@ -198,18 +199,18 @@ instance AsmPrint Value where
   toLlvm (Ve e) = toLlvm e
   toLlvm (Vc c) = toLlvm c
 
-instance AsmPrint TypedValue where
-  toLlvm (TypedValue t v) = toLlvm t <+> toLlvm v
+instance AsmPrint (Typed Value) where
+  toLlvm (TypedData t v) = toLlvm t <+> toLlvm v
 
 instance AsmPrint Pointer where
   toLlvm (Pointer i) = toLlvm i
 
-instance AsmPrint TypedPointer where
-  toLlvm (TypedPointer t v) = toLlvm t <+> toLlvm v
+instance AsmPrint (Typed Pointer) where
+  toLlvm (TypedData t v) = toLlvm t <+> toLlvm v
   
-instance AsmPrint TypedConst where  
-  toLlvm (TypedConst t c) = toLlvm t <+> toLlvm c
-  toLlvm TypedConstNull = text "null"
+instance AsmPrint (Typed Const) where  
+  toLlvm (TypedData t c) = toLlvm t <+> toLlvm c
+  toLlvm UntypedNull = text "null"
 
 instance AsmPrint FunName where
   toLlvm (FunNameGlobal s) = toLlvm s
@@ -238,22 +239,22 @@ instance AsmPrint PersFn where
     toLlvm PersFnNull = text "null"
     toLlvm (PersFnConst c) = toLlvm c
 
-instance AsmPrint (ExtractElem TypedValue) where
+instance AsmPrint (ExtractElem (Typed Value)) where
   toLlvm (ExtractElem tv1 tv2) = 
     text "extractelement" <+> (commaSepList [toLlvm tv1, toLlvm tv2])
   
-instance AsmPrint (InsertElem TypedValue) where  
+instance AsmPrint (InsertElem (Typed Value)) where  
   toLlvm (InsertElem vect tv idx) = 
     text "insertelement" <+> (commaSepList [toLlvm vect, toLlvm tv, toLlvm idx])
   
-instance AsmPrint (ShuffleVector TypedValue) where  
+instance AsmPrint (ShuffleVector (Typed Value)) where  
   toLlvm (ShuffleVector vect1 vect2 mask) = 
     text "shufflevector" <+> (commaSepList [toLlvm vect1, toLlvm vect2, toLlvm mask])
   
-instance AsmPrint (ExtractValue TypedValue) where  
+instance AsmPrint (ExtractValue (Typed Value)) where  
   toLlvm (ExtractValue tv idxs) = text "extractvalue" <+> (commaSepList ((toLlvm tv):(fmap text idxs)))
   
-instance AsmPrint (InsertValue TypedValue) where  
+instance AsmPrint (InsertValue (Typed Value)) where  
   toLlvm (InsertValue vect tv idxs) = 
     text "insertvalue" <+> (commaSepList ((toLlvm vect):(toLlvm tv):(fmap text idxs)))
 
