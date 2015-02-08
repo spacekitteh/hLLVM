@@ -340,17 +340,7 @@ instance Ord v => Ord (Typed v) where
   compare UntypedNull UntypedNull = undefined
   compare UntypedNull _ = LT
 
-{-
-data Typed v = Typed Type v deriving (Eq, Ord, Show)
-data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
-data TypedConst = TypedConst Type Const
-                | TypedConstNull deriving (Eq,Ord,Show)
--}
-
-
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
--- data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
-
 
 data Aliasee = AtV (Typed Value) -- u1
              | Ac (Conversion (Typed Const))

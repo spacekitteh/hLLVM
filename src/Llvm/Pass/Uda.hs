@@ -252,6 +252,6 @@ d1ofTerminatorInstWithDbg = d1 . uDofTerminatorInstWithDbg
 
 localIdSetOf :: Ds.Set GlobalOrLocalId -> Ds.Set LocalId
 localIdSetOf s = Ds.fold (\e p -> case e of 
-                                   GolG _ -> p
-                                   GolL x -> Ds.insert x p
+                             GolG _ -> p
+                             GolL x -> Ds.insert x p
                          ) Ds.empty s

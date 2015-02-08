@@ -28,3 +28,6 @@ mkModule mName = modify (\ms -> ms { moduleName = Just mName })
 
 mkBase :: Mc ()
 mkBase = undefined
+
+emitModule :: Mc Module
+emitModule = undefined

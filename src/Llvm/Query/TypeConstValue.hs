@@ -319,15 +319,7 @@ assertCast :: MonadError Qerror m => ConvertOp -> Type -> Type -> m ()
 assertCast op src dest = if castIsValid op src dest then return ()
                          else throwError (QerrWithInfo $ "Invalid cast:" ++ show op ++ " " ++ show src ++ " to " ++ show dest)
 
-{- Const -}
-getGetElementPtr :: Typed Const -> [Typed Const] -> IsOrIsNot InBounds -> Const
-getGetElementPtr c indices isB = CgEp (GetElemPtr isB c indices)
 
-getBitCast :: MonadError Qerror m => Typed Const -> Type -> m (Typed Const)
-getBitCast x@(TypedData t c) dt = if dt == t then return x
-                                  else do { _ <- assertCast Bitcast t dt 
-                                          ; return (TypedData dt (Cconv $ Conversion Bitcast x dt))
-                                          }
 
 getSplatValue :: Typed Const -> Maybe (Typed Const)
 getSplatValue (TypedData _ (Cca (Cvector l))) = if all (\x -> x == head l) l then Just $ head l
@@ -387,7 +379,15 @@ getUndefValue t = case t of
   TpLabel -> throwError $ QerrWithInfo $ show t ++ " has no undef const value"
   _ -> return CpUndef 
 
-createPointerCast :: MonadError Qerror m => Typed Value -> Type -> m (Typed Value)
-createPointerCast tv@(TypedData ts v) td = do { assertCast PtrToInt ts td
-                                              ; return (TypedData td (Ve $ Ec $ Conversion PtrToInt tv td))
-                                              }
+getPointerCast :: MonadError Qerror m => Typed v -> Type -> m (Conversion (Typed v))
+getPointerCast tv@(TypedData ts v) td = do { assertCast PtrToInt ts td
+                                           ; return (Conversion PtrToInt tv td)
+                                           }
+                                        
+getBitCast :: MonadError Qerror m => Typed v -> Type -> m (Conversion (Typed v))
+getBitCast x@(TypedData t c) dt = do { _ <- assertCast Bitcast t dt 
+                                     ; return (Conversion Bitcast x dt)
+                                     }
+
+getGetElementPtr :: Typed v -> [Typed v] -> IsOrIsNot InBounds -> GetElemPtr (Typed v)
+getGetElementPtr c indices isB = GetElemPtr isB c indices

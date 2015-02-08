@@ -38,7 +38,7 @@ data IbinOp = Add | Sub | Mul | Udiv
 ibinOpMap :: M.Map IbinOp String
 ibinOpMap = M.fromList [(Add, "add"), (Sub, "sub"), (Mul, "mul"), (Udiv, "udiv"), (Sdiv, "sdiv")
                        ,(Urem, "urem"), (Srem, "srem")
-                       , (Shl, "shl"), (Lshr, "lshr"), (Ashr, "ashr")
+                       ,(Shl, "shl"), (Lshr, "lshr"), (Ashr, "ashr")
                        ,(And, "and"), (Or, "or"), (Xor, "xor") 
                        ]
 
@@ -141,7 +141,6 @@ data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe A
 
 
 data Pointer = Pointer Value deriving (Eq, Ord, Show)
--- data TypedPointer = TypedPointer Type Pointer deriving (Eq, Ord, Show)
                          
 data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameString String
@@ -219,16 +218,11 @@ data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
 data ActualParam = ActualParam Type [ParamAttr] (Maybe Alignment) Value [ParamAttr]
                  deriving (Eq,Ord,Show)
                           
-                                            
 data Value = VgOl GlobalOrLocalId
            | Ve Expr
            | Vc Const
            deriving (Eq,Ord,Show)
-
-{-
-data Typed v = Typed (Maybe Type) v deriving (Eq, Ord, Show)
--}
-
+  
 data Typed v where
   TypedData :: Type -> v -> Typed v 
   UntypedNull :: Typed Const
@@ -248,12 +242,6 @@ instance Ord v => Ord (Typed v) where
                                                    else e1                                                        
   compare UntypedNull UntypedNull = undefined
   compare UntypedNull _ = LT
--- data TypedValue = TypedValue Type Value deriving (Eq,Ord,Show)
-{-
-data TypedConst = TypedConst Type Const 
-                | TypedConstNull 
-                deriving (Eq,Ord,Show)
--}
         
                                                 
 data Aliasee = AtV (Typed Value)
