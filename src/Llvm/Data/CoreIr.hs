@@ -692,50 +692,10 @@ data CInst where {
   
   I_llvm_dbg_declare :: [ActualParam] -> CInst;
   I_llvm_dbg_value :: [ActualParam] -> CInst;
-
-  {- dts intrinsic metadata inspection function calls -}
-  {-
-  I_dbaseOf :: { pointer :: T (Type ScalarB P) Value
-               , result :: LocalId 
-               } -> CInst;
-
-  I_dsizeOf :: { pointer :: T (Type ScalarB P) Value
-               , result :: LocalId 
-               } -> CInst;
-
-  I_inspect_sizeOf_formal_param_msect :: { result :: LocalId } -> CInst;
-  I_inspect_startOf_formal_param_msect1 :: { result :: LocalId } -> CInst;
-  I_inspect_startOf_formal_param_msect2 :: { result :: LocalId } -> CInst;
-  I_inspect_valueOf_va_list_dsect :: { pointer :: T (Type ScalarB P) Value
-                                     , result :: LocalId 
-                                     } -> CInst;
-  I_inspect_va_start_offset :: { result :: LocalId } -> CInst;
-  I_inspect_va_start_msize :: { result :: LocalId } -> CInst;
-  I_inspect_va_start_mbase :: { result :: LocalId } -> CInst;
-  -}
   } deriving (Eq, Ord, Show)
 
 data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)
-
-{-
-{- should be moved to a different place -}
-data FactInst = Fact_SfatRvalueInst Value SfatRvalue
-              | Fact_GfatLvalueInst LocalId GfatLvalue
-              deriving (Eq, Ord, Show)
-
--- A Rvalue is SfatRvalue if the Rvalue is an address in the dsect of [size|dsect|msect*]
-data SfatRvalue = SfatRvalue { sfrv_rvalueAsInt :: Value
-                             , sfrv_dsectBase :: Value
-                             , sfrv_dsectSize :: Value
-                             , sfrv_mrvalue :: Value
-                             } deriving (Eq, Ord, Show)
-
-{- Generic Fat Lvalue -}
-data GfatLvalue = GfatLvalue { gflv_lvalue_for_dsectBase :: LocalId
-                             , gflv_lvalue_for_dsectSize :: LocalId
-                             } deriving (Eq, Ord, Show)
--}
 
 {- -}
 data CInstWithDbg = CInstWithDbg CInst [Dbg] deriving (Eq, Ord, Show)
