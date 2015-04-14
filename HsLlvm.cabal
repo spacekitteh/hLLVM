@@ -1,5 +1,5 @@
-name:  HsLlvmTransMeta
-version: 1.0.0.0
+name:  HsLlvm
+version: 0.5.0.0
 description:  Haskell implementation of LLVM
 license: BSD3
 license-file: LICENSE
@@ -22,7 +22,6 @@ library
                      filepath,
                      directory,
                      hooplext == 3.10.0.2,
-                     -- hooplext == 3.8.7.4,
                      parsec >=3.1.2 && <3.2,
                      cmdargs >=0.10 && <0.11,
                      transformers >= 0.3.0.0,
@@ -73,7 +72,6 @@ library
                      Llvm.Pass.Rewriter,
                      Llvm.Pass.Uda,
                      ParserTester
---  extra-libraries:   stdc++
   ghc-options:       -fhpc
   other-extensions:        CPP
   hs-source-dirs:    src
@@ -92,11 +90,9 @@ executable llvm-test
                      directory,
                      template-haskell >= 2.9.0.0,
                      hooplext == 3.10.0.2,
-                     -- hooplext == 3.8.7.4,
                      parsec >=3.1.2 && <3.2,
                      cmdargs >=0.10 && <0.11,
                      transformers >= 0.3.0.0,
                      pretty >= 1.1.1.1,
                      data-dword == 0.3
   ghc-options:       -fhpc -dynamic
---  extra-libraries:   stdc++
