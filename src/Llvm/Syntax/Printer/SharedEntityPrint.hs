@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE GADTs #-}
 module Llvm.Syntax.Printer.SharedEntityPrint where
-import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++),error, show)
+import Prelude (($),fmap, Maybe(..),maybe, (.),null,(++),error, show,fromIntegral,String,Integral)
 
 import Llvm.Syntax.Printer.Common 
 import Llvm.Data.Shared
@@ -15,14 +16,14 @@ instance Print Endianness where
   print BigEndian = char 'E'
   
 instance Print LayoutAddrSpace where  
-  print (LayoutAddrSpace n) = integer n
+  print (LayoutAddrSpace n) = integral n
   print (LayoutAddrSpaceUnspecified) = empty
   
 instance Print SizeInBit where  
-  print (SizeInBit n) = integer n
+  print (SizeInBit n) = integral n
   
 instance Print AlignInBit where  
-  print (AlignInBit n) = integer n
+  print (AlignInBit n) = integral n
   
 instance Print StackAlign where  
   print (StackAlign n) = print n
@@ -41,15 +42,17 @@ instance Print AbiAlign where
 instance Print PrefAlign where
   print (PrefAlign n) = print n
   
-  
+
+integral :: Integral a => a -> Doc
+integral = integer . fromIntegral
 
 instance Print LayoutSpec where  
   print ls = case ls of
       DlE x -> print x
       DlS x -> char 'S' <> (print x)
-      DlLittleS s1 s2 s3 -> char 's' <> (maybe empty integer s1) 
-                            <> sepMaybe integer colonSep s2
-                            <> sepMaybe integer colonSep s3
+      DlLittleS s1 s2 s3 -> char 's' <> (maybe empty integral s1) 
+                            <> sepMaybe integral colonSep s2
+                            <> sepMaybe integral colonSep s3
       DlP as s a n -> char 'p' <> (print as) 
                       <> colonSep (print s) 
                       <> colonSep (print a) 
@@ -80,8 +83,10 @@ instance Print IcmpOp where
 instance Print FcmpOp where
   print x = text $ getValOrImplError (fcmpOpMap, "fcmpOpMap") x
 
+{-
 instance Print ConvertOp where
   print x = text $ getValOrImplError (convertOpMap, "convertOpMap") x
+-}
 
 instance Print Linkage where
   print LinkagePrivate = text "private"
@@ -151,14 +156,14 @@ instance Print ParamAttr where
   print PaNest = text "nest"
   print PaReturned = text "returned"
   print PaNonNull = text "nonnull"
-  print (PaDereferenceable n) = (text "dereferenceable") <> (parens $ integer n)
+  print (PaDereferenceable n) = (text "dereferenceable") <> (parens $ integral n)
   print PaReadOnly = text "readonly"
   print PaReadNone = text "readnone"
-  print (PaAlign n) = text "align" <+> integer n
+  print (PaAlign n) = text "align" <+> integral n
 
 
 instance Print FunAttr where
-  print (FaAlignStack n) = (text "alignstack") <> (parens $ integer n)
+  print (FaAlignStack n) = (text "alignstack") <> (parens $ integral n)
   print FaAlwaysInline = text "alwaysinline"
   print FaBuiltin = text "builtin"
   print FaCold = text "cold"
@@ -187,8 +192,8 @@ instance Print FunAttr where
   print FaSspStrong = text "sspstrong"
   print FaUwTable = text "uwtable"
   print (FaPair s1 s2) = print s1 <> (maybe empty ((equals<>) . print) s2)
-  print (FaAlign n) = text "align" <+> integer n
-  print (FaGroup n) = char '#'<> (integer n)
+  print (FaAlign n) = text "align" <+> integral n
+  print (FaGroup n) = char '#'<> (integral n)
   
 instance Print SelectionKind where  
   print x = text $ getValOrImplError (selectionKindMap, "selectionKindMap") x
@@ -204,7 +209,7 @@ instance Print Section where
   print (Section s) = text "section" <+> (print s)
 
 instance Print Alignment where
-    print (Alignment s) = text "align" <+>  (integer s)
+    print (Alignment s) = text "align" <+>  (integral s)
 
 instance Print Gc where
     print (Gc s) = text "gc" <+> (print s)
@@ -213,37 +218,19 @@ instance Print GlobalType where
     print (GlobalType s) = text s
 
 
-instance Print TypePrimitive where
-  print a = case a of 
-    TpI i -> text "i" <> integer i
-    TpF f -> text "f" <> integer f
-    TpV v -> text "v" <> integer v
-    TpVoid -> text "void"
-    TpHalf -> text "half"
-    TpFloat -> text "float"
-    TpDouble -> text "double"
-    TpFp128 -> text "fp128"
-    TpX86Fp80 -> text "x86_fp80"
-    TpPpcFp128 -> text "ppc_fp128"
-    TpX86Mmx -> text "x86_mmx"
-    TpLabel -> text "label"                             
-
-instance Print Lstring where
-  print (Lstring s) = text s
-  
 instance Print GlobalOrLocalId where
   print (GolG g) = print g
   print (GolL l) = print l
                     
 instance Print LocalId where
-  print (LocalIdNum s) = char '%'<>(integer s)
-  print (LocalIdAlphaNum s) = char '%' <> print s
-  print (LocalIdDqString s) = char '%' <> (doubleQuotes $ print s)
+  print (LocalIdNum s) = char '%'<>(integral s)
+  print (LocalIdAlphaNum s) = char '%' <> text s
+  print (LocalIdDqString s) = char '%' <> (doubleQuotes $ text s)
                       
 instance Print GlobalId where
-  print (GlobalIdNum s) = char '@'<>(integer s)
-  print (GlobalIdAlphaNum s) = char '@'<>print s
-  print (GlobalIdDqString s) = char '@'<> (doubleQuotes $ print s)
+  print (GlobalIdNum s) = char '@'<>(integral s)
+  print (GlobalIdAlphaNum s) = char '@'<> text s
+  print (GlobalIdDqString s) = char '@'<> (doubleQuotes $ text s)
 
 instance Print SimpleConstant where
   print x = case x of
@@ -255,55 +242,36 @@ instance Print SimpleConstant where
     CpUndef -> text "undef"
     CpTrue -> text "true"
     CpFalse -> text "false"
-    CpZero -> text "zeroinitializer"
+    CpZeroInitializer -> text "zeroinitializer"
     CpGlobalAddr g -> print g
     CpStr s -> char 'c'<> (doubleQuotes $ text s)
+    CpBconst bc -> print bc
                           
+instance Print BinaryConstant where
+  print x = case x of
+    BconstUint8 v -> integral v
+    BconstUint16 v -> integral v
+    BconstUint32 v -> integral v
+    BconstUint64 v -> integral v
+    BconstUint96 v -> integral v
+    BconstUint128 v -> integral v
+    BconstInt8 v -> integral v
+    BconstInt16 v -> integral v
+    BconstInt32 v -> integral v
+    BconstInt64 v -> integral v
+    BconstInt96 v -> integral v
+    BconstInt128 v -> integral v
+
 instance Print AtomicMemoryOrdering where
   print x = text $ getValOrImplError (atomicMemoryOrderingMap, "atomicMemoryOrderingMap") x
 
 instance Print AtomicOp where
   print x = text $ getValOrImplError (atomicOpMap, "atomicOpMap") x
     
-instance Print AddrSpace where
-  print (AddrSpace n) = text "addrspace" <+> (parens $ integer n)
-  print AddrSpaceUnspecified = empty
-    
-instance Print Type where
-  print a = case a of 
-    Tprimitive tp -> print tp
-    Tmetadata -> text "metadata"
-    Topaque -> text "opaque"
-    Tname s -> char '%' <> print s
-    TquoteName s -> char '%'<> (doubleQuotes $ print s)
-    Tno i -> char '%'<> integer i
-    TupRef i -> char '\\'<> integer i
-    Tarray i t -> brackets (integer i <+> char 'x' <+> print t)
-    Tvector i t -> char '<' <> integer i <+> char 'x' <+> print t <> char '>'
-    Tstruct b ts -> let (start, end) = case b of 
-                          Packed -> (char '<', char '>')
-                          Unpacked -> (empty, empty)
-                    in start <+> braces (hsep $ punctuate comma $ fmap print ts) <+> end
-  
-    Tpointer t addr -> print t <+> print addr <+> text "*"
-    Tfunction t fp atts -> print t <+> print fp <+> (hsep $ punctuate comma $ fmap print atts)
-    
 instance Print Fparam where
   print (FimplicitParam) = text "; implicit param\n"
   print (FexplicitParam x) = print x
   
-instance Print FormalParam where
-  print (FormalParam t att1 align id att2) =
-    (print t) <+> (hsep $ fmap print att1) <> (maybe empty ((comma <+>) . print) align)
-    <+> (print id) <+> (hsep $ fmap print att2)
-
-instance Print FormalParamList where
-  print (FormalParamList params var atts) =
-    parens (commaSepNonEmpty ((fmap print params) ++ [maybe empty print var])) <+> (hsep $ fmap print atts)
-
-instance Print TypeParamList where
-  print (TypeParamList params b) = parens (commaSepNonEmpty ((fmap print params) ++ [maybe empty print b]))
-    
 instance Print InAllocaAttr where
   print s = case s of
     InAllocaAttr -> text "inalloca"
@@ -327,13 +295,13 @@ instance Print a => Print (IsOrIsNot a) where
     IsNot _ -> empty
 
 instance Print Nontemporal where    
-  print (Nontemporal i) = char '!'<>(text "nontemporal") <+> char '!'<>(integer i)
+  print (Nontemporal i) = char '!'<>(text "nontemporal") <+> char '!'<>(integral i)
   
 instance Print InvariantLoad where
-  print (InvariantLoad i) = char '!'<>(text "invariant.load") <+> char '!'<>(integer i)
+  print (InvariantLoad i) = char '!'<>(text "invariant.load") <+> char '!'<>(integral i)
   
 instance Print Nonnull where
-  print (Nonnull i) = char '!'<>(text "nonnull") <+> char '!'<>(integer i)
+  print (Nonnull i) = char '!'<>(text "nonnull") <+> char '!'<>(integral i)
   
   
 instance Print TailCall where
@@ -343,9 +311,9 @@ instance Print TailCall where
     TcMustTailCall -> text "musttail"
     
 instance Print DollarId where
-  print (DollarIdNum n) = char '$' <> (integer n)
-  print (DollarIdAlphaNum s) = char '$' <> (print s)
-  print (DollarIdDqString s) = char '$' <> (doubleQuotes $ print s)
+  print (DollarIdNum n) = char '$' <> (integral n)
+  print (DollarIdAlphaNum s) = char '$' <> (text s)
+  print (DollarIdDqString s) = char '$' <> (doubleQuotes $ text s)
                                     
                         
 instance Print Comdat where
@@ -378,3 +346,51 @@ instance Print VarArgParam where
   
 instance Print Cleanup where
   print Cleanup = text "cleanup"
+
+instance Print Arch where
+  print arch = case arch of
+    Arch_i386 -> text "i386"
+    Arch_i686 -> text "i686"
+    Arch_x86 -> text "x86"
+    Arch_x86_64 -> text "x86_64"
+    Arch_PowerPc -> text "powerpc"
+    Arch_PowerPc64 -> text "powerpc64"
+    Arch_Arm s -> text "arm" <> text s
+    Arch_ThumbV7 -> text "thumbv7"
+    Arch_Itanium -> text "itanium"
+    Arch_Mips s -> text "mips" <> text s
+    Arch_String s -> text s
+    
+instance Print Vendor where
+  print v = case v of
+    Vendor_Pc -> text "pc"
+    Vendor_Apple -> text "apple"
+    Vendor_Unknown -> text "unknown"
+    Vendor_String s -> text s
+    
+instance Print Os where    
+  print v = case v of
+    Os_Linux -> text "linux"
+    Os_Windows -> text "windows"
+    Os_Win32 -> text "win32"
+    Os_Darwin s -> text "darwin" <> text s
+    Os_FreeBsd s -> text "freebsd" <> text s
+    Os_Macosx s -> text "macosx" <> text s
+    Os_Ios s -> text "ios" <> text s
+    Os_Mingw32 -> text "mingw32"
+    Os_Unknown -> text "unknown"
+    Os_String s -> text s
+    
+instance Print OsEnv where    
+  print v = case v of
+    OsEnv_Gnu -> text "gnu"
+    OsEnv_String s -> text s
+
+instance Print TargetTriple where
+  print (TargetTriple arch ven os env) = 
+    doubleQuotes (hcat $ punctuate (char '-') 
+                  ([print arch] ++ mb ven ++ mb os ++ mb env))
+    where mb v = maybe [] (\x -> [print x]) v
+
+instance Print DataLayoutInfo where
+  print (DataLayoutInfo e sa ptrs is fs as ni ml _) = text "datalayout"

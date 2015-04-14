@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
-module Llvm.Pass.Rewriter where
+module Llvm.Pass.RewriteUse where
 
 import Control.Monad
 import Data.Maybe
@@ -9,35 +9,26 @@ import Prelude hiding (succ)
 import qualified Compiler.Hoopl as H
 
 import Llvm.Data.Ir
-import Llvm.Query.TypeConstValue
 import Llvm.Util.Monadic (maybeM)
 import Debug.Trace
 
 type MaybeChange a = a -> Maybe a
 
-{-
-f2t :: (a -> Maybe a) -> (Typed a, Typed a) -> Maybe (Typed a, Typed a) 
-f2t f ((TypedData t1 a1), (TypedData t2 a2)) = case (f a1, f a2) of
-  (Nothing, Nothing) -> Nothing
-  (a1', a2') -> Just (TypedData t1 $ fromMaybe a1 a1', TypedData t2 $ fromMaybe a2 a2')
-
 
 f2 :: (a -> Maybe a) -> (a, a) -> Maybe (a, a) 
 f2 f (a1, a2) = case (f a1, f a2) of
-  (Nothing, Nothing) -> Nothing
-  (a1', a2') -> Just (fromMaybe a1 a1', fromMaybe a2 a2')
+                  (Nothing, Nothing) -> Nothing
+                  (a1', a2') -> Just (fromMaybe a1 a1', fromMaybe a2 a2')
 
 
-f3 :: (a -> Maybe a) -> (Typed a, Typed a, Typed a) -> Maybe (Typed a, Typed a, Typed a) 
-f3 f (TypedData t1 a1, TypedData t2 a2, TypedData t3 a3) = case (f a1, f a2, f a3) of
-  (Nothing, Nothing, Nothing) -> Nothing
-  (a1', a2', a3') -> Just (TypedData t1 $ fromMaybe a1 a1'
-                          , TypedData t2 $ fromMaybe a2 a2'
-                          , TypedData t3 $ fromMaybe a3 a3')
+f3 :: (a -> Maybe a) -> (a, a, a) -> Maybe (a, a, a) 
+f3 f (a1, a2, a3) = case (f a1, f a2, f a3) of
+                      (Nothing, Nothing, Nothing) -> Nothing
+                      (a1', a2', a3') -> Just (fromMaybe a1 a1', fromMaybe a2 a2', fromMaybe a3 a3')
 
 
-fs :: Eq a => (a -> Maybe a) -> [Typed a] -> Maybe [Typed a]
-fs f ls = let ls' = map (\(TypedData t x) -> TypedData t (fromMaybe x (f x))) ls
+fs :: Eq a => (a -> Maybe a) -> [a] -> Maybe [a]
+fs f ls = let ls' = map (\x -> (fromMaybe x (f x))) ls
           in if ls == ls' then Nothing else Just ls'
 
 
@@ -84,17 +75,15 @@ rwBinExpr f (Fe e) = liftM Fe (rwFbinExpr f e)
 
 
 rwConversion :: MaybeChange a -> MaybeChange (Conversion a)
-rwConversion f (Conversion co (TypedData ts v) t) = 
-  do { v1 <- f v
-     ; return $ Conversion co (TypedData ts v1) t
-     }
+rwConversion f (Conversion co tv1 t) = do { tv1' <- f tv1
+                                          ; return $ Conversion co tv1' t
+                                          }
 
 rwGetElemPtr :: Eq a => MaybeChange a -> MaybeChange (GetElemPtr a)
-rwGetElemPtr f (GetElemPtr b (TypedData ts (Pointer v)) indices) = 
-  do { v1 <- f v
-     -- ; indices1 <- fs f indices 
-     ; return $ GetElemPtr b (TypedData ts (Pointer v1)) indices
-     }
+rwGetElemPtr f (GetElemPtr b tv1 indices) = do { tv1' <- f tv1
+                                               ; indices' <- fs f indices
+                                               ; return $ GetElemPtr b tv1' indices'
+                                               }
 
 rwSelect :: MaybeChange a -> MaybeChange (Select a)
 rwSelect f (Select tv1 tv2 tv3) = do { (tv1', tv2', tv3') <- f3 f (tv1, tv2, tv3)
@@ -113,18 +102,18 @@ rwFcmp f (Fcmp op t v1 v2) = do { (v1', v2') <- f2 f (v1, v2)
 tv2v :: MaybeChange Value -> MaybeChange (Typed Value)
 tv2v f (TypedData t x) = liftM (TypedData t) (f x)
 
-tp2p :: MaybeChange Value -> MaybeChange (Typed (Pointer Value))
+tp2p :: MaybeChange Value -> MaybeChange (Typed Pointer)
 tp2p f x | trace ("tp2p " ++ (show x)) False = undefined
 tp2p f (TypedData t (Pointer x)) = liftM (\p -> TypedData t (Pointer p)) (f x)
 
 
 rwExpr :: MaybeChange Value -> MaybeChange Expr
-rwExpr f (EgEp gep) = rwGetElemPtr f gep >>= return . EgEp
+rwExpr f (EgEp gep) = rwGetElemPtr (tv2v f) gep >>= return . EgEp
 rwExpr f (EiC a) = rwIcmp f a >>= return . EiC
 rwExpr f (EfC a) = rwFcmp f a >>= return . EfC
 rwExpr f (Eb a) = rwBinExpr f a >>= return . Eb
-rwExpr f (Ec a) = rwConversion f a >>= return . Ec
-rwExpr f (Es a) = rwSelect f a >>= return . Es
+rwExpr f (Ec a) = rwConversion (tv2v f) a >>= return . Ec
+rwExpr f (Es a) = rwSelect (tv2v f) a >>= return . Es
 rwExpr f (Ev x) = (tv2v f x) >>= return . Ev
                   
 
@@ -138,11 +127,9 @@ rwMemOp f (RmO (Load x ptr a1 a2 a3 a4)) =
      ; traceM $ "tp:" ++ show tp
      ; return $ RmO (Load x tp a1 a2 a3 a4)
      }
-  {-
 rwMemOp f (RmO (LoadAtomic _ _ (TypedData (Tpointer t _) ptr) _)) = do { tv <- (tv2v f) (TypedData t (Deref ptr))
                                                                        ; return $ Re $ Ev tv
                                                                        }
-   -}
 -- rwMemOp f (RmO (Free tv)) = (tv2v f) tv >>= return . RmO . Free 
 rwMemOp f (RmO (Store a tv1 tv2 ma nt)) = do { tv1' <- (tv2v f) tv1
                                              ; return $ RmO $ Store a tv1' tv2 ma nt
@@ -159,22 +146,19 @@ rwMemOp f (RmO (AtomicRmw b ao ptr v1 b2 fe)) = do { v1' <- (tv2v f) v1
 rwMemOp _ _ = error "impossible case"                                                
 
 rwShuffleVector :: MaybeChange a -> MaybeChange (ShuffleVector a)
-rwShuffleVector f (ShuffleVector tv1 tv2 tv3) = 
-  do { (tv1', tv2', tv3') <- f3 f (tv1, tv2, tv3)
-     ; return $ ShuffleVector tv1' tv2' tv3'
-     }
-                                                
+rwShuffleVector f (ShuffleVector tv1 tv2 tv3) = do { (tv1', tv2', tv3') <- f3 f (tv1, tv2, tv3)
+                                                   ; return $ ShuffleVector tv1' tv2' tv3'
+                                                   }
 rwExtractValue :: MaybeChange a -> MaybeChange (ExtractValue a)
-rwExtractValue f (ExtractValue (TypedData t v) s) = 
-  f v >>= \v1 -> return $ ExtractValue (TypedData t v1) s
+rwExtractValue f (ExtractValue tv1 s) = f tv1 >>= \tv1' -> return $ ExtractValue tv1' s
 
 rwInsertValue :: MaybeChange a -> MaybeChange (InsertValue a)
-rwInsertValue f (InsertValue tv1 tv2 s) = do { (tv1', tv2') <- f2t f (tv1, tv2)
+rwInsertValue f (InsertValue tv1 tv2 s) = do { (tv1', tv2') <- f2 f (tv1, tv2)
                                              ; return $ InsertValue tv1' tv2' s
                                              }
                                           
 rwExtractElem :: MaybeChange a -> MaybeChange (ExtractElem a)
-rwExtractElem f (ExtractElem tv1 tv2) = do { (tv1', tv2') <- f2t f (tv1, tv2)
+rwExtractElem f (ExtractElem tv1 tv2) = do { (tv1', tv2') <- f2 f (tv1, tv2)
                                            ; return $ ExtractElem tv1' tv2'
                                            }
 
@@ -186,11 +170,11 @@ rwRhs :: MaybeChange Value -> MaybeChange Rhs
 rwRhs f (RmO a) = rwMemOp f (RmO a) 
 rwRhs _ (Call _ _) = Nothing
 rwRhs f (Re a) = rwExpr f a >>= return . Re
-rwRhs f (ReE a) = rwExtractElem f a >>= return . ReE
-rwRhs f (RiE a) = rwInsertElem f a >>= return . RiE
-rwRhs f (RsV a) = rwShuffleVector f a >>= return . RsV
-rwRhs f (ReV a) = rwExtractValue f a >>= return . ReV
-rwRhs f (RiV a) = rwInsertValue f a >>= return . RiV
+rwRhs f (ReE a) = rwExtractElem (tv2v f) a >>= return . ReE
+rwRhs f (RiE a) = rwInsertElem (tv2v f) a >>= return . RiE
+rwRhs f (RsV a) = rwShuffleVector (tv2v f) a >>= return . RsV
+rwRhs f (ReV a) = rwExtractValue (tv2v f) a >>= return . ReV
+rwRhs f (RiV a) = rwInsertValue (tv2v f) a >>= return . RiV
 rwRhs f (VaArg tv t) = (tv2v f) tv >>= \tv' -> return $ VaArg tv' t
 rwRhs _ (LandingPad _ _ _ _ _) = Nothing
 
@@ -208,7 +192,7 @@ rwCinst _ _ = Nothing
 
 
 rwTerminatorInst :: MaybeChange Value -> MaybeChange TerminatorInst
-rwTerminatorInst f (Return ls) = do { ls' <- fs f ls
+rwTerminatorInst f (Return ls) = do { ls' <- fs (tv2v f) ls
                                     ; return $ Return ls'
                                     }
 rwTerminatorInst f (Cbr v tl fl) = do { v' <- f v
@@ -225,18 +209,13 @@ rwTerminatorInstWithDbg f (TerminatorInstWithDbg cinst dbgs) =
 rwTinst :: MaybeChange Value -> MaybeChange (Node e x)
 rwTinst f (Tinst c) = rwTerminatorInstWithDbg f c >>= return . Tinst
 rwTinst _ _ = Nothing
--}
 
-rwNode :: MaybeChange Value -> MaybeChange (Node a e x)
-rwNode = undefined
-
-{-
+rwNode :: MaybeChange Value -> MaybeChange (Node e x)
 rwNode f n@(Cinst _) = rwCinst f n
 rwNode f n@(Tinst _) = rwTinst f n
 rwNode _ _  = Nothing
--}
 
-nodeToGraph :: Node a e x -> H.Graph (Node a) e x
+nodeToGraph :: Node e x -> H.Graph Node e x
 nodeToGraph n@(Nlabel _) = H.mkFirst n
 nodeToGraph n@(Pinst _) = H.mkMiddle n
 nodeToGraph n@(Cinst _) = H.mkMiddle n

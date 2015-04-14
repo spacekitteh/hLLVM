@@ -6,22 +6,27 @@ import Llvm.Syntax.Parser.Type
 import Llvm.Syntax.Parser.Const
 
 
+pTmetadata :: P MetaConst
+pTmetadata = do { reserved "metadata" 
+                ; mc <- pMetaConst
+                ; return mc
+                }
+
 pTypedValue :: P (Typed Value)
-pTypedValue = liftM2 TypedData pType pValue
+pTypedValue = liftM2 Typed pType pValue
 
 pValue :: P Value
-pValue = choice [ (liftM VgOl pGlobalOrLocalId)
-                , (liftM Vc pConst)
-                , (liftM Ve pExpr) 
+pValue = choice [ (liftM Val_const pConst)
+                , (liftM Val_local pLocalId) 
                 ]
 
-pTypedPointer :: P (Typed Pointer)
-pTypedPointer = liftM2 TypedData pType pPointer
 
-pPointer :: P Pointer
-pPointer = choice [liftM Pointer pValue]
-           
-
+pTypedPointer :: P (Pointer (Typed Value))
+pTypedPointer = do { t <- pType
+                   ; v <- pValue
+                   ; return (Pointer (Typed t v))
+                   }
+                
 pAllocate :: P MemOp
 pAllocate = do { reserved "alloca"
                ; ina <- option (IsNot InAllocaAttr) (reserved "inalloca" >> return (Is InAllocaAttr))
@@ -107,13 +112,13 @@ pAtomicRmw = do { reserved "atomicrmw"
      
           
 
-pMemOp :: P (Bool, MemOp)
-pMemOp = choice [ pAllocate >>= \x -> return (True, x)
-                , pLoad >>= \x -> return (True, x)
-                , pStore >>= \x -> return (False, x)
-                , pFence >>= \x -> return (False, x)
-                , pCmpXchg >>= \x -> return (False, x)
-                , pAtomicRmw >>= \x -> return (False, x)
+pMemOp :: P MemOp
+pMemOp = choice [ pAllocate
+                , pLoad
+                , pStore
+                , pFence
+                , pCmpXchg
+                , pAtomicRmw
                 ]
 
 
@@ -151,7 +156,7 @@ pIcmp = do { reserved "icmp"
            ; op <- pIcmpOp
            ; t <- pType
            ; (v1, v2) <- pTuple pValue
-           ; return $ Icmp op t v1 v2
+           ; return (Icmp op t v1 v2)
            }
 
 pFcmp :: P (Fcmp Value)
@@ -165,16 +170,16 @@ pFcmp = do { reserved "fcmp"
                 
 
                         
-pSelect :: P (Select (Typed Value))
+pSelect :: P (Select Value)
 pSelect = do { reserved "select"
              ; t <- pSelTy
              ; v <- pValue
              ; ignore comma
              ; (tv2, tv3) <- pTuple pTypedValue
-             ; return $ Select (TypedData t v) tv2 tv3
+             ; return $ Select (Typed t v) tv2 tv3
              }
 
-pConversion :: P (Conversion (Typed Value))
+pConversion :: P (Conversion Value)
 pConversion = do { op <- pConvertOp
               ; tv <- pTypedValue
               ; reserved "to"
@@ -182,43 +187,43 @@ pConversion = do { op <- pConvertOp
               ; return $ Conversion op tv t
               }
 
-pGetElemPtr :: P (GetElemPtr (Typed Value))
+pGetElemPtr :: P (GetElementPtr Value)
 pGetElemPtr = do { reserved "getelementptr"
                  ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
-                 ; tc1 <- pTypedValue
+                 ; tc1 <- pTypedPointer -- AddrValue
                  ; idx <- many (try (comma >> pTypedValue))
-                 ; return $ GetElemPtr ib tc1 idx
+                 ; return $ GetElementPtr ib tc1 idx
                  }
 
-pExtractElement :: P (ExtractElem (Typed Value))
-pExtractElement = reserved "extractelement" >> pTuple pTypedValue >>= return . (uncurry ExtractElem)
-                  
-pInsertElement :: P (InsertElem (Typed Value))
-pInsertElement = reserved "insertelement" >> pTriple pTypedValue >>= return . (uncurry3 InsertElem)
+pExtractElement :: P (ExtractElement Value)
+pExtractElement = reserved "extractelement" >> pTuple pTypedValue >>= return . (uncurry ExtractElement)
 
-pShuffleVector :: P (ShuffleVector (Typed Value))
+pInsertElement :: P (InsertElement Value)
+pInsertElement = reserved "insertelement" >> pTriple pTypedValue >>= return . (uncurry3 InsertElement)
+
+pShuffleVector :: P (ShuffleVector Value)
 pShuffleVector = reserved "shufflevector" >> pTriple pTypedValue >>= return . (uncurry3 ShuffleVector)
                      
-pExtractValue :: P (ExtractValue (Typed Value))
+pExtractValue :: P (ExtractValue Value)
 pExtractValue = do { reserved "extractvalue"
                    ; tc1 <- pTypedValue
-                   ; ls <- many (try (comma >> intStrToken))
+                   ; ls <- many (try (comma >> unsignedInt))
                    ; return $ ExtractValue tc1 ls
                    }
 
-pInsertValue :: P (InsertValue (Typed Value))
+pInsertValue :: P (InsertValue Value)
 pInsertValue = do { reserved "insertvalue"
                   ; (tv1, tv2) <- pTuple pTypedValue
-                  ; ls <- many (try (comma >> intStrToken))
+                  ; ls <- many (try (comma >> unsignedInt))
                   ; return $ InsertValue tv1 tv2 ls
                   }
                   
                
 pVaArg :: P Rhs
-pVaArg = reserved "va_arg" >> pTuple2 pTypedValue pType >>= return . (uncurry VaArg)
+pVaArg = reserved "va_arg" >> pTuple2 pTypedValue pType >>= return . (RvA . uncurry VaArg)
          
               
-pCallFun :: P (Bool, CallSite)
+pCallFun :: P CallSite
 pCallFun = do { cc <- opt pCallConv
               ; atts0 <- many pParamAttr
               ; t <- pType
@@ -227,10 +232,10 @@ pCallFun = do { cc <- opt pCallConv
                             ]
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
-              ; return (not $ isVoidType t, CsFun cc atts0 t i params atts1)
+              ; return (CsFun cc atts0 t i params atts1)
               }
 
-pCallAsm :: P (Bool, CallSite)
+pCallAsm :: P CallSite
 pCallAsm = do { t <- pType
               ; reserved "asm"
               ; se <- opt (reserved "sideeffect" >> return SideEffect)
@@ -239,51 +244,52 @@ pCallAsm = do { t <- pType
               ; (s1, s2) <- pTuple pQuoteStr
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
-              ; return (not $ isVoidType t, CsAsm t se as dialect (DqString s1) (DqString s2) params atts1)
+              ; return (CsAsm t se as dialect (DqString s1) (DqString s2) params atts1)
               }
 
-pCallConversion :: P (Bool, CallSite)
+pCallConversion :: P (CallSite)
 pCallConversion = do { a <- many pParamAttr
-                  ; t <- pType
-                  ; convert <- pConstConversion
-                  ; params <- parens (sepBy pActualParam comma)
-                  ; atts1 <- pFunAttrCollection
-                  ; return (not $ isVoidType t, CsConversion a t convert params atts1)
-                  }
+                     ; t <- pType
+                     ; convert <- pConstConversion
+                     ; params <- parens (sepBy pActualParam comma)
+                     ; atts1 <- pFunAttrCollection
+                     ; return (CsConversion a t convert params atts1)
+                     }
 
-pCallSite :: P (Bool, CallSite)
+pCallSite :: P CallSite
 pCallSite = choice [ try pCallFun
                    , try pCallAsm
                    , pCallConversion
                    ]
          
-pCall :: P (Bool, Rhs)     
+pCall :: P Rhs
 pCall = do { tl <- option TcNon pTailCall 
            ; reserved "call"
-           ; (b, callSite) <- pCallSite
-           ; return (b, Call tl callSite)
+           ; liftM (Call tl) pCallSite
            }
 
 pActualParam :: P ActualParam
-pActualParam = do { t <- pType
-                  ; atts0 <- many pParamAttr
-                  ; a <- opt pAlign
-                  ; v <- pValue
-                  ; atts1 <- many pParamAttr
-                  ; return $ ActualParam t atts0 a v atts1
-                  }
+pActualParam = choice [do { t <- pType
+                          ; atts0 <- many pParamAttr
+                          ; a <- opt pAlign
+                          ; v <- pValue
+                          ; atts1 <- many pParamAttr
+                          ; return $ ActualParamData t atts0 a v atts1
+                          }
+                      ,liftM ActualParamMeta pMetaKindedConst
+                      ]
                   
-pRhs :: P (Bool, Rhs)
-pRhs = choice [ try (liftM (\x -> (True, Re x)) pExpr)
-              , try (liftM (\(b,x) -> (b, RmO x)) pMemOp)
-              , try (liftM (\x -> (True, ReE x)) pExtractElement)
-              , try (liftM (\x -> (True, RiE x)) pInsertElement)
-              , try (liftM (\x -> (True, RsV x)) pShuffleVector)
-              , try (liftM (\x -> (True, ReV x)) pExtractValue)
-              , try (liftM (\x -> (True, RiV x)) pInsertValue)
-              , try (liftM (\x -> (True, x)) pVaArg)
-              , try (liftM (\(b, x) -> (b, x)) pCall)
-              , try (liftM (\x -> (True, x)) pLandingPad)
+pRhs :: P Rhs
+pRhs = choice [ liftM Re pExpr
+              , liftM RmO pMemOp
+              , liftM ReE pExtractElement
+              , liftM RiE pInsertElement
+              , liftM RsV pShuffleVector
+              , liftM ReV pExtractValue
+              , liftM RiV pInsertValue
+              , pVaArg
+              , pCall
+              , pLandingPad
               ]
        
        
@@ -298,7 +304,7 @@ pPersFn = choice [ liftM PersFnId pGlobalOrLocalId
                       ; reserved "to"
                       ; dt <- pType
                       ; ignore (chartok ')')
-                      ; return $ PersFnCast (Conversion op (ot,ix) dt)
+                      ; return $ PersFnCast (Conversion op (Typed ot ix) dt)
                       }
                  , reserved "undef" >> return PersFnUndef
                  , reserved "null" >> return PersFnNull
@@ -313,7 +319,7 @@ pLandingPad = do { reserved "landingpad"
                  ; ix <- pPersFn
                  ; cl <- option Nothing (reserved "cleanup" >> return (Just Cleanup))
                  ; c <- many pClause
-                 ; return $ LandingPad rt ft ix cl c
+                 ; return $ RlP $ LandingPad rt ft ix cl c
                  }
     where pClause = choice [ reserved "catch" >> liftM Catch pTypedValue
                            , reserved "filter" >> liftM Filter pTypedConst

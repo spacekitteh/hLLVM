@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-module ParserTester (testParser, writeOutLlvm, writeOutIr) where
+module ParserTester (testParser, writeOutLlvm, writeOutIr, writeOutShow) where
 import System.IO
 import Llvm.Syntax.Parser.Basic
 import Llvm.Syntax.Parser.Module
@@ -46,6 +46,9 @@ testParser fileName inh = do { inpStr <- hGetContents inh
                           
 writeOutLlvm :: AsmPrint a => a -> Handle -> IO ()
 writeOutLlvm m outh = hPutStr outh (render $ toLlvm m)
+
+writeOutShow :: Show a => a -> Handle -> IO ()
+writeOutShow m outh = hPutStr outh (show m)
 
 writeOutIr :: IrPrint a => a -> Handle -> IO ()
 writeOutIr m outh = hPutStr outh (render $ printIr m)

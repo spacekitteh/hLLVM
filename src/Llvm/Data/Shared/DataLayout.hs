@@ -1,18 +1,19 @@
 module Llvm.Data.Shared.DataLayout where
 
 import qualified Data.Map as M
+import Data.Word
 
 data Endianness = LittleEndian
                 | BigEndian deriving (Eq, Ord, Show)
 
-data LayoutAddrSpace = LayoutAddrSpace Integer
+data LayoutAddrSpace = LayoutAddrSpace Word32
                      | LayoutAddrSpaceUnspecified deriving (Eq, Ord, Show)
                                                            
 data StackAlign = StackAlign AlignInBit
                 | StackAlignUnspecified deriving (Eq, Ord, Show)
 
-data SizeInBit = SizeInBit Integer deriving (Eq, Ord, Show)
-data AlignInBit = AlignInBit Integer deriving (Eq, Ord, Show)
+data SizeInBit = SizeInBit Word32 deriving (Eq, Ord, Show)
+data AlignInBit = AlignInBit Word32 deriving (Eq, Ord, Show)
 
 data AbiAlign = AbiAlign AlignInBit deriving (Eq, Ord, Show)
 
@@ -25,7 +26,7 @@ data Mangling = ManglingE
                 
 data LayoutSpec = DlE Endianness
                 | DlS StackAlign
-                | DlLittleS (Maybe Integer) (Maybe Integer) (Maybe Integer)
+                | DlLittleS (Maybe Word32) (Maybe Word32) (Maybe Word32)
                 | DlP LayoutAddrSpace SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlI SizeInBit AbiAlign (Maybe PrefAlign)
                 | DlF SizeInBit AbiAlign (Maybe PrefAlign)
@@ -46,6 +47,7 @@ data DataLayoutInfo = DataLayoutInfo
                       , vectors :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign)
                       , aggregates :: M.Map (Maybe SizeInBit) (AbiAlign, Maybe PrefAlign)
                       , nativeInt :: [SizeInBit]
+                      , mangling :: Maybe Mangling
                       } deriving (Eq, Ord, Show)
                                  
                                  
@@ -57,17 +59,20 @@ selectAlignment at (AbiAlign aba) pa = case at of
   AlignPref -> maybe aba (\(PrefAlign n) -> n) pa
                                  
 
+emptyDataLayoutInfo :: DataLayoutInfo
+emptyDataLayoutInfo = DataLayoutInfo { endianess = LittleEndian
+                                     , stackAlign = StackAlignUnspecified
+                                     , pointers = M.empty -- (LayoutAddrSpaceUnspecified, SizeInBit 0, AbiAlign 0, Nothing)
+                                     , ints = M.empty
+                                     , floats = M.empty
+                                     , vectors = M.empty
+                                     , aggregates = M.empty
+                                     , nativeInt = []
+                                     , mangling = Nothing
+                                     }
+  
 getDataLayoutInfo :: DataLayout -> DataLayoutInfo                                 
-getDataLayoutInfo (DataLayout ls) = let dv = DataLayoutInfo { endianess = LittleEndian
-                                                            , stackAlign = StackAlignUnspecified
-                                                            , pointers = M.empty -- (LayoutAddrSpaceUnspecified, SizeInBit 0, AbiAlign 0, Nothing)
-                                                            , ints = M.empty
-                                                            , floats = M.empty
-                                                            , vectors = M.empty
-                                                            , aggregates = M.empty
-                                                            , nativeInt = []
-                                                            }
-                                    in foldl (\p v -> case v of
+getDataLayoutInfo (DataLayout ls) = foldl (\p v -> case v of
                                                  DlE x -> p { endianess = x}
                                                  DlS x -> p { stackAlign = x}
                                                  DlP la s aa pa -> p { pointers = M.insert la (s, aa, pa) (pointers p) }
@@ -76,4 +81,6 @@ getDataLayoutInfo (DataLayout ls) = let dv = DataLayoutInfo { endianess = Little
                                                  DlV s aa pa -> p { vectors = M.insert s (aa, pa) (vectors p) }
                                                  DlA s aa pa -> p { aggregates = M.insert s (aa, pa) (aggregates p) }
                                                  DlN l -> p { nativeInt = l }
-                                             ) dv ls
+                                                 DlM m -> p { mangling = Just m }
+                                                 _ -> error $ "unexpected case " ++ show v
+                                          ) emptyDataLayoutInfo ls

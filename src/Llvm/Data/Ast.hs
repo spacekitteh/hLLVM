@@ -2,44 +2,42 @@
 module Llvm.Data.Ast
        ( module Llvm.Data.Ast
        , module Llvm.Data.Shared
+       , module Llvm.Data.Type
        ) where
 
 import Llvm.Data.Shared
+import Llvm.Data.Type
 import qualified Data.Map as M
+import Data.Word (Word32)
 
 
 -- | quotation does not change a label value
--- | it's still unclear when a quoted verion is used  
--- | we keep the original format to make llvm-as happy 
-data LabelId = LabelString Lstring
-             | LabelDqString Lstring -- a string enclosed by double quotes
-             | LabelNumber Integer
-             | LabelDqNumber Integer -- a number enclosed by double quotes
+-- | it's still unclear when a quoted verion is used
+-- | we keep the original format to make llvm-as happy
+data LabelId = LabelString String -- Lstring
+             | LabelDqString String -- Lstring -- a string enclosed by double quotes
+             | LabelNumber Word32 -- Int
+             | LabelDqNumber Word32 -- Int -- a number enclosed by double quotes
              deriving (Eq,Ord,Show)
 
-labelIdToLstring :: LabelId -> Lstring
-labelIdToLstring (LabelString s) = s
-labelIdToLstring (LabelDqString s) = s
-labelIdToLstring (LabelNumber n) = Lstring $ show n
-labelIdToLstring (LabelDqNumber n) = Lstring $ show n
-
-data BlockLabel = ExplicitBlockLabel LabelId 
+data BlockLabel = ExplicitBlockLabel LabelId
                 | ImplicitBlockLabel (String, Int, Int)
                 deriving (Eq, Ord, Show)
-                         
+
 data PercentLabel = PercentLabel LabelId deriving (Eq, Ord, Show)
 data TargetLabel = TargetLabel PercentLabel deriving (Eq,Ord,Show)
 
-data IbinOp = Add | Sub | Mul | Udiv 
-            | Sdiv | Urem | Srem 
+data IbinOp = Add | Sub | Mul | Udiv
+            | Sdiv | Urem | Srem
             | Shl | Lshr | Ashr | And | Or | Xor
             deriving (Eq,Ord,Show)
-                     
+
 ibinOpMap :: M.Map IbinOp String
-ibinOpMap = M.fromList [(Add, "add"), (Sub, "sub"), (Mul, "mul"), (Udiv, "udiv"), (Sdiv, "sdiv")
+ibinOpMap = M.fromList [(Add, "add"), (Sub, "sub"), (Mul, "mul")
+                       ,(Udiv, "udiv"), (Sdiv, "sdiv")
                        ,(Urem, "urem"), (Srem, "srem")
                        ,(Shl, "shl"), (Lshr, "lshr"), (Ashr, "ashr")
-                       ,(And, "and"), (Or, "or"), (Xor, "xor") 
+                       ,(And, "and"), (Or, "or"), (Xor, "xor")
                        ]
 
 data FbinOp = Fadd | Fsub | Fmul | Fdiv | Frem
@@ -59,141 +57,170 @@ data FbinExpr v = FbinExpr FbinOp FastMathFlags Type v v deriving (Eq,Ord,Show)
 data BinExpr v = Ie (IbinExpr v)
                | Fe (FbinExpr v)
                deriving (Eq, Ord, Show)
-data GetElemPtr v = GetElemPtr (IsOrIsNot InBounds) v [v] deriving (Eq,Ord,Show)
-data Select v = Select v v v deriving (Eq,Ord,Show)
+data GetElementPtr v = GetElementPtr (IsOrIsNot InBounds) (Pointer (Typed v)) [Typed v] deriving (Eq,Ord,Show)
+data Select v = Select (Typed v) (Typed v) (Typed v) deriving (Eq,Ord,Show)
 data Icmp v = Icmp IcmpOp Type v v deriving (Eq,Ord,Show)
 data Fcmp v = Fcmp FcmpOp Type v v deriving (Eq,Ord,Show)
 
 
 -- | Vector Operations <http://llvm.org/releases/3.0/docs/LangRef.html#vectorops>
-data ExtractElem v = ExtractElem v v deriving (Eq,Ord,Show)
-data InsertElem v = InsertElem v v v deriving (Eq,Ord,Show)
-data ShuffleVector v = ShuffleVector v v v deriving (Eq,Ord,Show)
+data ExtractElement v = ExtractElement (Typed v) (Typed v) deriving (Eq,Ord,Show)
+data InsertElement v = InsertElement (Typed v) (Typed v) (Typed v) deriving (Eq,Ord,Show)
+data ShuffleVector v = ShuffleVector (Typed v) (Typed v) (Typed v) deriving (Eq,Ord,Show)
 
 -- | Aggregate Operations <http://llvm.org/releases/3.0/docs/LangRef.html#aggregateops>
-data ExtractValue v = ExtractValue v [String] deriving (Eq,Ord,Show)
-data InsertValue v = InsertValue v v [String] deriving (Eq,Ord,Show)
+data ExtractValue v = ExtractValue (Typed v) [Word32] deriving (Eq,Ord,Show)
+data InsertValue v = InsertValue (Typed v) (Typed v) [Word32] deriving (Eq,Ord,Show)
 
 -- | Conversion Operations <http://llvm.org/releases/3.0/docs/LangRef.html#convertops>
-data Conversion v = Conversion ConvertOp v Type deriving (Eq,Ord,Show)
+data Conversion v = Conversion ConvertOp (Typed v) Type deriving (Eq,Ord,Show)
 
--- | Complex Constants <http://llvm.org/releases/3.0/docs/LangRef.html#complexconstants>  
-data ComplexConstant = Cstruct Packing [(Typed Const)] 
-                     | Carray [(Typed Const)]
-                     | Cvector [(Typed Const)]
+data ConvertOp = Trunc | Zext | Sext | FpTrunc | FpExt | FpToUi
+               | FpToSi | UiToFp | SiToFp | PtrToInt | IntToPtr
+               | Bitcast | AddrSpaceCast
+               deriving (Eq,Ord,Show)
+
+convertOpMap :: M.Map ConvertOp String
+convertOpMap = M.fromList [(Trunc, "trunc"), (Zext, "zext"), (Sext, "sext")
+                          ,(FpTrunc, "fptrunc"), (FpExt, "fpext"), (FpToUi, "fptoui")
+                          ,(FpToSi, "fptosi"), (UiToFp, "uitofp"), (SiToFp, "sitofp")
+                          ,(PtrToInt, "ptrtoint"), (IntToPtr, "inttoptr"), (Bitcast, "bitcast")
+                          ,(AddrSpaceCast, "addrspacecast")]
+
+-- | Complex Constants <http://llvm.org/releases/3.0/docs/LangRef.html#complexconstants>
+data ComplexConstant = Cstruct Packing [TypedConstOrNull]
+                     | Carray [TypedConstOrNull]
+                     | Cvector [TypedConstOrNull]
                        deriving (Eq,Ord,Show)
-                         
+
 -- | Constants <http://llvm.org/releases/3.5.0/docs/LangRef.html#constant-expressions>
-data Const = Ccp SimpleConstant
-           | Cca ComplexConstant
-           | CmL LocalId
-           | Cl LabelId
+data Const = C_simple SimpleConstant
+           | C_complex ComplexConstant
+           | C_localId LocalId
+           | C_labelId LabelId
            -- | Addresses of Basic Block <http://llvm.org/releases/3.0/docs/LangRef.html#blockaddress>
-           | CblockAddress GlobalId PercentLabel
-           | Cb (BinExpr Const)
-           | Cconv (Conversion (Typed Const))
-           | CgEp (GetElemPtr (Typed Const))
-           | Cs (Select (Typed Const))
-           | CiC (Icmp Const)
-           | CfC (Fcmp Const)
-           | CsV (ShuffleVector (Typed Const))
-           | CeV (ExtractValue (Typed Const))
-           | CiV (InsertValue (Typed Const))
-           | CeE (ExtractElem (Typed Const))
-           | CiE (InsertElem (Typed Const))
-           | CmC MetaConst
-           | Cnull
+           | C_blockAddress GlobalId PercentLabel
+           | C_binexp (BinExpr Const)
+           | C_conv (Conversion Const)
+           | C_gep (GetElementPtr Const)
+           | C_select (Select Const)
+           | C_icmp (Icmp Const)
+           | C_fcmp (Fcmp Const)
+           | C_shufflevector (ShuffleVector Const)
+           | C_extractvalue (ExtractValue Const)
+           | C_insertvalue (InsertValue Const)
+           | C_extractelement (ExtractElement Const)
+           | C_insertelement (InsertElement Const)
+           | C_null
            deriving (Eq,Ord,Show)
-                    
-data Prefix = Prefix (Typed Const) deriving (Eq, Ord, Show)
-data Prologue = Prologue (Typed Const) deriving (Eq, Ord, Show)
+
+data Prefix = Prefix (TypedConstOrNull) deriving (Eq, Ord, Show)
+data Prologue = Prologue (TypedConstOrNull) deriving (Eq, Ord, Show)
 
 data MdVar = MdVar String deriving (Eq,Ord,Show)
 data MdNode = MdNode String deriving (Eq,Ord,Show)
-data MetaConst = MdConst Const
-               | MdString DqString
+data MetaConst = McStruct [MetaKindedConst]
+               | McString DqString
                | McMn MdNode
                | McMv MdVar
-               | MdRef LocalId
+               | McRef LocalId
+               | McSimple Const
                deriving (Eq,Ord,Show)
-                        
+
+data MetaKindedConst = MetaKindedConst MetaKind MetaConst
+                     | UnmetaKindedNull
+                     deriving (Eq, Ord, Show)
+
 data GetResult = GetResult (Typed Value) String deriving (Eq, Ord, Show)
 
 
-data Expr = EgEp (GetElemPtr (Typed Value))
+data Expr = EgEp (GetElementPtr Value)
           | EiC (Icmp Value)
           | EfC (Fcmp Value)
-          | Eb (BinExpr Value) 
-          | Ec (Conversion (Typed Value))
-          | Es (Select (Typed Value))
+          | Eb (BinExpr Value)
+          | Ec (Conversion Value)
+          | Es (Select Value)
           deriving (Eq,Ord,Show)
-                   
 
 -- | Memory Access and Addressing Operations <http://llvm.org/releases/3.5.0/docs/LangRef.html#memory-access-and-addressing-operations>
 data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe Alignment)
-           | Load (IsOrIsNot Volatile) (Typed Pointer) (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
-           | LoadAtomic Atomicity (IsOrIsNot Volatile) (Typed Pointer) (Maybe Alignment) 
-           | Store (IsOrIsNot Volatile) (Typed Value) (Typed Pointer) (Maybe Alignment) (Maybe Nontemporal)
-           | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Typed Pointer) (Maybe Alignment)
+           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+           | LoadAtomic Atomicity (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment)
+           | Store (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal)
+           | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment)
            | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
-           | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) (Typed Pointer) (Typed Value) (Typed Value) (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
-           | AtomicRmw (IsOrIsNot Volatile) AtomicOp (Typed Pointer) (Typed Value) (IsOrIsNot SingleThread) AtomicMemoryOrdering deriving (Eq,Ord,Show)
+           | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) (Pointer (Typed Value)) (Typed Value) (Typed Value)
+             (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
+           | AtomicRmw (IsOrIsNot Volatile) AtomicOp (Pointer (Typed Value)) (Typed Value)
+             (IsOrIsNot SingleThread) AtomicMemoryOrdering deriving (Eq,Ord,Show)
 
+data Pointer v = Pointer v deriving (Eq, Ord, Show)
 
-data Pointer = Pointer Value deriving (Eq, Ord, Show)
-                         
+instance Functor Pointer where
+  fmap f (Pointer x) = Pointer (f x)
+
 data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameString String
                deriving (Eq,Ord,Show)
-             
+
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr] 
-              | CsConversion [ParamAttr] Type (Conversion (Typed Const)) [ActualParam] [FunAttr]
+              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
+              | CsConversion [ParamAttr] Type (Conversion Const) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
-                       
+
 data Clause = Catch (Typed Value)
-            | Filter (Typed Const)
-            | Cco (Conversion (Typed Value))
+            | Filter TypedConstOrNull
+            | Cco (Conversion Value)
             deriving (Eq,Ord,Show)
 
+data TypedConstOrNull = TypedConst (Typed Const)
+                      | UntypedNull
+                      deriving (Eq, Ord, Show)
+
 data PersFn = PersFnId GlobalOrLocalId
-            | PersFnCast (Conversion (Type, GlobalOrLocalId))
+            | PersFnCast (Conversion GlobalOrLocalId)
             | PersFnUndef
             | PersFnNull
             | PersFnConst Const
             deriving (Eq, Ord, Show)
-                     
-                           
+
+
 data Rhs = RmO MemOp
          | Re Expr
          | Call TailCall CallSite
-         | ReE (ExtractElem (Typed Value))
-         | RiE (InsertElem (Typed Value))
-         | RsV (ShuffleVector (Typed Value))
-         | ReV (ExtractValue (Typed Value)) 
-         | RiV (InsertValue (Typed Value))
-         | VaArg (Typed Value) Type
-         | LandingPad Type Type PersFn (Maybe Cleanup) [Clause] 
+         | ReE (ExtractElement Value)
+         | RiE (InsertElement Value)
+         | RsV (ShuffleVector Value)
+         | ReV (ExtractValue Value)
+         | RiV (InsertValue Value)
+         | RvA VaArg
+         | RlP LandingPad
          deriving (Eq,Ord,Show)
-              
+
+data VaArg = VaArg (Typed Value) Type deriving (Eq, Ord, Show)
+
+data LandingPad = LandingPad Type Type PersFn (Maybe Cleanup) [Clause] deriving (Eq, Ord, Show)
+
 data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
 
-data PhiInst = PhiInst (Maybe GlobalOrLocalId) Type 
+data PhiInst = PhiInst (Maybe LocalId) Type
                [(Value, PercentLabel)] deriving (Eq,Show)
-    
+
 data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg]
                       deriving (Eq, Show)
-                               
-data ComputingInst = ComputingInst (Maybe GlobalOrLocalId) Rhs
+
+data ComputingInst = ComputingInst (Maybe LocalId) Rhs
                      deriving (Eq,Show)
                               
 data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
+                          | ComputingInstWithComment String
                             deriving (Eq,Show)
-                               
--- | Terminator Instructions <http://llvm.org/releases/3.0/docs/LangRef.html#terminators>      
-data TerminatorInst = 
+
+-- | Terminator Instructions <http://llvm.org/releases/3.0/docs/LangRef.html#terminators>
+data TerminatorInst =
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_ret>
-    Return [(Typed Value)]
+    RetVoid
+    | Return [(Typed Value)]
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_br>
     | Br TargetLabel
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_br>
@@ -203,7 +230,7 @@ data TerminatorInst =
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_indirectbr>
     | IndirectBr (Typed Value) [TargetLabel]
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_invoke>
-    | Invoke (Maybe GlobalOrLocalId) CallSite TargetLabel TargetLabel
+    | Invoke (Maybe LocalId) CallSite TargetLabel TargetLabel
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_unwind>
     | Unwind
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_resume>
@@ -211,47 +238,29 @@ data TerminatorInst =
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_unreachable>
     | Unreachable
       deriving (Eq,Show)
-                               
-data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg] 
-                             deriving (Eq,Show)
-                                      
-data ActualParam = ActualParam Type [ParamAttr] (Maybe Alignment) Value [ParamAttr]
-                 deriving (Eq,Ord,Show)
-                          
-data Value = VgOl GlobalOrLocalId
-           | Ve Expr
-           | Vc Const
-           deriving (Eq,Ord,Show)
-  
-data Typed v where
-  TypedData :: Type -> v -> Typed v 
-  UntypedNull :: Typed Const
 
-instance Eq v => Eq (Typed v) where
-  (==) (TypedData t1 v1) (TypedData t2 v2) = (t1 == t2) && (v1 == v2)
-  (==) UntypedNull UntypedNull = undefined
-  (==) _ _ = False
-  
-instance Show v => Show (Typed v) where  
-  show (TypedData t1 v1) = "TypedData " ++ (show t1) ++ " " ++ (show v1)
-  show UntypedNull = "UntypedNull"
-  
-instance Ord v => Ord (Typed v) where  
-  compare (TypedData t1 v1) (TypedData t2 v2) = let e1 = compare t1 t2
-                                                in if e1 == EQ then compare v1 v2
-                                                   else e1                                                        
-  compare UntypedNull UntypedNull = undefined
-  compare UntypedNull _ = LT
-        
-                                                
+data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
+                             deriving (Eq,Show)
+
+data ActualParam = ActualParamData Type [ParamAttr] (Maybe Alignment) Value [ParamAttr]
+                 | ActualParamMeta MetaKindedConst
+                 deriving (Eq,Ord,Show)
+
+data Value = Val_local LocalId
+           | Val_const Const
+           deriving (Eq,Ord,Show)
+                    
+data Typed v = Typed Type v deriving (Eq, Ord, Show)
+
 data Aliasee = AtV (Typed Value)
-             | Ac (Conversion (Typed Const))
-             | AgEp (GetElemPtr (Typed Const))
+             | Ac (Conversion Const)
+             | AgEp (GetElementPtr Const)
              deriving (Eq,Show)
-                        
+
 data FunctionPrototype = FunctionPrototype
                          (Maybe Linkage)
                          (Maybe Visibility)
+                         (Maybe DllStorageClass)
                          (Maybe CallConv)
                          [ParamAttr]
                          Type
@@ -268,16 +277,42 @@ data FunctionPrototype = FunctionPrototype
                        deriving (Eq,Ord,Show)
 
 
-data Toplevel = ToplevelTriple DqString
-              | ToplevelDataLayout DataLayout
-              | ToplevelAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage) AddrNaming (Maybe Linkage) Aliasee
-              | ToplevelDbgInit String Integer
-              | ToplevelStandaloneMd String (Typed Value)
-              | ToplevelNamedMd MdVar [MdNode]
-              | ToplevelDeclare FunctionPrototype
-              | ToplevelDefine FunctionPrototype [Block]
-              | ToplevelGlobal 
-                (Maybe GlobalId)
+data Toplevel = ToplevelTriple TlTriple
+              | ToplevelDataLayout TlDataLayout
+              | ToplevelAlias TlAlias
+              | ToplevelDbgInit TlDbgInit
+              | ToplevelStandaloneMd TlStandaloneMd
+              | ToplevelNamedMd TlNamedMd
+              | ToplevelDeclare TlDeclare
+              | ToplevelDefine TlDefine
+              | ToplevelGlobal TlGlobal
+              | ToplevelTypeDef TlTypeDef
+              | ToplevelDepLibs TlDepLibs
+              | ToplevelUnamedType TlUnamedType
+              | ToplevelModuleAsm TlModuleAsm
+              | ToplevelAttribute TlAttribute
+              | ToplevelComdat TlComdat
+              deriving (Eq,Show)
+
+
+data TlTriple = TlTriple TargetTriple deriving (Eq, Show)
+
+data TlDataLayout = TlDataLayout DataLayout deriving (Eq, Show)
+
+data TlAlias = TlAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage)
+               AddrNaming (Maybe Linkage) Aliasee deriving (Eq, Show)
+
+data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Show)
+
+data TlStandaloneMd = TlStandaloneMd String MetaKindedConst deriving (Eq, Show)
+
+data TlNamedMd = TlNamedMd MdVar [MdNode] deriving (Eq, Show)
+
+data TlDeclare = TlDeclare FunctionPrototype deriving (Eq, Show)
+
+data TlDefine = TlDefine FunctionPrototype [Block] deriving (Eq, Show)
+
+data TlGlobal = TlGlobal (Maybe GlobalId)
                 (Maybe Linkage)
                 (Maybe Visibility)
                 (Maybe DllStorageClass)
@@ -291,14 +326,20 @@ data Toplevel = ToplevelTriple DqString
                 (Maybe Section)
                 (Maybe Comdat)
                 (Maybe Alignment)
-              | ToplevelTypeDef LocalId Type
-              | ToplevelDepLibs [DqString]
-              | ToplevelUnamedType Integer Type
-              | ToplevelModuleAsm DqString
-              | ToplevelAttribute Integer [FunAttr]
-              | ToplevelComdat DollarId SelectionKind
-              deriving (Eq,Show)
-                       
+              deriving (Eq, Show)
+
+data TlTypeDef = TlTypeDef LocalId Type deriving (Eq, Show)
+
+data TlDepLibs = TlDepLibs [DqString] deriving (Eq, Show)
+
+data TlUnamedType = TlUnamedType Word32 Type deriving (Eq, Show)
+
+data TlModuleAsm = TlModuleAsm DqString deriving (Eq, Show)
+
+data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Show)
+
+data TlComdat = TlComdat DollarId SelectionKind deriving (Eq, Show)
+
 data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg deriving (Eq,Show)
 
 blockLabel :: Block -> BlockLabel
@@ -307,3 +348,10 @@ blockLabel (Block v _ _ _) = v
 data Module = Module [Toplevel] deriving (Eq,Show)
 
 
+dataLayoutOfModule :: Module -> DataLayoutInfo
+dataLayoutOfModule (Module tl) = let [ToplevelDataLayout (TlDataLayout dl)] =
+                                       filter (\x -> case x of
+                                                  ToplevelDataLayout _ -> True
+                                                  _ -> False
+                                              ) tl
+                                 in getDataLayoutInfo dl

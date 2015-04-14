@@ -7,7 +7,7 @@ pType :: P Type
 pType =
     do { t <- choice [ try (liftM Tprimitive pPrimType)
                      , pTypeName
-                     , upref
+                     --, upref
                      , array
                      , try pstruct
                      , vector
@@ -17,31 +17,42 @@ pType =
        ; post t
        }
  where
-   upref    = chartok '\\' >> liftM TupRef decimal
+--   upref    = chartok '\\' >> liftM TupRef decimal
    array    = brackets (avbody Tarray)
    vector   = angles (avbody Tvector)
-   avbody f = do { n <- lexeme decimal
-                 ; chartok 'x'
+   avbody f = do { n <- lexeme unsignedInt -- decimal
+                 ; ignore $ chartok 'x'
                  ; t <- pType
                  ; return (f n t)
                  }
    struct   = liftM (Tstruct Unpacked) (braces (sepBy pType comma))
-   pstruct  = do { symbol "<{"
+   pstruct  = do { ignore $ symbol "<{"
                  ; v <- sepBy pType comma
-                 ; symbol "}>"
+                 ; ignore $ symbol "}>"
                  ; return (Tstruct Packed v)
                  }
    pOther = choice [ reserved "opaque" >> return Topaque
-                   , reserved "metadata" >> return Tmetadata
+                   , reserved "void" >> return Tvoid
+                   ]
+
+
+castTypeToMetaKind :: Type -> MetaKind
+castTypeToMetaKind t = Mtype t                       
+
+
+pMetaKind :: P MetaKind
+pMetaKind = choice [ try (liftM castTypeToMetaKind pType)
+                   , reserved "metadata" >> return Mmetadata
                    ]
 
 pTypeName :: P Type
 pTypeName = do { x <- pLocalId 
                ; case x of 
-                 LocalIdNum n -> return $ Tno n 
+                 LocalIdNum n -> return $ Tno n
                  LocalIdAlphaNum s -> return $ Tname s
                  LocalIdDqString s -> return $ TquoteName s
                }
+
 
 pStar :: P AddrSpace
 pStar = option AddrSpaceUnspecified pAddrSpace >>= \x -> chartok '*' >> return x
@@ -55,13 +66,13 @@ post t = do { pt <- option t (pStar >>= \x -> post (Tpointer t x))
             }
 
 pTypeI :: P TypePrimitive
-pTypeI = (char 'i' >> liftM TpI decimal)
+pTypeI = (char 'i' >> liftM TpI unsignedInt)
 
 pTypeF :: P TypePrimitive
-pTypeF = (char 'f' >> liftM TpF decimal)
+pTypeF = (char 'f' >> liftM TpF unsignedInt)
 
 pTypeV :: P TypePrimitive
-pTypeV = (char 'v' >> liftM TpV decimal)
+pTypeV = (char 'v' >> liftM TpV unsignedInt)
 
 
 pPrimType :: P TypePrimitive
@@ -75,14 +86,13 @@ pPrimType = choice [ try pTypeI
                    , reserved "x86_fp80"  >> return TpX86Fp80
                    , reserved "x86_mmx"   >> return TpX86Mmx
                    , reserved "ppc_fp128" >> return TpPpcFp128
-                   , reserved "void"      >> return TpVoid
                    , pTypeV
                    , reserved "null" >> return TpNull
                    ]
             
             
 pTypeParamList :: P TypeParamList
-pTypeParamList = do { chartok '('
+pTypeParamList = do { ignore $ chartok '('
                     ; (l, f) <- args []
                     ; return $ TypeParamList l f
                     }
@@ -100,7 +110,7 @@ pTypeParamList = do { chartok '('
   
 
 pFormalParamList :: P FormalParamList
-pFormalParamList = do { chartok '('
+pFormalParamList = do { ignore $ chartok '('
                       ; (l, f) <- args []
                       ; funAttrs <- many pFunAttr
                       ; return $ FormalParamList l f funAttrs
@@ -117,19 +127,25 @@ pFormalParamList = do { chartok '('
                     , chartok ')' >> return (reverse l, Nothing)
                     ]
     where
-        param = do { at <- pType
-                   ; ar1 <- many pParamAttr
-                   ; an <- opt pAlign
-                   ; lv <- opt pLocalId
-                   ; let lv' = maybe FimplicitParam FexplicitParam lv 
-                   ; ar2 <- many pParamAttr
-                   ; return $ FormalParam at  ar1 an lv' ar2
-                   }
+        param = choice [do { at <- pType
+                           ; ar1 <- many pParamAttr
+                           ; an <- opt pAlign
+                           ; lv <- opt pLocalId
+                           ; let lv' = maybe FimplicitParam FexplicitParam lv 
+                           ; ar2 <- many pParamAttr
+                           ; return $ FormalParamData at  ar1 an lv' ar2
+                           }
+                       , do { mt <- pMetaKind
+                            ; lv <- opt pLocalId
+                            ; let lv1 = maybe FimplicitParam FexplicitParam lv
+                            ; return $ FormalParamMeta mt lv1
+                            }
+                       ]
 
 pSelTy :: P Type
 pSelTy = choice [ reserved "i1" >> return (Tprimitive $ TpI 1)
-                , angles $ do { n <- decimal
-                              ; chartok 'x'
+                , angles $ do { n <- unsignedInt -- decimal
+                              ; ignore $ chartok 'x'
                               ; reserved "i1"
                               ; return $ Tvector n (Tprimitive $ TpI 1)
                               }

@@ -1,46 +1,58 @@
-Name:  HsLlvm350
-Version: 1.0.0.0
-Description:  Haskell implementation of LLVM 
-License: BSD3
-License-file: LICENSE
-Author: Ning Wang
-Maintainer: email@ningwang.org
-Build-Type: Simple
-Cabal-Version: >= 1.6
-Stability: 0.1
-Synopsis: A library for processing LLVM Assembly
-Category: Compilers/Interpreters
+name:  HsLlvmTransMeta
+version: 1.0.0.0
+description:  Haskell implementation of LLVM
+license: BSD3
+license-file: LICENSE
+author: Ning Wang
+maintainer: email@ningwang.org
+build-Type: Simple
+cabal-Version: >= 1.10
+stability: 0.1
+synopsis: A library for processing LLVM Assembly
+category: Compilers/Interpreters
 
 
-Library 
-  Build-Depends:     base >= 3 && < 5, 
-                     containers, 
-                     array, 
-                     bytestring, 
+library
+  default-language:  Haskell2010
+  build-depends:     base >= 3 && < 5,
+                     containers,
+                     array,
+                     bytestring,
                      mtl,
                      filepath,
                      directory,
                      hooplext == 3.10.0.2,
+                     -- hooplext == 3.8.7.4,
                      parsec >=3.1.2 && <3.2,
                      cmdargs >=0.10 && <0.11,
                      transformers >= 0.3.0.0,
-                     pretty >= 1.1.1.1
+                     pretty >= 1.1.1.1,
+                     data-dword == 0.3,
+                     template-haskell >= 2.9.0.0
+--                     HsLlvmNativeWrapper
 
-  Exposed-modules:   Llvm.Data.Ast,
+  exposed-modules:   Llvm.Data.Ast,
+                     Llvm.Data.Type,
                      Llvm.Data.CoreIr,
                      Llvm.Data.Ir,
+                     Llvm.Data.IrType,
                      Llvm.Data.Shared,
                      Llvm.Data.Shared.AtomicEntity,
                      Llvm.Data.Shared.SimpleConst,
-                     Llvm.Data.Shared.Type,
                      Llvm.Data.Shared.DataLayout,
                      Llvm.Data.Conversion,
                      Llvm.Data.Conversion.AstSimplification,
                      Llvm.Data.Conversion.AstIrConversion,
+                     Llvm.Data.Conversion.TypeConversion,
                      Llvm.Data.Conversion.LabelMapM,
-                     Llvm.Util.Mapping, 
-                     Llvm.Util.Monadic, 
+                     Llvm.Util.Mapping,
+                     Llvm.Util.Monadic,
                      Llvm.Query.TypeConstValue,
+                     Llvm.Query.Qerror,
+                     Llvm.Query.ConstValue,
+                     Llvm.Query.Conversion,
+                     Llvm.Query.IrCxt,
+                     Llvm.Query.TypeDef,
                      Llvm.Syntax.Printer.Common,
                      Llvm.Syntax.Printer.SharedEntityPrint,
                      Llvm.Syntax.Printer.IrPrint,
@@ -61,12 +73,57 @@ Library
                      Llvm.Pass.PhiFixUp,
                      Llvm.Pass.Rewriter,
                      Llvm.Pass.Uda,
+--                     Llvm.Pass.DynSafeRw,
+--                     Llvm.Pass.DynSafeUtil,
+--                     Llvm.Pass.DsPreScan,
                      ParserTester
---  ghc-options:       -Wall -fno-warn-name-shadowing
-  Extensions:        CPP 
+--  extra-libraries:   stdc++
+  ghc-options:       -fhpc
+  other-extensions:        CPP
   hs-source-dirs:    src
 
 
-Executable llvm-test
-  Main-is:           LlvmTest.hs
+executable llvm-test
+  default-language:  Haskell2010
+  main-is:           LlvmTest.hs
   hs-source-dirs:    src
+  build-depends:     base >= 3 && < 5,
+                     containers,
+                     array,
+                     bytestring,
+                     mtl,
+                     filepath,
+                     directory,
+                     template-haskell >= 2.9.0.0,
+                     hooplext == 3.10.0.2,
+                     -- hooplext == 3.8.7.4,
+                     parsec >=3.1.2 && <3.2,
+                     cmdargs >=0.10 && <0.11,
+                     transformers >= 0.3.0.0,
+                     pretty >= 1.1.1.1,
+                     data-dword == 0.3
+  ghc-options:       -fhpc -dynamic
+--                     HsLlvmNativeWrapper
+--  extra-libraries:   stdc++
+
+
+executable dynsafe-test
+  default-language:  Haskell2010
+  main-is:           DynSafeTest.hs
+  hs-source-dirs:    src
+  build-depends:     base >= 3 && < 5,
+                     containers,
+                     array,
+                     bytestring,
+                     mtl,
+                     filepath,
+                     directory,
+                     template-haskell >= 2.9.0.0,
+                     hooplext == 3.10.0.2,
+                     -- hooplext == 3.8.7.4,
+                     parsec >=3.1.2 && <3.2,
+                     cmdargs >=0.10 && <0.11,
+                     transformers >= 0.3.0.0,
+                     pretty >= 1.1.1.1,
+                     data-dword == 0.3
+  ghc-options:       -fhpc -dynamic

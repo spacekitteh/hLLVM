@@ -13,21 +13,22 @@ pTerminatorInst = choice [ pRet
                          , reserved "indirectbr" >> liftM (uncurry IndirectBr)
                            (pTuple2 pTypedValue (brackets (sepBy pTargetLabel comma)))
                          , reserved "unreachable" >> return Unreachable
-                         , reserved "resume" >> liftM Resume pTypedValue]
+                         , reserved "resume" >> liftM Resume pTypedValue
+                         ]
                   <?> "control instruction"
 
 pRet :: P TerminatorInst
 pRet = do { reserved "ret"
           ; t <- pType
           ; case t of
-              Tprimitive TpVoid -> return (Return [])
-              _    -> do { v <- pValue
-                        ; option (Return $ [TypedData t v])
-                          (do { ls <- many (try (comma >> pTypedValue))
-                              ; return (Return ((TypedData t v):ls))
-                              }
-                          )
-                        }
+              Tvoid -> return RetVoid
+              _  -> do { v <- pValue
+                       ; option (Return $ [Typed t v])
+                         (do { ls <- many (try (comma >> pTypedValue))
+                             ; return (Return ((Typed t v):ls))
+                             }
+                         )
+                       }
           }
 
 
@@ -55,7 +56,7 @@ data Instruction = Comp ComputingInst
 data InstructionWithDbg = InstructionWithDbg Instruction [Dbg]
 
 pInstruction :: P Instruction
-pInstruction = do { lhs <- opt (do { x <- pGlobalOrLocalId
+pInstruction = do { lhs <- opt (do { x <- pLocalId
                                    ; ignore (chartok '=')
                                    ; return x
                                    })
@@ -80,43 +81,29 @@ pInstructionWithDbg  = do { ins <- pInstruction
 
 
 
-pComputingInst ::  Maybe GlobalOrLocalId -> P ComputingInst
-pComputingInst lhs = do { (b, rhs) <- pRhs
-                        ; lhs' <- if b then getLhs lhs
-                                  else return lhs
-                        ; return $ ComputingInst lhs' rhs
+pComputingInst ::  Maybe LocalId -> P ComputingInst
+pComputingInst lhs = do { rhs <- pRhs
+                        ; return $ ComputingInst lhs rhs
                         }
 
 
-
-getLhs :: Maybe GlobalOrLocalId -> P (Maybe GlobalOrLocalId)
-getLhs (Just x) = return $ Just x
-getLhs Nothing = return Nothing
-                 {- do { m <- getNextImpParam
-                    ; return $ Just $ GolL $ LocalIdNum m
-                    } -}
-
-
-pInvoke :: Maybe GlobalOrLocalId -> P TerminatorInst
+pInvoke :: Maybe LocalId -> P TerminatorInst
 pInvoke lhs = do { reserved "invoke"
-                 ; (b, callSite) <- pCallSite
+                 ; callSite <- pCallSite
                  ; reserved "to"
                  ; toLbl <- pTargetLabel
                  ; reserved "unwind"
                  ; unwindLbl <- pTargetLabel
-                 ; lhs' <- if b then getLhs lhs
-                           else return lhs
-                 ; return $ Invoke lhs' callSite toLbl unwindLbl
+                 ; return $ Invoke lhs callSite toLbl unwindLbl
                  }
 
 
-pPhiInst :: Maybe GlobalOrLocalId -> P PhiInst
+pPhiInst :: Maybe LocalId -> P PhiInst
 pPhiInst lhsOpt = do { reserved "phi"
                      ; t <- pType
                      ; one <- pair
                      ; ls <- many (try (comma >> pair))
-                     ; lhs <- getLhs lhsOpt
-                     ; return $ PhiInst lhs t (one:ls)
+                     ; return $ PhiInst lhsOpt t (one:ls)
                      }
   where pair = brackets (pTuple2 pValue pPercentLabel)
 

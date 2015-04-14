@@ -55,7 +55,7 @@ pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
 pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
 pAlias lhs vis dll tlm na = do { link <- option Nothing (liftM Just pAliasLinkage)
                                ; aliasee <- pAliasee
-                               ; return $ ToplevelAlias lhs vis dll tlm na link aliasee
+                               ; return $ ToplevelAlias (TlAlias lhs vis dll tlm na link aliasee)
                                }
     where pAliasee = 
             choice [ liftM AtV pTypedValue
@@ -84,8 +84,8 @@ pGlobal lhs link vis dll tls na =
                             <|?> (Nothing, try (comma >> liftM Just pComdat))
                             <|?> (Nothing, try (comma >> liftM Just pAlign))
                            )
-     ; return $ ToplevelGlobal lhs link vis dll tls na addrOpt exti
-       globalOpt t c s cd a
+     ; return $ ToplevelGlobal (TlGlobal lhs link vis dll tls na addrOpt exti
+                                globalOpt t c s cd a)
      }
   where hasInit x = case x of 
           Just(LinkageExternWeak) -> False
@@ -100,7 +100,7 @@ pLhsType :: P LocalIdOrQuoteStr
 pLhsType = do { lhs <- choice [ liftM L pLocalId
                               , liftM (Q . DqString) pQuoteStr
                               ] 
-              ; _ <- chartok '='
+              ; ignore (chartok '=')
               ; reserved "type"              
               ; return lhs
               }
@@ -108,27 +108,31 @@ pLhsType = do { lhs <- choice [ liftM L pLocalId
 pToplevelTypeDef :: P Toplevel           
 pToplevelTypeDef = do { lhsOpt <- opt pLhsType
                       ; case lhsOpt of
-                        Nothing -> liftM (ToplevelUnamedType 1) pType
-                        Just (L x) -> liftM (ToplevelTypeDef x) pType
+                        Nothing -> liftM (ToplevelUnamedType . (TlUnamedType 1)) pType
+                        Just (L x) -> liftM (ToplevelTypeDef . (TlTypeDef x)) pType
                         Just (Q _) -> error "irrefutable"
                       }
 
 pToplevelTarget :: P Toplevel
 pToplevelTarget = do { reserved "target"
-                     ; choice [ reserved "triple" >> chartok '=' >> pQuoteStr >>= \s -> return $ ToplevelTriple (DqString s)
+                     ; choice [ do { reserved "triple"  
+                                   ; ignore $ chartok '=' 
+                                   ; tt <- lexeme (between (char '"') (char '"') pTargetTriple)
+                                   ; return $ ToplevelTriple (TlTriple tt)
+                                   }
                               , do { reserved "datalayout" 
-                                   ; ignore (chartok '=') 
+                                   ; ignore $ chartok '='
                                    ; ls <- lexeme (between (char '"') (char '"') pDataLayout) 
-                                   ; return $ ToplevelDataLayout ls 
+                                   ; return $ ToplevelDataLayout (TlDataLayout ls) 
                                    }
                               ]
                      }
 
 pToplevelDepLibs :: P Toplevel
 pToplevelDepLibs = do { reserved "deplibs"
-                      ; _ <- chartok '='
+                      ; ignore (chartok '=')
                       ; l <- brackets (sepBy pQuoteStr comma)
-                      ; return $ ToplevelDepLibs (fmap DqString l)
+                      ; return $ ToplevelDepLibs (TlDepLibs (fmap DqString l))
                       }
 
                      
@@ -149,7 +153,7 @@ pFunctionPrototype = do { lopt <- opt pLinkage
                         ; gopt <- opt (liftM (Gc . DqString) (reserved "gc" >> pQuoteStr))
                         ; prefixOpt <- opt pPrefix
                         ; prologueOpt <- opt pPrologue
-                        ; return (FunctionPrototype lopt vopt copt 
+                        ; return (FunctionPrototype lopt vopt dllopt copt 
                                   as ret name params unnamed attrs sopt cdopt aopt gopt 
                                   prefixOpt prologueOpt)
                         }
@@ -164,60 +168,56 @@ pToplevelDefine :: P Toplevel
 pToplevelDefine = do { reserved "define"
                      ; fh <- pFunctionPrototype
                      ; bs <- braces pBlocks
-                     ; return $ ToplevelDefine fh bs
+                     ; return $ ToplevelDefine (TlDefine fh bs)
                      }
                   
 pToplevelAttributeGroup :: P Toplevel                  
 pToplevelAttributeGroup = do { reserved "attributes" 
-                             ; char '#' 
-                             ; n <- decimal
-                             ; chartok '='
+                             ; ignore (char '#')
+                             ; n <- unsignedInt -- decimal
+                             ; ignore (chartok '=')
                              ; l <- braces $ many pFunAttr
-                             ; return $ ToplevelAttribute n l
+                             ; return $ ToplevelAttribute (TlAttribute n l)
                              }
                   
 pToplevelDeclare :: P Toplevel                  
 pToplevelDeclare = liftM ToplevelDeclare 
-                   (reserved "declare" >> pFunctionPrototype)
+                   (reserved "declare" >> liftM TlDeclare pFunctionPrototype)
 
 pToplevelModuleAsm :: P Toplevel
 pToplevelModuleAsm = do { reserved "module"
                         ; reserved "asm"
                         ; s <- pQuoteStr
-                        ; return $ ToplevelModuleAsm $ DqString s
+                        ; return $ ToplevelModuleAsm (TlModuleAsm (DqString s))
                         }
                      
 
 pToplevelComdat :: P Toplevel
 pToplevelComdat = do { l <- pDollarId
-                     ; chartok '='
+                     ; ignore (chartok '=')
                      ; reserved "comdat"
                      ; s <- pSelectionKind
-                     ; return $ ToplevelComdat l s
+                     ; return $ ToplevelComdat (TlComdat l s)
                      }
-
-                
-
-                   
 
 pMdNode :: P MdNode
 pMdNode = (char '!' >> liftM MdNode intStrToken)
 
 pStandaloneMd :: P Toplevel
-pStandaloneMd = do { _ <- char '!' 
+pStandaloneMd = do { ignore (char '!')
                    ; choice [ do { n <- intStrToken
-                                 ; _ <- chartok '='
-                                 ; choice [ do { t <- pTypedValue
-                                               ; return (ToplevelStandaloneMd n t)
+                                 ; ignore (chartok '=')
+                                 ; choice [ do { t <- pMetaKindedConst -- Tmetadata
+                                               ; return (ToplevelStandaloneMd (TlStandaloneMd n t))
                                                }
                                           ]
                                  }
                             , do { i <- lexeme pId
-                                 ; _ <- chartok '='
-                                 ; _ <- lexeme (string "!{")
+                                 ; ignore (chartok '=')
+                                 ; ignore (lexeme (string "!{"))
                                  ; l <- sepBy pMdNode comma 
-                                 ; _ <- chartok '}'
-                                 ; return $ ToplevelNamedMd (MdVar i) l
+                                 ; ignore (chartok '}')
+                                 ; return $ ToplevelNamedMd (TlNamedMd (MdVar i) l)
                                  }
                             ]
                    }

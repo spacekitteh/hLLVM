@@ -1,6 +1,10 @@
 {-# OPTIONS_GHC -cpp #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+#define FLC   (FileLoc $(srcLoc))
 {-
   This module compute the use, def, and Addr of CoreIr
 -}
@@ -8,250 +12,155 @@ module Llvm.Pass.Uda where
 import Llvm.Data.CoreIr
 import qualified Data.Set as Ds
 import Data.Monoid
-import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Bool(False), undefined)
+import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Bool(False), undefined, foldl,error
+               ,fmap)
 #ifdef DEBUG
 import Debug.Trace
 #endif
 
-data UDA = UDA { u1 :: Ds.Set GlobalOrLocalId -- uses
-               , d1 :: Ds.Set GlobalOrLocalId -- defs
-               , addr :: Ds.Set GlobalOrLocalId
-               } deriving (Show, Eq, Ord)
-        
-instance Monoid UDA where
-    mempty = UDA { u1 = Ds.empty
-                 , d1 = Ds.empty
-                 , addr = Ds.empty
-                 }
-    mappend x y = 
-        UDA {  u1 = (u1 x) `Ds.union` (u1 y)
-            ,  d1 = (d1 x) `Ds.union` (d1 y)
-            ,  addr = (addr x) `Ds.union` (addr y)
-            }
-          
+import Llvm.Query.TypeConstValue
+import Llvm.Query.IrCxt
+import qualified Llvm.Query.TypeConstValue as Tc
 
-uDofRhs :: Rhs -> UDA
-#ifdef DEBUG
-uDofRhs rhs | trace ("uDofRhs " ++ (show rhs)) False = undefined
-#endif
-uDofRhs (RmO e) = uDofMemOp e
-uDofRhs (Re e) = uDofExpr e
-uDofRhs (Call _ cs) = uDofCallSite cs
-uDofRhs (ReE e) = uDofExtractElem uDofTypedValue e
-uDofRhs (RiE e) = uDofInsertElem uDofTypedValue e
-uDofRhs (RsV e) = uDofShuffleVector uDofTypedValue e
-uDofRhs (ReV e) = uDofExtractValue uDofTypedValue e
-uDofRhs (RiV e) = uDofInsertValue uDofTypedValue e
-uDofRhs (VaArg e _) = uDofTypedValue e
-uDofRhs (LandingPad _ _ f _ cl) = (uDofPersFn f) `mappend` (mconcat $ map uDofClause cl)
-
-uDofMemOp :: MemOp -> UDA
-uDofMemOp (Allocate _ _ s _) = maybe mempty uDofTypedValue s
--- uDofMemOp (Free v) = uDofTypedValue v
-uDofMemOp (Load _ ptr _ _ _ _) = uDofTypedPointer ptr
-uDofMemOp (LoadAtomic _ _ ptr _) = uDofTypedPointer ptr
-uDofMemOp (Store _ v a _ _) = (uDofTypedValue v) `mappend` (uDofTypedPointer a)
-uDofMemOp (StoreAtomic _ _ v a _) = (uDofTypedValue v) `mappend` (uDofTypedPointer a)
-uDofMemOp (Fence _ _) = mempty
-uDofMemOp (CmpXchg _ _ ptr v1 v2 _ _ _) = (uDofTypedPointer ptr) 
-                                          `mappend` (mconcat $ map uDofTypedValue [v1, v2])
-uDofMemOp (AtomicRmw _ _ ptr v1 _ _) = (uDofTypedPointer ptr) `mappend` (uDofTypedValue v1)
-
-
-uDofTypedValue :: Typed Value -> UDA
-uDofTypedValue (TypedData _ v) = uDofValue v
-
-uDofTypedPointer :: Typed Pointer -> UDA
-uDofTypedPointer (TypedData _ ptr) = uDofPointer ptr
-
-uDofPointer :: Pointer -> UDA
-uDofPointer (Pointer g) = uDofValue g
-                          
-                 
-uDofExtractElem :: (a -> UDA) -> ExtractElem a -> UDA
-uDofExtractElem f (ExtractElem v1 v2) = mconcat $ map f [v1,v2] 
-
-uDofInsertElem :: (a -> UDA) -> InsertElem a -> UDA
-uDofInsertElem f (InsertElem v1 v2 v3) = mconcat $ map f [v1,v2,v3]
-
-uDofShuffleVector :: (a -> UDA) -> ShuffleVector a -> UDA
-uDofShuffleVector f (ShuffleVector v1 v2 v3) = mconcat $ map f [v1,v2,v3]
-
-uDofExtractValue :: (a -> UDA) -> ExtractValue a -> UDA
-uDofExtractValue f (ExtractValue v _) = f v
-
-
-uDofInsertValue :: (a -> UDA) -> InsertValue a -> UDA
-uDofInsertValue f (InsertValue v1 v2 _) = mconcat $ map f [v1,v2]
-
-uDofClause :: Clause -> UDA
-uDofClause (Catch v) = uDofTypedValue v
-uDofClause (Filter c) = uDofTypedConst c
-uDofClause (Cco c) = uDofConversion uDofTypedValue c
-                 
-
-uDofExpr :: Expr -> UDA
-uDofExpr (EgEp e) = uDofGetElemPtr uDofTypedValue e
-uDofExpr (EiC e) = uDofIcmp uDofValue e
-uDofExpr (EfC e) = uDofFcmp uDofValue e
-uDofExpr (Eb e) = uDofBinExpr uDofValue e
-uDofExpr (Ec e) = uDofConversion uDofTypedValue e
-uDofExpr (Es e) = uDofSelect uDofTypedValue e
-uDofExpr (Ev e) = uDofTypedValue e
-
-
-uDofGetElemPtr :: (a -> UDA) -> GetElemPtr a -> UDA
-uDofGetElemPtr f (GetElemPtr _ ptr indices) =  (f ptr) `mappend` (mconcat $ map f indices)
-
-uDofIcmp :: (a -> UDA) -> Icmp a -> UDA
-uDofIcmp f (Icmp _ _ v1 v2) = mconcat $ map f [v1,v2]
-
-uDofFcmp :: (a -> UDA) -> Fcmp a -> UDA
-uDofFcmp f (Fcmp _ _ v1 v2) = mconcat $ map f [v1,v2]
-
-
-uDofBinExpr :: (a -> UDA) -> BinExpr a -> UDA
-uDofBinExpr f e = let (v1, v2) = operandOfBinExpr e
-                  in mconcat $ map f [v1, v2]
-                   
-
-uDofConversion :: (a -> UDA) -> Conversion a -> UDA
-uDofConversion f (Conversion _ v _) = f v
-
-uDofSelect :: (a -> UDA) -> Select a -> UDA
-uDofSelect f (Select v1 v2 v3) = mconcat $ map f [v1,v2,v3]
-
-
-uDofFunName :: FunName -> UDA
-uDofFunName (FunNameGlobal g) = mempty { u1 = Ds.singleton g }
-uDofFunName (FunNameString _) = mempty 
-
-
-uDofCallSite :: CallSite -> UDA
-uDofCallSite (CsFun _ _ _ fn params _) = (uDofFunName fn) `mappend` (mconcat $ map uDofActualParam params)
-uDofCallSite (CsAsm _ _ _ _ _ _ params _) = mconcat $ map uDofActualParam params
-uDofCallSite (CsConversion _ _ c params _) = let s = uDofConversion uDofTypedConst c
-                                             in s `mappend` (mconcat $ map uDofActualParam params)
-
-uDofActualParam :: ActualParam -> UDA
-uDofActualParam (ActualParam _ _ _ v _) = uDofValue v
-
-
-uDofTypedConst :: Typed Const -> UDA
-uDofTypedConst (TypedData _ v) = uDofConst v
-uDofTypedConst UntypedNull = mempty
+class Uda a where
+  use :: a -> Ds.Set GlobalOrLocalId
+  def :: a -> Ds.Set LocalId -- defined ssa variables
   
-uDofConst :: Const -> UDA
-uDofConst (Ccp s) = uDofSimpleConstant s
-uDofConst (Cca c) = uDofComplexConstant c
-uDofConst (CmL _) = mempty
-uDofConst (Cl _) = mempty
-uDofConst (CblockAddress _ _) = mempty
-uDofConst (Cb _) = mempty
-uDofConst (Cconv c) = uDofConversion uDofTypedConst c
-uDofConst (CgEp g) = uDofGetElemPtr uDofTypedConst g
-uDofConst (Cs s) = uDofSelect uDofTypedConst s
-uDofConst (CiC x) = uDofIcmp uDofConst x
-uDofConst (CfC x) = uDofFcmp uDofConst x
-uDofConst (CsV x) = uDofShuffleVector uDofTypedConst x
-uDofConst (CeV x) = uDofExtractValue uDofTypedConst x
-uDofConst (CiV x) = uDofInsertValue uDofTypedConst x
-uDofConst (CeE x) = uDofExtractElem uDofTypedConst x
-uDofConst (CiE x) = uDofInsertElem uDofTypedConst x
-uDofConst (CmC x) = uDofMetaConst x
+  storeTo :: a -> Ds.Set Value
+  storeTo _ = Ds.empty
+  
+  loadFrom :: a -> Ds.Set Value
+  loadFrom _ = Ds.empty 
+  
+instance Uda Const where
+  use c = case c of
+    C_globalAddr i -> Ds.insert (GolG i) Ds.empty
+    _ -> Ds.empty
+  def _ = Ds.empty
+
+instance Uda v => Uda (GetElementPtr s v) where
+  use (GetElementPtr _ (T _ ptr) indices) = use ptr `Ds.union` (foldl (\p e -> Ds.union p (use e)) Ds.empty indices)
+  def _ = Ds.empty
+  
+instance Uda v => Uda (Maybe v) where  
+  use x = maybe Ds.empty use x
+  def x = maybe Ds.empty def x
+  storeTo x = maybe Ds.empty storeTo x
+  
+instance Uda v => Uda (T t v) where  
+  use (T _ x) = use x
+  def (T _ x) = def x
+  storeTo (T _ x) = storeTo x
+  
+instance Uda LocalId where
+  use x = Ds.insert (GolL x) Ds.empty
+  def x = Ds.insert x Ds.empty
+  storeTo x = Ds.insert (Val_ssa x) Ds.empty
+  
+instance Uda Value where
+  use x = case x of
+    Val_ssa l -> Ds.insert (GolL l) Ds.empty
+    Val_const c -> use c
+  def _ = error $ "cannot happen"
+  storeTo x = Ds.insert x Ds.empty
+ 
+instance Uda ActualParam where
+  use ap = case ap of
+    ActualParamData _ _ _ v _ -> use v
+    ActualParamLabel _ _ _ v _ -> use v
+    ActualParamMeta _ -> Ds.empty
+  def _ = errorLoc FLC $ "cannot happen"
+  storeTo _ = errorLoc FLC $ "cannot happen"
+  loadFrom _ = errorLoc FLC $ "cannot happen"
+  
+  
+instance Uda x => Uda [x] where  
+  use l = Ds.unions (fmap use l)
+  def l = Ds.unions (fmap def l)
+  storeTo l = Ds.unions (fmap storeTo l)
+  loadFrom l = Ds.unions (fmap loadFrom l)
+
+instance Uda CallSite where
+  use x = case x of
+    CsFun _ _ _ _ l _ -> use l
+    CsAsm _ _ _ _ _ _ l _ -> use l
+    CsConversion _ _ _ l _ -> use l
+
+instance Uda CInst where 
+  use ci = case ci of
+    I_alloca{..} -> use size
+    I_load{..} -> use pointer
+    I_loadatomic{..} -> use pointer
+    I_store{..} -> Ds.union (use storedvalue) (use pointer)
+    I_storeatomic{..} -> Ds.union (use storedvalue) (use pointer)
+    I_fence{..} -> Ds.empty
+    I_cmpxchg_I{..} -> Ds.unions [use pointer,use cmpi,use newi]
+    I_cmpxchg_F{..} -> Ds.unions [use pointer,use cmpf,use newf]
+    I_cmpxchg_P{..} -> Ds.unions [use pointer,use cmpp,use newp]
+    I_atomicrmw{..} -> Ds.unions [use pointer,use val]
+    I_call_fun{..} -> use actualParams
+    I_call_other{..} -> use callSite
+    I_extractelement_I{..} -> Ds.unions [use vectorI, use index]
+    I_extractelement_F{..} -> Ds.unions [use vectorF, use index]
+    I_extractelement_P{..} -> Ds.unions [use vectorP, use index]
+    I_bitcast{..} -> use srcP
+    I_ptrtoint{..} -> use srcP
+    I_inttoptr{..} -> use srcI
+    I_add{..} -> use operand1 `mappend` use operand2
+    I_getelementptr{..} -> use pointer `mappend` (foldl (\p e -> p `mappend` (use e)) Ds.empty indices)
+    I_getelementptr_V{..} -> use vpointer `mappend` (foldl (\p e -> p `mappend` (use e)) Ds.empty vindices)
+    I_llvm_dbg_declare{..} -> Ds.empty
+    I_icmp{..} -> use operand1 `mappend` use operand2
+    I_icmp_V{..} -> use operand1 `mappend` use operand2
+    I_va_end{..} -> use pointer
+    I_va_start{..} -> use pointer
+    I_va_arg tv _ _ -> use tv
+    _ -> errorLoc FLC $ "unsupported " ++ show ci
+  def ci = case ci of
+    I_alloca{..} -> def result
+    I_load{..} -> def result
+    I_store{..} -> Ds.empty
+    I_bitcast{..} -> def result
+    I_ptrtoint{..} -> def result
+    I_inttoptr{..} -> def result
+    I_add{..} -> def result
+    I_sub{..} -> def result
+    I_mul{..} -> def result
+    I_udiv{..} -> def result
+    I_sdiv{..} -> def result
+    I_urem{..} -> def result
+    I_srem{..} -> def result
+    I_shl{..} -> def result
+    I_lshr{..} -> def result
+    I_ashr{..} -> def result    
+    I_and{..} -> def result    
+    I_or{..} -> def result        
+    I_xor{..} -> def result 
+    I_getelementptr{..} -> def result
+    I_llvm_dbg_declare{..} -> Ds.empty
+    I_icmp{..} -> def result
+    I_icmp_V{..} -> def result
+    I_trunc{..} -> def result
+    I_sext{..} -> def result
+    I_va_start{..} -> Ds.empty
+    I_va_arg{..} -> def result
+    I_va_end{..} -> Ds.empty
+    _ -> errorLoc FLC $ "unsupported " ++ show ci    
+  storeTo ci = case ci of
+    I_store{..} -> storeTo pointer
+    I_va_start tv -> storeTo tv
+    _ -> Ds.empty
+  loadFrom ci = case ci of
+    I_load{..} -> let T _ v = pointer
+                  in Ds.insert v Ds.empty
+    _ -> Ds.empty
 
 
-uDofMetaConst :: MetaConst -> UDA
-uDofMetaConst (MdConst c) = uDofConst c
-uDofMetaConst (MdRef _) = mempty 
-uDofMetaConst _ = mempty
-
-uDofPersFn :: PersFn -> UDA
-uDofPersFn (PersFnId g) = mempty { u1 = Ds.singleton g }
-uDofPersFn (PersFnCast c) = uDofConversion (\(_,x) -> mempty {u1 = Ds.singleton x}) c
-uDofPersFn PersFnUndef = mempty
-uDofPersFn PersFnNull = mempty
-uDofPersFn (PersFnConst _) = mempty
-
-uDofSimpleConstant :: SimpleConstant -> UDA
-uDofSimpleConstant (CpGlobalAddr g) = mempty { addr = Ds.singleton $ GolG g }
-uDofSimpleConstant _ = mempty
-
-
-uDofComplexConstant :: ComplexConstant -> UDA
-uDofComplexConstant (Cstruct _ l) = mconcat $ map uDofTypedConst l
-uDofComplexConstant (Cvector l) = mconcat $ map uDofTypedConst l
-uDofComplexConstant (Carray l) = mconcat $ map uDofTypedConst l
-
-
-uDofValue :: Value -> UDA
-uDofValue (VgOl g) = mempty { u1 = Ds.singleton g }
-uDofValue (Ve e) = uDofExpr e
-uDofValue (Vc c) = uDofConst c
-uDofValue (Deref x) = uDofPointer x
-
-
-
-d1ofMaybeGlobalOrLocalId :: Maybe GlobalOrLocalId -> UDA
-d1ofMaybeGlobalOrLocalId lhsOpt = mempty { d1 = maybe Ds.empty Ds.singleton lhsOpt }
-
-uDofPhiInst :: PhiInst -> UDA
-uDofPhiInst (PhiInst lhs _ pairs) = 
-  (mempty { d1 = maybe Ds.empty Ds.singleton lhs}) `mappend` (mconcat $ map (uDofValue . fst) pairs)
-
-
-
-uDofComputingInst :: ComputingInst -> UDA
-uDofComputingInst (ComputingInst lhsOpt rhs) = 
-    (d1ofMaybeGlobalOrLocalId lhsOpt) `mappend` (uDofRhs rhs)
-
-uDofComputingInstWithDbg :: ComputingInstWithDbg -> UDA
-uDofComputingInstWithDbg (ComputingInstWithDbg i _) = uDofComputingInst i
-
-
-uDofTerminatorInst :: TerminatorInst -> UDA
-uDofTerminatorInst (Return l) = mconcat $ map uDofTypedValue l
-uDofTerminatorInst (Br _) = mempty
-uDofTerminatorInst (Cbr c _ _) = uDofValue c
-uDofTerminatorInst (IndirectBr c _) = uDofTypedValue c
-uDofTerminatorInst (Switch c _ cases) = (uDofTypedValue c) `mappend` 
-                                        (mconcat $ map (uDofTypedValue . fst) cases)
-uDofTerminatorInst (Invoke lhsOpt cs _ _) = (d1ofMaybeGlobalOrLocalId lhsOpt) `mappend` (uDofCallSite cs)
-uDofTerminatorInst (Resume v) = uDofTypedValue v
-uDofTerminatorInst Unreachable = mempty
-uDofTerminatorInst Unwind = mempty
-
-uDofTerminatorInstWithDbg :: TerminatorInstWithDbg -> UDA
-uDofTerminatorInstWithDbg (TerminatorInstWithDbg i _) = uDofTerminatorInst i
-
-u1ofPinstWithDbg :: PhiInstWithDbg -> Ds.Set GlobalOrLocalId
-u1ofPinstWithDbg (PhiInstWithDbg n dbgs) = u1ofPinst n
-
-d1ofPinstWithDbg :: PhiInstWithDbg -> Ds.Set GlobalOrLocalId
-d1ofPinstWithDbg (PhiInstWithDbg n dbgs) = d1ofPinst n
-
-u1ofPinst :: PhiInst -> Ds.Set GlobalOrLocalId
-u1ofPinst = u1 . uDofPhiInst
-
-d1ofPinst :: PhiInst -> Ds.Set GlobalOrLocalId
-d1ofPinst = d1 . uDofPhiInst
-
-u1ofComputingInstWithDbg :: ComputingInstWithDbg -> Ds.Set GlobalOrLocalId
-u1ofComputingInstWithDbg = u1 . uDofComputingInstWithDbg
-
-d1ofComputingInstWithDbg :: ComputingInstWithDbg -> Ds.Set GlobalOrLocalId
-d1ofComputingInstWithDbg = d1 . uDofComputingInstWithDbg
-
-u1ofTerminatorInstWithDbg :: TerminatorInstWithDbg -> Ds.Set GlobalOrLocalId
-u1ofTerminatorInstWithDbg = u1 . uDofTerminatorInstWithDbg
-
-d1ofTerminatorInstWithDbg :: TerminatorInstWithDbg -> Ds.Set GlobalOrLocalId
-d1ofTerminatorInstWithDbg = d1 . uDofTerminatorInstWithDbg
-
-
-
-localIdSetOf :: Ds.Set GlobalOrLocalId -> Ds.Set LocalId
-localIdSetOf s = Ds.fold (\e p -> case e of 
-                             GolG _ -> p
-                             GolL x -> Ds.insert x p
-                         ) Ds.empty s
+instance Uda CInstWithDbg where  
+  use (CInstWithDbg ci _) = use ci
+  def (CInstWithDbg ci _) = def ci
+  storeTo (CInstWithDbg ci _) = storeTo ci
+  loadFrom (CInstWithDbg ci _) = loadFrom ci
+  
+  
+                              
