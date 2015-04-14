@@ -152,24 +152,8 @@ instance IrPrint a => IrPrint (Node a e x) where
   printIr (Pinst i) = printIr i
   printIr (Cinst c) = printIr c
   printIr (Tinst t) = printIr t
---  printIr (Finst l) = text "<fact>" <+> printIr l
   printIr (Comment s) = text s
   printIr (Additional a) = printIr a
-
-{-
-instance IrPrint FatPtr where
-  printIr x = case x of
-    FatPtr_Ssa s -> printIr s
-    FatPtr_Const s -> printIr s
--}
-
-{-
-instance IrPrint FactInst where
-  printIr inst = case inst of
-    Fact_SfatRvalueInst l r -> printIr l <+> equals <+> printIr r
-    Fact_GfatLvalueInst l r -> printIr l <+> equals <+> printIr r
---    Fact_TakenBase l -> text "<taken>" <+> printIr l
--}
     
 instance IrPrint a => IrPrint (H.Graph (Node a) H.C H.C) where
   printIr g = braces (H.foldGraphNodes (\n -> \s -> s $$ (printIr n)) g empty)
