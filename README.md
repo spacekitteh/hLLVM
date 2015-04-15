@@ -1,4 +1,4 @@
-hLLVM -- A Haskell Library for processing LLVM assembly codes
+hLLVM -- A Haskell Library for analyzing and transforming LLVM assembly codes
 
 
 Goal: 

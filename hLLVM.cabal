@@ -56,7 +56,7 @@ library {
                      Llvm.Util.Monadic,
                      Llvm.Query.TypeConstValue,
                      Llvm.Query.Qerror,
-                     Llvm.Query.ConstValue,
+                     -- Llvm.Query.ConstValue,
                      Llvm.Query.Conversion,
                      Llvm.Query.IrCxt,
                      Llvm.Query.TypeDef,
