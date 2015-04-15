@@ -32,9 +32,6 @@ data Type = Tprimitive TypePrimitive
           | Tpointer Type AddrSpace
           | Tfunction Type TypeParamList [FunAttr]
           | Tvoid
-          -- | deref a type will strip off Tpointer, this is a syntatical
-          -- | representation that should be evaluated later.
-          -- | Tderef Type 
           deriving (Eq,Ord,Show)
 
 

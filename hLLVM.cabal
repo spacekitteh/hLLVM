@@ -1,20 +1,19 @@
 name:  hLLVM
-version: 0.5.0.0
+version: 0.5.0.1
 license: BSD3
 license-file: LICENSE
 author: Ning Wang <email@ningwang.org>
 maintainer: Ning Wang <email@ningwang.org>
 build-Type: Simple
-cabal-Version: >= 1.10
+cabal-Version: >= 1.20
 stability: 0.5
-synopsis: A library for processing LLVM assembly codes
+synopsis: A library for analyzing and transforming LLVM (3.5) assembly codes
 category: Compilers/Interpreters
-description:  A pure Haskell library for analyzing and transforming LLVM assembly codes. 
-              It includes:
-              1) a parser to parse LLVM code in its text form
-              2) an internal IR that can be feed into Hoopl
-              3) a set of utility functions to convert LLVM AST to and from the internal IR 
-              4) a set of utility functions to query the IR
+description:  A pure Haskell library for analyzing and transforming LLVM assembly codes. It includes:
+              1) a parser to parse LLVM code in its text form; 
+              2) an internal IR that is designed for Hoopl and direct composition; 
+              3) a set of utility functions to convert LLVM AST to and from the internal IR; 
+              4) a set of utility functions to query the IR.
 
 extra-source-files:  README.md, LICENSE, CHANGES, TODO
 
@@ -106,7 +105,7 @@ library {
     }
   } 
   if flag(testcoverage) {
-    ghc-options: -fhpc
+    ghc-options: 
   }
   other-extensions: CPP
 }
@@ -130,6 +129,6 @@ executable llvm-test
                      pretty >= 1.1.1.1,
                      data-dword == 0.3
   if flag(testcoverage) {
-    ghc-options:       -fhpc -dynamic
+    ghc-options:
   }
 
