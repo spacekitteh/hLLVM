@@ -1,15 +1,28 @@
 name:  hLLVM
 version: 0.5.0.0
-description:  A Haskell library for processing LLVM assembly codes
 license: BSD3
 license-file: LICENSE
-author: Ning Wang
-maintainer: email@ningwang.org
+author: Ning Wang <email@ningwang.org>
+maintainer: Ning Wang <email@ningwang.org>
 build-Type: Simple
 cabal-Version: >= 1.10
 stability: 0.5
 synopsis: A library for processing LLVM assembly codes
 category: Compilers/Interpreters
+description:  A pure Haskell library for analyzing and transforming LLVM assembly codes. 
+              It includes:
+              1) a parser to parse LLVM code in its text form
+              2) an internal IR that can be feed into Hoopl
+              3) a set of utility functions to convert LLVM AST to and from the internal IR 
+              4) a set of utility functions to query the IR
+
+extra-source-files:  README.md, LICENSE, CHANGES, TODO
+
+source-repository head
+  type:     git
+  location: https://github.com/mlite/hLLVM.git
+
+
 
 flag debug {
   description: Enable debug support
@@ -37,7 +50,7 @@ library {
                      pretty >= 1.1.1.1,
                      data-dword == 0.3,
                      template-haskell >= 2.9.0.0
-
+  hs-source-dirs:    src
   exposed-modules:   Llvm.Data.Ast,
                      Llvm.Data.Type,
                      Llvm.Data.CoreIr,
@@ -47,16 +60,18 @@ library {
                      Llvm.Data.Shared.AtomicEntity,
                      Llvm.Data.Shared.SimpleConst,
                      Llvm.Data.Shared.DataLayout,
+                     Llvm.Data.Shared.Util,
                      Llvm.Data.Conversion,
                      Llvm.Data.Conversion.AstSimplification,
                      Llvm.Data.Conversion.AstIrConversion,
+                     Llvm.Data.Conversion.AstScanner,
+                     Llvm.Data.Conversion.IrAstConversion,
                      Llvm.Data.Conversion.TypeConversion,
                      Llvm.Data.Conversion.LabelMapM,
                      Llvm.Util.Mapping,
                      Llvm.Util.Monadic,
                      Llvm.Query.TypeConstValue,
                      Llvm.Query.Qerror,
-                     -- Llvm.Query.ConstValue,
                      Llvm.Query.Conversion,
                      Llvm.Query.IrCxt,
                      Llvm.Query.TypeDef,
@@ -67,6 +82,7 @@ library {
                      Llvm.Syntax.Parser.Basic,
                      Llvm.Syntax.Parser.Block,
                      Llvm.Syntax.Parser.Const,
+                     Llvm.Syntax.Parser.DataLayout,
                      Llvm.Syntax.Parser.Instruction,
                      Llvm.Syntax.Parser.Module,
                      Llvm.Syntax.Parser.Rhs,
@@ -80,6 +96,7 @@ library {
                      Llvm.Pass.PhiFixUp,
                      Llvm.Pass.Rewriter,
                      Llvm.Pass.Uda,
+                     Llvm.Pass.PassTester,
                      ParserTester
   if flag(debug) {
      if !os(windows) {
@@ -91,8 +108,7 @@ library {
   if flag(testcoverage) {
     ghc-options: -fhpc
   }
-  other-extensions:        CPP
-  hs-source-dirs:    src
+  other-extensions: CPP
 }
 
 executable llvm-test
@@ -116,3 +132,4 @@ executable llvm-test
   if flag(testcoverage) {
     ghc-options:       -fhpc -dynamic
   }
+
