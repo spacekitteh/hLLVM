@@ -7,7 +7,7 @@ author: Ning Wang
 maintainer: email@ningwang.org
 build-Type: Simple
 cabal-Version: >= 1.10
-stability: 0.1
+stability: 0.5
 synopsis: A library for processing LLVM assembly codes
 category: Compilers/Interpreters
 
