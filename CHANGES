@@ -1,6 +1,6 @@
+0.5 
+- support LLVM 3.5 syntax
+- renamed to hLLVM
 0.1
 - support LLVM 3.1 syntax
 - Hoopl based implementation :mem2reg, dce, dominator 
-0.2 
-- support LLVM 3.5 syntax
-

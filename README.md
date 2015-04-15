@@ -1,14 +1,15 @@
-HsLlvm -- Haskell implementation of LLVM-3.5
+hLLVM -- A Haskell Library for processing LLVM assembly codes
 
 
 Goal: 
 ==========================================
-- Provide functionalities to generate and maniuplate LLVM code in pure Haskell
+- Provide functionalities for performaning analysis and transformation of LLVM codes in pure Haskell
+
 
 
 Build:
 ==============
-From HsLlvm toplevel directory
+From hLLVM toplevel directory
 
   cabal configure
 

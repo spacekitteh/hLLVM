@@ -1,6 +1,6 @@
-name:  HsLlvm
+name:  hLLVM
 version: 0.5.0.0
-description:  Haskell implementation of LLVM
+description:  A Haskell library for processing LLVM assembly codes
 license: BSD3
 license-file: LICENSE
 author: Ning Wang
@@ -8,11 +8,20 @@ maintainer: email@ningwang.org
 build-Type: Simple
 cabal-Version: >= 1.10
 stability: 0.1
-synopsis: A library for processing LLVM Assembly
+synopsis: A library for processing LLVM assembly codes
 category: Compilers/Interpreters
 
+flag debug {
+  description: Enable debug support
+  default:     False
+}
 
-library
+flag testcoverage {
+  description: Enable test coverage report
+  default: False
+}
+
+library {
   default-language:  Haskell2010
   build-depends:     base >= 3 && < 5,
                      containers,
@@ -72,10 +81,19 @@ library
                      Llvm.Pass.Rewriter,
                      Llvm.Pass.Uda,
                      ParserTester
-  ghc-options:       -fhpc
+  if flag(debug) {
+     if !os(windows) {
+        cc-options: -DDEBUG
+     } else {
+        cc-options: -DNDEBUG
+    }
+  } 
+  if flag(testcoverage) {
+    ghc-options: -fhpc
+  }
   other-extensions:        CPP
   hs-source-dirs:    src
-
+}
 
 executable llvm-test
   default-language:  Haskell2010
@@ -95,4 +113,6 @@ executable llvm-test
                      transformers >= 0.3.0.0,
                      pretty >= 1.1.1.1,
                      data-dword == 0.3
-  ghc-options:       -fhpc -dynamic
+  if flag(testcoverage) {
+    ghc-options:       -fhpc -dynamic
+  }
