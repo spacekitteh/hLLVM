@@ -33,10 +33,10 @@ From hLLVM toplevel directory
 ./dist/build/llvm-test/llvm-test parse -i LLVM_3.5_codes/&lt;any.ll&gt; -o out.ll
 
 ## test LLVM AST to IR conversion
-./dist/build/llvm-test/llvm-test ast2ir -i LLVM_3.5_codes/<any.ll> -o out.ll
+./dist/build/llvm-test/llvm-test ast2ir -i LLVM_3.5_codes/&lt;any.ll&gt; -o out.ll
 
 ## test IR to LLVM AST conversion
-./dist/build/llvm-test/llvm-test ir2ast -i LLVM_3.5_codes/<any.ll> -o out.ll
+./dist/build/llvm-test/llvm-test ir2ast -i LLVM_3.5_codes/&lt;any.ll&gt; -o out.ll
 
 ## run tests in batch 
 ./scripts/runLlvmTest.sh parse LLVM_3.5_codes
