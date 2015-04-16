@@ -30,7 +30,7 @@ From hLLVM toplevel directory
 ./scripts/clone_LLVM_codes.sh
 
 ## test LLVM assembly parser
-./dist/build/llvm-test/llvm-test parse -i LLVM_3.5_codes/<any.ll> -o out.ll
+./dist/build/llvm-test/llvm-test parse -i LLVM_3.5_codes/&lt;any.ll&gt; -o out.ll
 
 ## test LLVM AST to IR conversion
 ./dist/build/llvm-test/llvm-test ast2ir -i LLVM_3.5_codes/<any.ll> -o out.ll
@@ -40,6 +40,7 @@ From hLLVM toplevel directory
 
 ## run tests in batch 
 ./scripts/runLlvmTest.sh parse LLVM_3.5_codes
+
 ./scripts/runLlvmTest.sh ir2ast LLVM_3.5_codes
 
 
