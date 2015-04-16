@@ -1007,7 +1007,7 @@ instance Conversion I.FunctionPrototype (Rm A.FunctionPrototype) where
 
 
 instance Conversion I.PhiInst (Rm A.PhiInst) where
-  convert (I.PhiInst mg t branches) = 
+  convert (I.PhiInst t branches mg) = 
     Md.liftM (A.PhiInst (Just mg) (tconvert () t)) 
     (mapM (pairM convert convert_to_PercentLabel) branches)
 
@@ -1118,15 +1118,23 @@ getLabelId :: A.BlockLabel -> A.LabelId
 getLabelId (A.ImplicitBlockLabel _) = error "ImplicitBlockLabel should be normalized"
 getLabelId (A.ExplicitBlockLabel l) = l
 
+isComment :: A.ComputingInstWithDbg -> Bool
+isComment x = case x of
+  A.ComputingInstWithComment _ -> True
+  _ -> False
+
 convertNode :: I.Node a e x -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
                -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
 convertNode (I.Nlabel a) p = do { (bl, bs, Nothing) <- p
                                 ; a' <- convert_to_BlockLabel a
                                 ; return (bl, bs, Just (a', [], []))
                                 }
-convertNode (I.Pinst a) p = do { (bl, bs, Just (pb, phis, [])) <- p
-                               ; a' <- convert a
-                               ; return (bl, bs, Just (pb, a':phis, []))
+convertNode (I.Pinst a) p = do { (bl, bs, pblk) <- p
+                               ; case pblk of
+                                 Just (pb, phis, l) | all isComment l -> do { a' <- convert a
+                                                                            ; return (bl, bs, Just (pb, a':phis, l))
+                                                                            }
+                                 _ -> I.errorLoc FLC $ "irrefutable:unexpected case " ++ show pblk
                                }
 convertNode (I.Cinst a) p = do { (bl, bs, Just (pb, phis, cs)) <- p
                                ; a' <- convert a

@@ -489,7 +489,7 @@ instance IrPrint Dbg where
 
 
 instance IrPrint PhiInst where
-  printIr (PhiInst lhs t pairs) =  printIr lhs <+> equals <+> text "phi" 
+  printIr (PhiInst t pairs lhs) =  printIr lhs <+> equals <+> text "phi" 
                                    <+> printIr t <+> (commaSepList $ fmap tvToLLvm pairs)
     where tvToLLvm (h1,h2) = brackets (printIr h1 <+> comma <+> printIr h2)
 

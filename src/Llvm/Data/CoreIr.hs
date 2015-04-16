@@ -244,7 +244,10 @@ data PersFn = PersFnId GlobalOrLocalId
 
 data Dbg = Dbg MdVar MetaConst deriving (Eq, Ord, Show)
 
-data PhiInst = PhiInst LocalId Ftype [(Value, Label)] deriving (Eq, Ord, Show)
+data PhiInst = PhiInst { ftype :: Ftype 
+                       , flowins :: [(Value, Label)] 
+                       , flowout :: LocalId 
+                       } deriving (Eq, Ord, Show)
 
 data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg] deriving (Eq, Ord, Show)
 
@@ -311,7 +314,8 @@ data CInst where {
                    } -> CInst;
 
   I_fence :: { singleThread :: IsOrIsNot SingleThread
-             , ordering :: AtomicMemoryOrdering } -> CInst;
+             , ordering :: AtomicMemoryOrdering 
+             } -> CInst;
 
   I_cmpxchg_I :: { weak :: IsOrIsNot Weak
                  , volatile :: IsOrIsNot Volatile
@@ -321,7 +325,8 @@ data CInst where {
                  , singlethread :: IsOrIsNot SingleThread
                  , success_ordering :: AtomicMemoryOrdering
                  , failure_ordering :: AtomicMemoryOrdering
-                 , result :: LocalId } -> CInst;
+                 , result :: LocalId 
+                 } -> CInst;
 
   I_cmpxchg_F :: { weak :: IsOrIsNot Weak
                  , volatile :: IsOrIsNot Volatile
@@ -331,7 +336,8 @@ data CInst where {
                  , singlethread :: IsOrIsNot SingleThread
                  , success_ordering :: AtomicMemoryOrdering
                  , failure_ordering :: AtomicMemoryOrdering
-                 , result :: LocalId } -> CInst;
+                 , result :: LocalId 
+                 } -> CInst;
 
   I_cmpxchg_P :: { weak :: IsOrIsNot Weak
                  , volatile :: IsOrIsNot Volatile
@@ -341,7 +347,8 @@ data CInst where {
                  , singlethread :: IsOrIsNot SingleThread
                  , success_ordering :: AtomicMemoryOrdering
                  , failure_ordering :: AtomicMemoryOrdering
-                 , result :: LocalId } -> CInst;
+                 , result :: LocalId 
+                 } -> CInst;
 
   I_atomicrmw :: { volatile :: IsOrIsNot Volatile
                  , atomicOp :: AtomicOp
@@ -349,7 +356,8 @@ data CInst where {
                  , val :: T (Type ScalarB I) Value
                  , singlethread :: IsOrIsNot SingleThread
                  , ordering :: AtomicMemoryOrdering
-                 , result :: LocalId } -> CInst;
+                 , result :: LocalId 
+                 } -> CInst;
 
   I_call_fun :: { tailCall :: TailCall
                 , callConv :: Maybe CallConv
@@ -358,28 +366,34 @@ data CInst where {
                 , calleeName :: FunName
                 , actualParams :: [ActualParam]
                 , funAttrs :: [FunAttr]
-                , callReturn :: Maybe LocalId } -> CInst;
+                , callReturn :: Maybe LocalId 
+                } -> CInst;
 
   I_call_other :: { tailCall :: TailCall
                   , callSite :: CallSite
-                  , callReturn :: Maybe LocalId } -> CInst;
+                  , callReturn :: Maybe LocalId 
+                  } -> CInst;
 
   I_extractelement_I :: { vectorI :: T (Type VectorB I) Value
                         , index :: T (Type ScalarB I) Value
-                        , result :: LocalId } -> CInst;
+                        , result :: LocalId 
+                        } -> CInst;
 
   I_extractelement_F :: { vectorF :: T (Type VectorB F) Value
                         , index :: T (Type ScalarB I) Value
-                        , result :: LocalId } -> CInst;
+                        , result :: LocalId 
+                        } -> CInst;
 
   I_extractelement_P :: { vectorP :: T (Type VectorB P) Value
                         , index :: T (Type ScalarB I) Value
-                        , result :: LocalId } -> CInst;
+                        , result :: LocalId 
+                        } -> CInst;
 
   I_insertelement_I :: { vectorI :: T (Type VectorB I) Value
                        , elementI :: T (Type ScalarB I) Value
                        , index :: T (Type ScalarB I) Value
-                       , result :: LocalId } -> CInst;
+                       , result :: LocalId 
+                       } -> CInst;
 
   I_insertelement_F :: { vectorF :: T (Type VectorB F) Value
                        , elementF :: T (Type ScalarB F) Value
@@ -411,8 +425,16 @@ data CInst where {
                        , result :: LocalId
                        } -> CInst;
 
-  I_extractvalue :: T (Type RecordB D) Value -> [Word32] -> LocalId ->  CInst;
-  I_insertvalue :: T (Type RecordB D) Value -> T Dtype Value -> [Word32] -> LocalId ->  CInst;
+  I_extractvalue :: { record :: T (Type RecordB D) Value 
+                    , windices :: [Word32] 
+                    , result :: LocalId 
+                    } ->  CInst;
+  
+  I_insertvalue :: { record :: T (Type RecordB D) Value 
+                   , element :: T Dtype Value 
+                   , windices :: [Word32] 
+                   , result :: LocalId 
+                   } ->  CInst;
 
   I_va_arg :: { dv :: T Dtype Value 
               , typeD :: Dtype 
@@ -555,100 +577,280 @@ data CInst where {
            } -> CInst;
 
   {-- int bin vector exp --}
-  I_add_V :: (Maybe NoWrap) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_sub_V :: (Maybe NoWrap) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_mul_V :: (Maybe NoWrap) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_udiv_V :: (Maybe Exact) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_sdiv_V :: (Maybe Exact) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_urem_V :: Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_srem_V :: Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_shl_V :: (Maybe NoWrap) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_lshr_V :: (Maybe Exact) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_ashr_V :: (Maybe Exact) -> Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_and_V :: Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_or_V :: Type VectorB I -> Value -> Value -> LocalId -> CInst;
-  I_xor_V :: Type VectorB I -> Value -> Value -> LocalId -> CInst;
+  I_add_V :: { flagI :: Maybe NoWrap
+             , typeVI :: Type VectorB I 
+             , operand1 :: Value 
+             , operand2 :: Value 
+             , result :: LocalId 
+             } -> CInst;
+  
+  I_sub_V :: { flagI :: Maybe NoWrap 
+             , typeVI :: Type VectorB I 
+             , operand1 :: Value 
+             , operand2 :: Value 
+             , result :: LocalId 
+             } -> CInst;
+  
+  I_mul_V :: { flagI :: Maybe NoWrap 
+             , typeVI :: Type VectorB I 
+             , operand1 :: Value 
+             , operand2 :: Value 
+             , result :: LocalId 
+             } -> CInst;
+  
+  I_udiv_V :: { flagE :: Maybe Exact 
+              , typeVI :: Type VectorB I 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_sdiv_V :: { flagE :: Maybe Exact 
+              , typeVI :: Type VectorB I 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_urem_V :: { typeVI :: Type VectorB I 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_srem_V :: { typeVI :: Type VectorB I 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_shl_V :: { flagW :: Maybe NoWrap 
+             , typeVI :: Type VectorB I 
+             , operand1 :: Value 
+             , operand2 :: Value 
+             , result :: LocalId 
+             } -> CInst;
+  
+  I_lshr_V :: { flagE :: Maybe Exact 
+              , typeVI :: Type VectorB I 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_ashr_V :: { flagE :: Maybe Exact 
+              , typeVI :: Type VectorB I 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_and_V :: { typeVI :: Type VectorB I 
+             , operand1 :: Value 
+             , operand2 :: Value 
+             , result :: LocalId 
+             } -> CInst;
+  
+  I_or_V :: { typeVI :: Type VectorB I 
+            , operand1 :: Value 
+            , operand2 :: Value 
+            , result :: LocalId 
+            } -> CInst;
+  
+  I_xor_V :: { typeVI :: Type VectorB I 
+             , operand1 :: Value 
+             , operand2 :: Value 
+             , result :: LocalId 
+             } -> CInst;
+  
+  {- float bin exp -}
+  I_fadd :: { flagF :: FastMathFlags 
+            , typeF :: Type ScalarB F 
+            , operand1 :: Value 
+            , operand2 :: Value 
+            , result :: LocalId 
+            } -> CInst;
+  
+  I_fsub :: { flagF :: FastMathFlags 
+            , typeF :: Type ScalarB F 
+            , operand1 :: Value 
+            , operand2 :: Value 
+            , result :: LocalId 
+            } -> CInst;
+  
+  I_fmul :: { flagF :: FastMathFlags 
+            , typeF :: Type ScalarB F 
+            , operand1 :: Value 
+            , operand2 :: Value 
+            , result :: LocalId 
+            } -> CInst;
+  
+  I_fdiv :: { flagF :: FastMathFlags 
+            , typeF :: Type ScalarB F 
+            , operand1 :: Value 
+            , operand2 :: Value 
+            , result :: LocalId 
+            } -> CInst;
+  
+  I_frem :: { flagF :: FastMathFlags 
+            , typeF :: Type ScalarB F 
+            , operand1 :: Value 
+            , operand2 :: Value 
+            , result :: LocalId 
+            } -> CInst;
 
   {- float bin exp -}
-  I_fadd :: FastMathFlags -> Type ScalarB F -> Value -> Value -> LocalId -> CInst;
-  I_fsub :: FastMathFlags -> Type ScalarB F -> Value -> Value -> LocalId -> CInst;
-  I_fmul :: FastMathFlags -> Type ScalarB F -> Value -> Value -> LocalId -> CInst;
-  I_fdiv :: FastMathFlags -> Type ScalarB F -> Value -> Value -> LocalId -> CInst;
-  I_frem :: FastMathFlags -> Type ScalarB F -> Value -> Value -> LocalId -> CInst;
-
-  {- float bin exp -}
-  I_fadd_V :: FastMathFlags -> Type VectorB F -> Value -> Value -> LocalId -> CInst;
-  I_fsub_V :: FastMathFlags -> Type VectorB F -> Value -> Value -> LocalId -> CInst;
-  I_fmul_V :: FastMathFlags -> Type VectorB F -> Value -> Value -> LocalId -> CInst;
-  I_fdiv_V :: FastMathFlags -> Type VectorB F -> Value -> Value -> LocalId -> CInst;
-  I_frem_V :: FastMathFlags -> Type VectorB F -> Value -> Value -> LocalId -> CInst;
+  I_fadd_V :: { flagF :: FastMathFlags 
+              , typeVF :: Type VectorB F 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_fsub_V :: { flagF :: FastMathFlags 
+              , typeVF :: Type VectorB F 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_fmul_V :: { flagF :: FastMathFlags 
+              , typeVF :: Type VectorB F 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_fdiv_V :: { flagF :: FastMathFlags 
+              , typeVF :: Type VectorB F 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_frem_V :: { flagF :: FastMathFlags 
+              , typeVF :: Type VectorB F 
+              , operand1 :: Value 
+              , operand2 :: Value 
+              , result :: LocalId 
+              } -> CInst;
 
   {-- Scalar conversion --}
   I_trunc :: { srcI :: T (Type ScalarB I) Value
              , toI :: Type ScalarB I
-             , result :: LocalId } -> CInst;
+             , result :: LocalId 
+             } -> CInst;
 
   I_zext :: { srcI :: T (Type ScalarB I) Value
             , toI :: Type ScalarB I
-            , result :: LocalId } -> CInst;
+            , result :: LocalId 
+            } -> CInst;
 
   I_sext :: { srcI :: T (Type ScalarB I) Value
             , toI :: Type ScalarB I
-            , result :: LocalId } -> CInst;
+            , result :: LocalId 
+            } -> CInst;
 
   I_fptrunc ::  { srcF :: T (Type ScalarB F) Value
                 , toF :: Type ScalarB F
-                , result :: LocalId } -> CInst;
+                , result :: LocalId 
+                } -> CInst;
 
   I_fpext ::  { srcF :: T (Type ScalarB F) Value
               , toF :: Type ScalarB F
-              , result :: LocalId } -> CInst;
+              , result :: LocalId 
+              } -> CInst;
 
   I_fptoui :: { srcF :: T (Type ScalarB F) Value
               , toI :: Type ScalarB I
-              , result :: LocalId } -> CInst;
+              , result :: LocalId 
+              } -> CInst;
 
   I_fptosi :: { srcF ::T (Type ScalarB F) Value
               , toI :: Type ScalarB I
-              , result :: LocalId } -> CInst;
+              , result :: LocalId 
+              } -> CInst;
 
   I_uitofp :: { srcI :: T (Type ScalarB I) Value
               , toF :: Type ScalarB F
-              , result :: LocalId } -> CInst;
+              , result :: LocalId 
+              } -> CInst;
 
   I_sitofp :: { srcI :: T (Type ScalarB I) Value
               , toF :: Type ScalarB F
-              , result :: LocalId } -> CInst;
+              , result :: LocalId 
+              } -> CInst;
 
   I_ptrtoint :: { srcP :: T (Type ScalarB P) Value
                 , toI :: Type ScalarB I
-                , result :: LocalId } -> CInst;
+                , result :: LocalId 
+                } -> CInst;
 
   I_inttoptr :: { srcI :: T (Type ScalarB I) Value
                 , toP :: Type ScalarB P
-                , result :: LocalId } -> CInst;
+                , result :: LocalId 
+                } -> CInst;
 
-  I_addrspacecast :: T (Type ScalarB P) Value -> Type ScalarB P -> LocalId -> CInst;
-
+  I_addrspacecast :: { srcP :: T (Type ScalarB P) Value 
+                     , toP :: Type ScalarB P 
+                     , result :: LocalId 
+                     } -> CInst;
 
   I_bitcast :: { srcP :: T (Type ScalarB P) Value
                , toP :: Type ScalarB P
-               , result :: LocalId } -> CInst;
+               , result :: LocalId 
+               } -> CInst;
 
   I_bitcast_D :: { srcD :: T Dtype Value
                  , toD :: Dtype
-                 , result :: LocalId } -> CInst;
+                 , result :: LocalId 
+                 } -> CInst;
 
   {-- Vector conversion --}
-  I_trunc_V :: T (Type VectorB I) Value -> Type VectorB I -> LocalId -> CInst;
-  I_zext_V :: T (Type VectorB I) Value -> Type VectorB I -> LocalId -> CInst;
-  I_sext_V :: T (Type VectorB I) Value -> Type VectorB I -> LocalId -> CInst;
-  I_fptrunc_V :: T (Type VectorB F) Value -> Type VectorB F -> LocalId -> CInst;
-  I_fpext_V :: T (Type VectorB F) Value -> Type VectorB F -> LocalId -> CInst;
-  I_fptoui_V :: T (Type VectorB F) Value -> Type VectorB I -> LocalId -> CInst;
-  I_fptosi_V :: T (Type VectorB F) Value -> Type VectorB I -> LocalId -> CInst;
-  I_uitofp_V :: T (Type VectorB I) Value -> Type VectorB F -> LocalId -> CInst;
-  I_sitofp_V :: T (Type VectorB I) Value -> Type VectorB F -> LocalId -> CInst;
+  I_trunc_V :: { srcVI :: T (Type VectorB I) Value 
+               , toVI :: Type VectorB I 
+               , result :: LocalId 
+               } -> CInst;
+  
+  I_zext_V :: { srcVI :: T (Type VectorB I) Value 
+              , toVI :: Type VectorB I 
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_sext_V :: { srcVI :: T (Type VectorB I) Value 
+              , toVI :: Type VectorB I
+              , result :: LocalId 
+              } -> CInst;
+  
+  I_fptrunc_V :: { srcVF :: T (Type VectorB F) Value
+                 , toVF :: Type VectorB F
+                 , result :: LocalId 
+                 } -> CInst;
+  
+  I_fpext_V :: { srcVF :: T (Type VectorB F) Value
+               , toVF :: Type VectorB F 
+               , result :: LocalId 
+               } -> CInst;
+  
+  I_fptoui_V :: { srcVF :: T (Type VectorB F) Value
+                , toVI :: Type VectorB I
+                , result :: LocalId 
+                } -> CInst;
+  
+  I_fptosi_V :: { srcVF :: T (Type VectorB F) Value 
+                , toVI :: Type VectorB I 
+                , result :: LocalId 
+                } -> CInst;
+  
+  I_uitofp_V :: { srcVI :: T (Type VectorB I) Value 
+                , toVF :: Type VectorB F 
+                , result :: LocalId 
+                } -> CInst;
+  
+  I_sitofp_V :: { srcVI :: T (Type VectorB I) Value 
+                , toVF :: Type VectorB F 
+                , result :: LocalId 
+                } -> CInst;
 
   I_ptrtoint_V :: { srcVP :: T (Type VectorB P) Value
                   , toVI :: Type VectorB I
@@ -660,26 +862,50 @@ data CInst where {
 
   I_addrspacecast_V :: { srcVP :: T (Type VectorB P) Value
                        , toVP :: Type VectorB P
-                       , result :: LocalId } -> CInst;
+                       , result :: LocalId 
+                       } -> CInst;
 
-  I_select_I :: T (Type ScalarB I) Value -> T (Type ScalarB I) Value -> T (Type ScalarB I) Value -> LocalId -> CInst;
-  I_select_F :: T (Type ScalarB I) Value -> T (Type ScalarB F) Value -> T (Type ScalarB F) Value -> LocalId -> CInst;
-  I_select_P :: T (Type ScalarB I) Value -> T (Type ScalarB P) Value -> T (Type ScalarB P) Value -> LocalId -> CInst;
+  I_select_I :: { cond :: T (Type ScalarB I) Value 
+                , trueI :: T (Type ScalarB I) Value 
+                , falseI :: T (Type ScalarB I) Value 
+                , result :: LocalId 
+                } -> CInst;
+  
+  I_select_F :: { cond :: T (Type ScalarB I) Value 
+                , trueF :: T (Type ScalarB F) Value 
+                , falseF :: T (Type ScalarB F) Value 
+                , result :: LocalId 
+                } -> CInst;
+  
+  I_select_P :: { cond :: T (Type ScalarB I) Value 
+                , trueP :: T (Type ScalarB P) Value 
+                , falseP :: T (Type ScalarB P) Value 
+                , result :: LocalId 
+                } -> CInst;
 
-  I_select_VI :: Either (T (Type ScalarB I) Value) (T (Type VectorB I) Value)
-                 -> T (Type VectorB I) Value -> T (Type VectorB I) Value -> LocalId -> CInst;
-  I_select_VF :: Either (T (Type ScalarB I) Value) (T (Type VectorB I) Value)
-                 -> T (Type VectorB F) Value -> T (Type VectorB F) Value -> LocalId -> CInst;
+  I_select_VI :: { condVI :: Either (T (Type ScalarB I) Value) (T (Type VectorB I) Value)
+                 , trueVI :: T (Type VectorB I) Value
+                 , falseVI :: T (Type VectorB I) Value 
+                 , result :: LocalId 
+                 } -> CInst;
+  
+  I_select_VF :: { condVF :: Either (T (Type ScalarB I) Value) (T (Type VectorB I) Value)
+                 , trueVF :: T (Type VectorB F) Value 
+                 , falseVF :: T (Type VectorB F) Value 
+                 , result :: LocalId 
+                 } -> CInst;
 
   I_select_VP :: { condV :: Either (T (Type ScalarB I) Value) (T (Type VectorB I) Value)
                  , trueVP :: T (Type VectorB P) Value
                  , falseVP :: T (Type VectorB P) Value
-                 , result :: LocalId } -> CInst;
+                 , result :: LocalId 
+                 } -> CInst;
 
   I_select_First :: { cond :: T (Type ScalarB I) Value
                     , trueFirst :: T (Type FirstClassB D) Value
                     , falseFirst :: T (Type FirstClassB D) Value
-                    , result :: LocalId } -> CInst;
+                    , result :: LocalId 
+                    } -> CInst;
 
   {-- llvm intrinsic function calls --}
   I_llvm_memcpy:: { memlen :: MemLen

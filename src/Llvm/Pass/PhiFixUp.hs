@@ -56,13 +56,12 @@ removePhi x live | trace ("removePhi is called over " ++ show x) False = undefin
 removePhi x live | trace ("removePhi is called with " ++ show live) False = undefined
 removePhi x live | trace ("removePhi is called with " ++ show live) False = undefined
 #endif
-removePhi (PhiInstWithDbg (PhiInst lhs t ins) dbgs) live = 
-  if liveOperands == ins then
-    return $ Nothing
-  else if liveOperands == [] then
-         return $ Just emptyGraph
-       else 
-         return $ Just $ nodeToGraph (Pinst $ PhiInstWithDbg (PhiInst lhs t liveOperands) dbgs)
+removePhi (PhiInstWithDbg (PhiInst lt ins lhs) dbgs) live = 
+  if liveOperands == ins 
+  then return $ Nothing
+  else if liveOperands == [] 
+       then return $ Just emptyGraph
+       else return $ Just $ nodeToGraph (Pinst $ PhiInstWithDbg (PhiInst lt liveOperands lhs) dbgs)
    where 
 #ifdef DEBUG
      isAlive x s | trace ("isAlive is called with " ++ show x ++ "  " ++ show s) False = undefined

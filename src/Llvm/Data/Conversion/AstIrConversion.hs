@@ -1298,7 +1298,7 @@ convert_PhiInst phi@(A.PhiInst mg t branches) =
              I.UtypeRecordD e -> I.dcast FLC (I.squeeze FLC e)
              _ -> I.dcast FLC ta 
      ; case mg of 
-       Just lhs -> return $ I.PhiInst lhs tab (fmap (\x -> (fst x, snd x)) branchesa)
+       Just lhs -> return $ I.PhiInst tab (fmap (\x -> (fst x, snd x)) branchesa) lhs
        Nothing -> I.errorLoc FLC $ "unused phi" ++ show phi
      }
 
