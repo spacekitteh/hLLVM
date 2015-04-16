@@ -17,12 +17,15 @@ Build:
 From hLLVM toplevel directory
 
   cabal configure
+
   cabal build
 
 The test driver 'llvm-test' is generated at dist/build/llvm-test
 
 What work?
 ==============
+From hLLVM toplevel directory
+
 ## get LLVM 3.5 test codes
 ./scripts/clone_LLVM_codes.sh
 
