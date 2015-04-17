@@ -84,6 +84,7 @@ instance Uda CallSite where
     CsFun _ _ _ _ l _ -> use l
     CsAsm _ _ _ _ _ _ l _ -> use l
     CsConversion _ _ _ l _ -> use l
+  def _ = S.empty  
 
 instance Uda CInst where 
   use ci = case ci of
@@ -199,6 +200,7 @@ instance Uda CInst where
     I_llvm_dbg_declare{..} -> S.empty
     I_llvm_dbg_value{..} -> S.empty
     _ -> errorLoc FLC $ "unsupported " ++ show ci
+    
   def ci = case ci of
     I_alloca{..} -> def result
     I_load{..} -> def result

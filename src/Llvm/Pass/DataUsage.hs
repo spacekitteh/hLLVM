@@ -208,8 +208,13 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
       I_va_start (T _ v) -> addAddrPassedToVaStart v f
       I_va_end (T _ v) -> addAddrPassedToVaStart v f
       I_call_fun{..} -> 
-        f { callSites = S.insert (returnType callSiteType, calleeName, typesOfActualParams actualParams) (callSites f)
-          }
+        let vals = getValuesFromParams actualParams
+        in foldl (\p e -> addAddrPassedToVaStart e 
+                          $ addAddrCaptured e
+                          $ addAddrStoringPtr e
+                          $ addAddrStoringValue e
+                          p
+                 ) (f { callSites = S.insert (returnType callSiteType, calleeName, typesOfActualParams actualParams) (callSites f)}) (S.toList vals)
       _ -> f
     getValuesFromParams :: [ActualParam] -> S.Set Value
     getValuesFromParams ls = foldl (\p e -> case e of

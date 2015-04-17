@@ -86,6 +86,7 @@ findGlobalAddr cnst = case cnst of
   C_s32 _ -> Nothing
   C_u32 _ -> Nothing
   C_null -> Nothing
+  C_undef -> Nothing
   _ -> errorLoc FLC ("unsupported " ++ show cnst)
                         
        
