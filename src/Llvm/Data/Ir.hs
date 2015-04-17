@@ -107,35 +107,39 @@ data Node a e x where
   Pnode  :: Ci.Pinst -> [Dbg] -> Node a H.O H.O
   -- | Cnode, Computation nodes, it can be anyway between Lnode(+ Possibly Pnodes) and Tnode
   Cnode  :: Ci.Cinst -> [Dbg] -> Node a H.O H.O
+  -- | Mnode, Metadata nodes, dataflow analysis can refer to, but should not depend on, the information in Metadata nodes
+  Mnode :: Ci.Minst -> [Dbg] -> Node a H.O H.O
   -- | It's handy if we can communicate some decisions or changes made by
   -- | dataflow analyses/transformations back as comments, so I create this
   -- | Comment node, it is NOOP and will display as a comment in LLVM assembly codes
   Comment :: String -> Node a H.O H.O
-  Tnode  :: Ci.Tinst -> [Dbg] -> Node a H.O H.C
   -- | Extension node, it could be NOOP or any customization node used by
   -- | backends to facilitate dataflow analysis and transformations.
   -- | The clients of this library should never handle this node. If 
   -- | a Enode represents anything other than NOOP, which is (), it should alwasy be  
   -- | converted back to other nodes. 
   Enode :: a -> Node a H.O H.O
+  Tnode  :: Ci.Tinst -> [Dbg] -> Node a H.O H.C  
 
 instance Show a => Show (Node a e x) where
   show x = case x of
     Lnode v -> "Lnode: Node C O:" ++ show v
     Pnode v dbgs -> "Pnode : Node O O:" ++ show v ++ show dbgs
     Cnode v dbgs -> "Cnode : Node O O:" ++ show v ++ show dbgs
-    Tnode v dbgs -> "Tnode : Node O C:" ++ show v ++ show dbgs
+    Mnode v dbgs -> "Mnode : Node O O:" ++ show v ++ show dbgs    
     Comment s -> "Comment : Node O O:" ++ s
     Enode a -> "Enode : Node O O:" ++ show a
+    Tnode v dbgs -> "Tnode : Node O C:" ++ show v ++ show dbgs    
 
 instance Eq a => Eq (Node a e x) where
   (==) x1 x2 = case (x1, x2) of
     (Lnode l1, Lnode l2) -> l1 == l2
     (Pnode v1 d1, Pnode v2 d2) -> v1 == v2 && d1 == d2
     (Cnode v1 d1, Cnode v2 d2) -> v1 == v2 && d1 == d2
-    (Tnode v1 d1, Tnode v2 d2) -> v1 == v2 && d1 == d2
+    (Mnode v1 d1, Mnode v2 d2) -> v1 == v2 && d1 == d2    
     (Comment v1, Comment v2) -> v1 == v2
     (Enode a1, Enode a2) -> a1 == a2
+    (Tnode v1 d1, Tnode v2 d2) -> v1 == v2 && d1 == d2    
     (_, _) -> False
 
 instance (Show a, Ord a) => Ord (Node a e x) where
@@ -143,26 +147,25 @@ instance (Show a, Ord a) => Ord (Node a e x) where
     (Lnode l1, Lnode l2) -> compare l1 l2
     (Pnode v1 d1, Pnode v2 d2) -> compare (v1,d1) (v2,d2)
     (Cnode v1 d1, Cnode v2 d2) -> compare (v1,d1) (v2,d2)
-    (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2) 
+    (Mnode v1 d1, Mnode v2 d2) -> compare (v1,d1) (v2,d2)    
     (Comment v1, Comment v2) -> compare v1 v2
     (Enode v1, Enode v2) -> compare v1 v2
+    (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2)     
     (_, _) -> compare (show x1) (show x2)
 
 instance H.NonLocal (Node a) where
   entryLabel (Lnode l) = l
-  successors (Tnode inst _) = suc inst
-    where
-      suc (Ci.Unreachable) = []
-      suc (Ci.Return _) = []
-      suc (Ci.RetVoid) = []
-      suc (Ci.Br l) = [l]
-      suc (Ci.Cbr _ l1 l2) = [l1, l2]
-      suc (Ci.IndirectBr _ ls) = ls
-      suc (Ci.Switch _ d ls) = (d):(map snd ls)
-      suc (Ci.Invoke  _ l1 l2 _) = [l1, l2]
-      suc (Ci.InvokeCmd _ l1 l2) = [l1, l2]
-      suc (Ci.Resume _) = error "what is resume"
-      suc (Ci.Unwind) = error "what is unwind"
+  successors (Tnode inst _) = case inst of
+    Ci.T_unreachable -> []
+    Ci.T_return _ -> []
+    Ci.T_ret_void -> []
+    Ci.T_br l -> [l]
+    Ci.T_cbr _ l1 l2 -> [l1, l2]
+    Ci.T_indirectbr _ ls -> ls
+    Ci.T_switch d ls -> (snd d):(map snd ls)
+    Ci.T_invoke  _ l1 l2 _ -> [l1, l2]
+    Ci.T_resume _ -> error "what is resume"
+    Ci.T_unwind -> error "what is unwind"
 
 globalIdOfModule :: (Module a) -> S.Set (Ci.Dtype, Ci.GlobalId) -- this should be a map, globalid might have an opaque type
 globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty tl

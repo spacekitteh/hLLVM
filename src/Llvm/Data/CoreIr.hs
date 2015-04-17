@@ -357,7 +357,7 @@ data Cinst where {
                  , val :: T (Type ScalarB I) Value
                  , singlethread :: IsOrIsNot SingleThread
                  , ordering :: AtomicMemoryOrdering
-                 , result :: LocalId 
+                 , result :: LocalId
                  } -> Cinst;
 
   I_call_fun :: { tailCall :: TailCall
@@ -916,35 +916,47 @@ data Cinst where {
                   , align :: T (Type ScalarB I) Value
                   , isvolatile :: T (Type ScalarB I) Value
                   } -> Cinst;
-  
+  {-  
   I_llvm_dbg_declare :: [ActualParam] -> Cinst;
   I_llvm_dbg_value :: [ActualParam] -> Cinst;
+   -}
   } deriving (Eq, Ord, Show)
 
 data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)
 
+-- | LLVM metadata instructions
+data Minst = Minst FunName [MetaParam] -- MetaKindedConst]
+           deriving (Eq, Ord, Show)
+                    
+data MetaParam = MetaParamMeta MetaKindedConst                    
+               | MetaParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
+               deriving (Eq, Ord, Show)
 {- -}
 -- | Terminator instructions cause control flow transferring and 
 -- | side effects (which is unfortunately difficult to seperate out)
-data Tinst = Unreachable
-           | RetVoid
-           | Return [T Dtype Value]
-           | Br Label
-           | Cbr Value Label Label
-           | IndirectBr (T (Type ScalarB P) Value) [Label]
-           | Switch (T (Type ScalarB I) Value) Label [((T (Type ScalarB I) Value), Label)]
-           | Invoke CallSite Label Label (Maybe LocalId)
-           | InvokeCmd CallSite Label Label
-           | Resume (T Dtype Value)
-           | Unwind
+data Tinst = T_unreachable
+           | T_ret_void
+           | T_return [T Dtype Value]
+           | T_br Label
+           | T_cbr { condition :: Value 
+                   , trueL :: Label 
+                   , falseL :: Label
+                   }
+           | T_indirectbr (T (Type ScalarB P) Value) [Label]
+           | T_switch { defaultcase :: (T (Type ScalarB I) Value, Label) 
+                      , othercases :: [(T (Type ScalarB I) Value, Label)]
+                      }
+           | T_invoke CallSite Label Label (Maybe LocalId)
+           | T_resume (T Dtype Value)
+           | T_unwind
            deriving (Eq, Ord, Show)
 
 data ActualParam = ActualParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
                  | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Value [ParamAttr]
-                 | ActualParamMeta MetaKindedConst
+                 -- | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
-
+                          
 data Value = Val_ssa LocalId
            | Val_const Const
            deriving (Eq,Ord,Show)

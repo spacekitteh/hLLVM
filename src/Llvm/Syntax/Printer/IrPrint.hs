@@ -481,8 +481,15 @@ instance IrPrint ActualParam where
   printIr x = case x of
     (ActualParamData t att1 align v att2) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]
-    (ActualParamMeta mc) -> printIr mc
-  
+    (ActualParamLabel t att1 align v att2) -> 
+      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]      
+
+instance IrPrint MetaParam where
+  printIr x = case x of
+    (MetaParamData t att1 align v att2) ->
+      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]
+    (MetaParamMeta mc) -> printIr mc
+
 
 instance IrPrint Dbg where
   printIr (Dbg mv meta) = printIr mv <+> printIr meta
@@ -636,15 +643,14 @@ instance IrPrint Cinst where
     (I_select_VP cnd t f lhs) -> hsep [printIr lhs, equals, text "select", printIr cnd, printIr t, printIr f]
     
     I_llvm_memcpy mod tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr mod  <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5]) 
-    I_llvm_dbg_declare aps ->  text "I_llvm_dbg_declare" <> parens (hsep (fmap printIr aps))
-    I_llvm_dbg_value aps ->  text "I_llvm_dbg_value" <> parens (hsep (fmap printIr aps))    
-    {-
-    I_dbaseOf tv lhs -> hsep [printIr lhs, equals, text "dbaseOf", printIr tv]
-    I_dsizeOf tv lhs -> hsep [printIr lhs, equals, text "dsizeOf", printIr tv]
-    I_inspect_va_start_offset lhs -> hsep [printIr lhs, equals, text "inspect_va_start_offset"]
-    I_inspect_va_start_mbase lhs -> hsep [printIr lhs, equals, text "inspect_va_start_mbase"]    
-    I_inspect_va_start_msize lhs -> hsep [printIr lhs, equals, text "inspect_va_start_msize"]
-    -}
+    
+instance IrPrint Minst where    
+  printIr (Minst fn params) = printIr fn <+> hsep (fmap printIr params)
+  {-
+                              x = case x of
+    M_llvm_dbg_declare aps ->  text "M_llvm_dbg_declare" <> parens (hsep (fmap printIr aps))
+    M_llvm_dbg_value aps ->  text "M_llvm_dbg_value" <> parens (hsep (fmap printIr aps))    
+-}
     
 instance IrPrint MemLen where    
   printIr m = case m of
@@ -652,20 +658,18 @@ instance IrPrint MemLen where
     MemLenI64 -> text "i64"
 
 instance IrPrint Tinst where
-  printIr RetVoid = text "ret" <+> text "void"
-  printIr (Return x) = text "ret" <+> (commaSepList $ fmap printIr x)
-  printIr (Br a) = text "br" <+> printIr a
-  printIr (Cbr v t f) = text "br i1" <+> (commaSepList [printIr v, printIr t, printIr f])
-  printIr (IndirectBr v l) = hsep [text "indirectbr", printIr v <> comma, brackets (commaSepList $ fmap printIr l)]
-  printIr (Switch v d tbl) = 
+  printIr T_ret_void = text "ret" <+> text "void"
+  printIr (T_return x) = text "ret" <+> (commaSepList $ fmap printIr x)
+  printIr (T_br a) = text "br" <+> printIr a
+  printIr (T_cbr v t f) = text "br i1" <+> (commaSepList [printIr v, printIr t, printIr f])
+  printIr (T_indirectbr v l) = hsep [text "indirectbr", printIr v <> comma, brackets (commaSepList $ fmap printIr l)]
+  printIr (T_switch (v,d) tbl) = 
     hsep [text "switch", printIr v <> comma, printIr d, brackets (hsep $ fmap (\(p1,p2) -> printIr p1 <> comma <+> printIr p2) tbl)]
-  printIr (Invoke callSite toL unwindL lhs) = 
+  printIr (T_invoke callSite toL unwindL lhs) = 
     hsep [optSepToLlvm lhs equals, text "invoke", printIr callSite, text "to", printIr toL, text "unwind", printIr unwindL]
-  printIr (InvokeCmd callSite toL unwindL) =  
-    hsep [text "invoke", printIr callSite, text "to", printIr toL, text "unwind", printIr unwindL]
-  printIr Unreachable = text "unreachable"
-  printIr (Resume a) = text "resume" <+> printIr a
-  printIr Unwind = text "unwind"
+  printIr T_unreachable = text "unreachable"
+  printIr (T_resume a) = text "resume" <+> printIr a
+  printIr T_unwind = text "unwind"
 
 instance IrPrint Aliasee where
   printIr (AtV tv ) = printIr tv

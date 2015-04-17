@@ -454,6 +454,13 @@ instance Conversion I.PersFn (Rm A.PersFn) where
     convert (I.PersFnConst c) = Md.liftM A.PersFnConst (convert c)
 
 
+instance Conversion I.Minst (Rm A.ComputingInst) where
+  convert (I.Minst fn params) = 
+    do { fna <- convert fn
+       ; apa <- mapM convert params
+       ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid fna apa []
+       }
+
 instance Conversion I.Cinst (Rm A.ComputingInst) where
   convert cinst = case cinst of 
     I.I_alloca mar t mtv ma lhs -> do { mtva <- maybeM convert mtv 
@@ -941,6 +948,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { csa <- convert cs
          ; return $ A.ComputingInst lhs $ A.Call tc csa 
          }
+      {-
     I.I_llvm_dbg_declare ap ->
       do { apa <- mapM convert ap
          ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.dbg.declare")
@@ -950,7 +958,8 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { apa <- mapM convert ap
          ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.dbg.value")
            apa []
-         }      
+         }
+    -}
     I.I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
       do { (A.Typed t1 v1) <- convert tv1
          ; (A.Typed t2 v2) <- convert tv2
@@ -977,7 +986,19 @@ instance Conversion I.ActualParam (Rm A.ActualParam) where
     (I.ActualParamLabel t pa1 ma v pa2) -> do { va <- convert v 
                                               ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
                                               }
-    (I.ActualParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
+--    (I.ActualParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
+
+instance Conversion I.MetaParam (Rm A.ActualParam) where
+  convert x = case x of
+    (I.MetaParamData t pa1 ma v pa2) -> do { va <- convert v 
+                                             ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
+                                             }
+                                        {-
+    (I.ActualParamLabel t pa1 ma v pa2) -> do { va <- convert v 
+                                              ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
+                                              } -}
+    (I.MetaParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
+
 
 instance Conversion I.Aliasee (Rm A.Aliasee) where
   convert (I.AtV tv) = Md.liftM A.AtV (convert tv)
@@ -1012,32 +1033,33 @@ instance Conversion I.Pinst (Rm A.PhiInst) where
     (mapM (pairM convert convert_to_PercentLabel) branches)
 
 instance Conversion I.Tinst (Rm A.TerminatorInst) where
-  convert (I.RetVoid) = return A.RetVoid
-  convert (I.Return tvs) = Md.liftM A.Return (mapM convert tvs)
-  convert (I.Br t) = Md.liftM A.Br (convert_to_TargetLabel t)
-  convert (I.Cbr cnd t f) = Md.liftM3 A.Cbr (convert cnd) (convert_to_TargetLabel t) (convert_to_TargetLabel f)
-  convert (I.IndirectBr cnd bs) = Md.liftM2 A.IndirectBr (convert cnd) (mapM convert_to_TargetLabel bs)
-  convert (I.Switch cnd d cases) = Md.liftM3 A.Switch (convert cnd) (convert_to_TargetLabel d) 
-                                   (mapM (pairM convert convert_to_TargetLabel) cases)
-  convert (I.Invoke cs t f mg) = Md.liftM3 (A.Invoke mg) (convert cs) (convert_to_TargetLabel t) (convert_to_TargetLabel f)
-  convert (I.InvokeCmd cs t f) = Md.liftM3 (A.Invoke Nothing) (convert cs) (convert_to_TargetLabel t) (convert_to_TargetLabel f)
-  convert (I.Resume tv) = Md.liftM A.Resume (convert tv)
-  convert I.Unreachable = return A.Unreachable
-  convert I.Unwind = return A.Unwind
+  convert (I.T_ret_void) = return A.RetVoid
+  convert (I.T_return tvs) = Md.liftM A.Return (mapM convert tvs)
+  convert (I.T_br t) = Md.liftM A.Br (convert_to_TargetLabel t)
+  convert (I.T_cbr cnd t f) = Md.liftM3 A.Cbr (convert cnd) (convert_to_TargetLabel t) (convert_to_TargetLabel f)
+  convert (I.T_indirectbr cnd bs) = Md.liftM2 A.IndirectBr (convert cnd) (mapM convert_to_TargetLabel bs)
+  convert (I.T_switch (cnd,d) cases) = Md.liftM3 A.Switch (convert cnd) (convert_to_TargetLabel d) 
+                                       (mapM (pairM convert convert_to_TargetLabel) cases)
+  convert (I.T_invoke cs t f mg) = Md.liftM3 (A.Invoke mg) (convert cs) (convert_to_TargetLabel t) (convert_to_TargetLabel f)
+  convert (I.T_resume tv) = Md.liftM A.Resume (convert tv)
+  convert I.T_unreachable = return A.Unreachable
+  convert I.T_unwind = return A.Unwind
 
 instance Conversion I.Dbg (Rm A.Dbg) where
-    convert (I.Dbg mv mc) = Md.liftM2 A.Dbg (convert mv) (convert mc)
+  convert (I.Dbg mv mc) = Md.liftM2 A.Dbg (convert mv) (convert mc)
 
 instance Conversion PhiInstWithDbg (Rm A.PhiInstWithDbg) where
   convert (PhiInstWithDbg ins dbgs) = Md.liftM2 A.PhiInstWithDbg (convert ins) (mapM convert dbgs)
 
 instance Conversion CInstWithDbg (Rm A.ComputingInstWithDbg) where
-    convert (CInstWithDbg ins dbgs) = Md.liftM2 A.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
+  convert (CInstWithDbg ins dbgs) = Md.liftM2 A.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
+
+instance Conversion MInstWithDbg (Rm A.ComputingInstWithDbg) where
+  convert (MInstWithDbg ins dbgs) = Md.liftM2 A.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
 
 instance Conversion TerminatorInstWithDbg (Rm A.TerminatorInstWithDbg) where
-    convert (TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
-    
-    
+  convert (TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
+
     
 instance Conversion I.TlTriple (Rm A.TlTriple) where
   convert (I.TlTriple x) = return (A.TlTriple x)
@@ -1124,6 +1146,7 @@ isComment x = case x of
 
 data PhiInstWithDbg = PhiInstWithDbg I.Pinst [I.Dbg] deriving (Eq, Ord, Show)
 data CInstWithDbg = CInstWithDbg I.Cinst [I.Dbg] deriving (Eq, Ord, Show)
+data MInstWithDbg = MInstWithDbg I.Minst [I.Dbg] deriving (Eq, Ord, Show)
 data TerminatorInstWithDbg = TerminatorInstWithDbg I.Tinst [I.Dbg] deriving (Eq, Ord, Show)
 
 convertNode :: I.Node a e x -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
@@ -1141,6 +1164,10 @@ convertNode (I.Pnode a dbgs) p = do { (bl, bs, pblk) <- p
                                     }
 convertNode (I.Cnode a dbgs) p = do { (bl, bs, Just (pb, phis, cs)) <- p
                                     ; a' <- convert (CInstWithDbg a dbgs)
+                                    ; return (bl, bs, Just (pb, phis, a':cs))
+                                    }
+convertNode (I.Mnode a dbgs) p = do { (bl, bs, Just (pb, phis, cs)) <- p
+                                    ; a' <- convert (MInstWithDbg a dbgs)
                                     ; return (bl, bs, Just (pb, phis, a':cs))
                                     }
 convertNode (I.Comment a) p = do { (bl, bs, Just (pb, phis, cs)) <- p

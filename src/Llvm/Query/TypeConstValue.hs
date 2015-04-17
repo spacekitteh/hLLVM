@@ -360,5 +360,5 @@ instance TypeOf Cinst Dtype where
     I_inttoptr{..} -> ucast toP
     I_load{..} -> let (T (Tpointer et _) _) = pointer
                   in dcast FLC et
-    I_llvm_dbg_declare{..} -> error $ show x ++ " has no type"
+--    I_llvm_dbg_declare{..} -> error $ show x ++ " has no type"
     _ -> errorLoc FLC $ "unsupported " ++ show x 

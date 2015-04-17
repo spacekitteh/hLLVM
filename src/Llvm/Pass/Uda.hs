@@ -67,7 +67,6 @@ instance Uda ActualParam where
   use ap = case ap of
     ActualParamData _ _ _ v _ -> use v
     ActualParamLabel _ _ _ v _ -> use v
-    ActualParamMeta _ -> S.empty
   def _ = errorLoc FLC $ "cannot happen"
   storeTo _ = errorLoc FLC $ "cannot happen"
   loadFrom _ = errorLoc FLC $ "cannot happen"
@@ -197,8 +196,6 @@ instance Uda Cinst where
     I_select_VP{..} -> S.unions [use trueVP, use falseVP]
     I_select_First{..} -> S.unions [use trueFirst, use falseFirst]
     I_llvm_memcpy{..} -> S.unions [use dest, use src, use len, use align]
-    I_llvm_dbg_declare{..} -> S.empty
-    I_llvm_dbg_value{..} -> S.empty
     _ -> errorLoc FLC $ "unsupported " ++ show ci
     
   def ci = case ci of
@@ -314,8 +311,6 @@ instance Uda Cinst where
     I_select_First{..} -> def result
     
     I_llvm_memcpy{..} -> S.empty
-    I_llvm_dbg_declare{..} -> S.empty
-    I_llvm_dbg_value{..} -> S.empty
     _ -> errorLoc FLC $ "unsupported " ++ show ci    
   storeTo ci = case ci of
     I_store{..} -> storeTo pointer
