@@ -4,7 +4,6 @@ module Llvm.Pass.DataUsage where
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Map as Dm
-import qualified Data.List as L
 import Llvm.Query.IrCxt
 
 import qualified Compiler.Hoopl as H
@@ -190,6 +189,22 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                              in propogateUpPtrUsage result ptr f
       I_bitcast{..} -> let (T _ src) = srcP
                        in propogateUpPtrUsage result src f
+      I_bitcast_D{..} -> let (T _ src) = srcD
+                         in propogateUpPtrUsage result src f
+      I_ptrtoint{..} -> let (T _ src) = srcP
+                        in propogateUpPtrUsage result src f
+      I_inttoptr{..} -> let (T _ src) = srcI
+                        in propogateUpPtrUsage result src f
+      I_addrspacecast{..} -> let (T _ src) = srcP
+                             in propogateUpPtrUsage result src f
+      I_select_P{..} -> let (T _ src1) = trueP
+                            (T _ src2) = falseP              
+                        in propogateUpPtrUsage result src1
+                           $ propogateUpPtrUsage result src2 f
+      I_select_First{..} -> let (T _ src1) = trueFirst
+                                (T _ src2) = falseFirst
+                            in propogateUpPtrUsage result src1
+                               $ propogateUpPtrUsage result src2 f
       I_va_start (T _ v) -> addAddrPassedToVaStart v f
       I_va_end (T _ v) -> addAddrPassedToVaStart v f
       I_call_fun{..} -> 
