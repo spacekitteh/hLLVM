@@ -99,6 +99,7 @@ library {
                      Llvm.Pass.CodeMonad,
                      Llvm.Pass.Changer,
                      Llvm.Pass.RewriterEx,
+                     Llvm.Pass.DataUsage,
                      ParserTester
   if flag(debug) {
      if !os(windows) {
