@@ -454,7 +454,7 @@ instance Conversion I.PersFn (Rm A.PersFn) where
     convert (I.PersFnConst c) = Md.liftM A.PersFnConst (convert c)
 
 
-instance Conversion I.CInst (Rm A.ComputingInst) where
+instance Conversion I.Cinst (Rm A.ComputingInst) where
   convert cinst = case cinst of 
     I.I_alloca mar t mtv ma lhs -> do { mtva <- maybeM convert mtv 
                                       ; return $ A.ComputingInst (Just lhs) $ A.RmO $ A.Alloca mar (tconvert () t) mtva ma
@@ -1006,13 +1006,12 @@ instance Conversion I.FunctionPrototype (Rm A.FunctionPrototype) where
          }
 
 
-instance Conversion I.PhiInst (Rm A.PhiInst) where
-  convert (I.PhiInst t branches mg) = 
+instance Conversion I.Pinst (Rm A.PhiInst) where
+  convert (I.Pinst t branches mg) = 
     Md.liftM (A.PhiInst (Just mg) (tconvert () t)) 
     (mapM (pairM convert convert_to_PercentLabel) branches)
 
-
-instance Conversion I.TerminatorInst (Rm A.TerminatorInst) where
+instance Conversion I.Tinst (Rm A.TerminatorInst) where
   convert (I.RetVoid) = return A.RetVoid
   convert (I.Return tvs) = Md.liftM A.Return (mapM convert tvs)
   convert (I.Br t) = Md.liftM A.Br (convert_to_TargetLabel t)
@@ -1029,14 +1028,14 @@ instance Conversion I.TerminatorInst (Rm A.TerminatorInst) where
 instance Conversion I.Dbg (Rm A.Dbg) where
     convert (I.Dbg mv mc) = Md.liftM2 A.Dbg (convert mv) (convert mc)
 
-instance Conversion I.PhiInstWithDbg (Rm A.PhiInstWithDbg) where
-  convert (I.PhiInstWithDbg ins dbgs) = Md.liftM2 A.PhiInstWithDbg (convert ins) (mapM convert dbgs)
+instance Conversion PhiInstWithDbg (Rm A.PhiInstWithDbg) where
+  convert (PhiInstWithDbg ins dbgs) = Md.liftM2 A.PhiInstWithDbg (convert ins) (mapM convert dbgs)
 
-instance Conversion I.CInstWithDbg (Rm A.ComputingInstWithDbg) where
-    convert (I.CInstWithDbg ins dbgs) = Md.liftM2 A.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
+instance Conversion CInstWithDbg (Rm A.ComputingInstWithDbg) where
+    convert (CInstWithDbg ins dbgs) = Md.liftM2 A.ComputingInstWithDbg (convert ins) (mapM convert dbgs)
 
-instance Conversion I.TerminatorInstWithDbg (Rm A.TerminatorInstWithDbg) where
-    convert (I.TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
+instance Conversion TerminatorInstWithDbg (Rm A.TerminatorInstWithDbg) where
+    convert (TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
     
     
     
@@ -1123,35 +1122,39 @@ isComment x = case x of
   A.ComputingInstWithComment _ -> True
   _ -> False
 
+data PhiInstWithDbg = PhiInstWithDbg I.Pinst [I.Dbg] deriving (Eq, Ord, Show)
+data CInstWithDbg = CInstWithDbg I.Cinst [I.Dbg] deriving (Eq, Ord, Show)
+data TerminatorInstWithDbg = TerminatorInstWithDbg I.Tinst [I.Dbg] deriving (Eq, Ord, Show)
+
 convertNode :: I.Node a e x -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
                -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
-convertNode (I.Nlabel a) p = do { (bl, bs, Nothing) <- p
-                                ; a' <- convert_to_BlockLabel a
-                                ; return (bl, bs, Just (a', [], []))
-                                }
-convertNode (I.Pinst a) p = do { (bl, bs, pblk) <- p
-                               ; case pblk of
-                                 Just (pb, phis, l) | all isComment l -> do { a' <- convert a
-                                                                            ; return (bl, bs, Just (pb, a':phis, l))
-                                                                            }
-                                 _ -> I.errorLoc FLC $ "irrefutable:unexpected case " ++ show pblk
+convertNode (I.Lnode a) p = do { (bl, bs, Nothing) <- p
+                               ; a' <- convert_to_BlockLabel a
+                               ; return (bl, bs, Just (a', [], []))
                                }
-convertNode (I.Cinst a) p = do { (bl, bs, Just (pb, phis, cs)) <- p
-                               ; a' <- convert a
-                               ; return (bl, bs, Just (pb, phis, a':cs))
-                               }
+convertNode (I.Pnode a dbgs) p = do { (bl, bs, pblk) <- p
+                                    ; case pblk of
+                                      Just (pb, phis, l) | all isComment l -> do { a' <- convert (PhiInstWithDbg a dbgs)
+                                                                                 ; return (bl, bs, Just (pb, a':phis, l))
+                                                                                 }
+                                      _ -> I.errorLoc FLC $ "irrefutable:unexpected case " ++ show pblk
+                                    }
+convertNode (I.Cnode a dbgs) p = do { (bl, bs, Just (pb, phis, cs)) <- p
+                                    ; a' <- convert (CInstWithDbg a dbgs)
+                                    ; return (bl, bs, Just (pb, phis, a':cs))
+                                    }
 convertNode (I.Comment a) p = do { (bl, bs, Just (pb, phis, cs)) <- p
                                  ; return (bl, bs, Just (pb, phis, (A.ComputingInstWithComment a):cs))
                                  }
-convertNode (I.Tinst a) p = do { (bl, bs, pb) <- p
-                               ; a' <- convert a
-                               ; case pb of
-                                 Nothing -> error "irrefutable"
-                                 Just (l, phis, cs) ->
-                                   let blk = A.Block l (reverse phis) (reverse cs) a'
-                                   in return (blk:bl, M.insert (getLabelId l) blk bs, Nothing)
-                               }
-convertNode (I.Additional _) _ = error "irrefutable:Additional node should be converted to LLVM node"                            
+convertNode (I.Tnode a dbgs) p = do { (bl, bs, pb) <- p
+                                    ; a' <- convert (TerminatorInstWithDbg a dbgs)
+                                    ; case pb of
+                                      Nothing -> error "irrefutable"
+                                      Just (l, phis, cs) ->
+                                        let blk = A.Block l (reverse phis) (reverse cs) a'
+                                        in return (blk:bl, M.insert (getLabelId l) blk bs, Nothing)
+                                    }
+convertNode (I.Enode _) _ = error "irrefutable:Additional node should be converted to LLVM node"
   
 graphToBlocks :: H.Graph (I.Node a) H.C H.C -> Rm ([A.Block], M.Map A.LabelId A.Block)
 graphToBlocks g = do { (bl, bs, Nothing) <- H.foldGraphNodes convertNode g (return ([], M.empty, Nothing))

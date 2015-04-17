@@ -45,15 +45,15 @@ deadAsstElim :: forall a. forall m. H.FuelMonad m => H.BwdRewrite m (Node a) Liv
 deadAsstElim = H.mkBRewrite d
    where
      d :: Node a e x -> H.Fact x Live -> m (Maybe (H.Graph (Node a) e x))
-     d (Cinst n) live = dead n live
+     d (Cnode n _) live = dead n live
      d _ _ = return Nothing
 
 
-dead :: forall a.forall m. H.FuelMonad m => CInstWithDbg -> H.Fact H.O Live -> m (Maybe (H.Graph (Node a) H.O H.O))
-dead (CInstWithDbg ci _) live = deadCi ci live
+dead :: forall a.forall m. H.FuelMonad m => Cinst -> H.Fact H.O Live -> m (Maybe (H.Graph (Node a) H.O H.O))
+dead ci live = deadCi ci live
 
 
-deadCi :: forall a.forall m. H.FuelMonad m => CInst -> H.Fact H.O Live -> m (Maybe (H.Graph (Node a) H.O H.O))
+deadCi :: forall a.forall m. H.FuelMonad m => Cinst -> H.Fact H.O Live -> m (Maybe (H.Graph (Node a) H.O H.O))
 deadCi = undefined
 {-
 deadCi (ComputingInst Nothing (RmO m)) live = deadRmo m live

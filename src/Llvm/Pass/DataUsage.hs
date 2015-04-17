@@ -89,20 +89,15 @@ addAddrStoringValue v du@DataUsage{..} =
 addStackAddrStoringValue :: LocalId -> DataUsage -> DataUsage  
 addStackAddrStoringValue v du@DataUsage{..} = 
   du { stack_addrs_storing_values = S.insert v stack_addrs_storing_values }
-  
 
 bubbleUp :: Ord x => x -> x -> S.Set x -> S.Set x
 bubbleUp dest src s = if S.member dest s then S.insert src s else s
 
-
-
 filterAlloca :: LocalId -> (DataUsage -> S.Set Value) -> (LocalId -> DataUsage -> DataUsage) -> DataUsage -> DataUsage
 filterAlloca ssa src addf du = if S.member (Val_ssa ssa) (src du) then addf ssa du else du
 
-
 bubbleUp2 :: Value -> (DataUsage -> S.Set Value) -> Value -> (Value -> DataUsage -> DataUsage) -> DataUsage -> DataUsage
 bubbleUp2 dest setf src addf du = if S.member dest (setf du) then addf src du else du
-
 
 propogateUpPtrUsage :: LocalId -> Value -> DataUsage -> DataUsage
 propogateUpPtrUsage dest src du = 
@@ -153,9 +148,6 @@ unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11) (DataUsage t1 t2 t
   (s7 `S.union` t7) (s8 `S.union` t8) (s9 `S.union` t9)
   (s10 `S.union` t10) (s11 `S.union` t11)
 
-
-
-
 bwdScan :: forall a.forall m. (Show a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node a) DataUsage
 bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                  , H.bp_transfer = H.mkBTransfer (bwdTran formalParams)
@@ -163,13 +155,13 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                  }
   where
     bwdTran :: S.Set LocalId -> Node a e x -> H.Fact x DataUsage -> DataUsage
-    bwdTran _ n@(Tinst _) f = 
+    bwdTran _ n@(Tnode _ _) f = 
       let bs = H.successors n
       in foldl (\p l -> p `unionDataUsage` (fromMaybe emptyDataUsage $ H.lookupFact l f)) emptyDataUsage bs
-    bwdTran _ (Nlabel _) f = f
-    bwdTran _ (Pinst (PhiInstWithDbg PhiInst{..} _)) f = foldl (\p (e, _) -> propogateUpPtrUsage flowout e p) f flowins
-    bwdTran _ (Additional x) f = f -- error $ "unexpected " ++ show x
-    bwdTran fp (Cinst (CInstWithDbg comp _)) f = case comp of
+    bwdTran _ (Lnode _) f = f
+    bwdTran _ (Pnode (Pinst{..}) _) f = foldl (\p (e, _) -> propogateUpPtrUsage flowout e p) f flowins
+    bwdTran _ (Enode x) f = f -- error $ "unexpected " ++ show x
+    bwdTran fp (Cnode comp _) f = case comp of
       I_store{..} -> 
         let (T _ ptrv) = pointer
         in addAddrStoringValue ptrv $ case (storedvalue, pointer) of

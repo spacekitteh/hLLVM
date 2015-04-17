@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
 import System.IO
 import System.Console.CmdArgs
 import ParserTester
@@ -14,7 +14,9 @@ import qualified Llvm.Data.Conversion as Cv
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
 import qualified Llvm.Pass.PassTester as T
+import qualified Llvm.Pass.DataUsage as Du
 import qualified Llvm.Syntax.Printer.IrPrint as P
+
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -36,6 +38,7 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | Pass { input :: FilePath, output :: Maybe String, step :: [String], fuel :: Int }
             | PhiFixUp { input :: FilePath, output :: Maybe String, fuel :: Int }
             | AstCanonic { input :: FilePath, output :: Maybe String }
+            | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
             deriving (Show, Data, Typeable, Eq)
 
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
@@ -61,9 +64,14 @@ astcanonic = AstCanonic { input = def &= typ "<INPUT>"
                         , output = outFlags Nothing
                         } &= help "Test Ir to Ast conversion"
 
+datause = DataUse { input = def &= typ "<INPUT>"
+                  , output = outFlags Nothing
+                  , fuel = H.infiniteFuel &= typ "FUEL" &= help "the fuel used to rewrite the code, the default is infiniteFuel"
+                  } &= help "Test DataUsage Pass"
+
 pass = Pass { input = def &= typ "<INPUT>"
             , output = outFlags Nothing
-            , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
+            , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass, the default is infiniteFuel"
             , step = def &= typ "STEP" &= help "Supported steps : mem2reg, dce. Multiple passes are supported by specifying multiple --step s, e.g., --step=mem2reg --step=dce"
             } &= help "Test Optimization pass"
 
@@ -72,7 +80,7 @@ phifixup = PhiFixUp { input = def &= typ "<INPUT>"
                     , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
                     } &= help "Test PhiFixUp pass"
 
-mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup] &= help "Test sub components"
+mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup,datause] &= help "Test sub components"
        &= program "Test" &= summary "Test driver v1.0"
 
 main :: IO ()
@@ -135,6 +143,18 @@ main = do { sel <- cmdArgsRun mode
                                    ; hClose inh
                                    ; closeFileOrStdout ox outh
                                    }
+            DataUse ix ox f -> do { inh <- openFile ix ReadMode
+                                  ; outh <- openFileOrStdout ox
+                                  ; ast <- testParser ix inh
+                                  ; let ast' = Cv.simplify ast
+                                  ; let (m, ir::I.Module ()) = testAst2Ir ast'
+                                  ; let ic = irCxtOfModule ir
+                                  ; let liv = H.runSimpleUniqueMonad $ H.runWithFuel f
+                                              ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionPrototype Du.DataUsage))
+                                  ; writeOutIr liv outh
+                                  ; hClose inh
+                                  ; closeFileOrStdout ox outh
+                                  }
             Pass ix ox passes f -> do { inh <- openFile ix ReadMode
                                       ; outh <- openFileOrStdout ox
                                       ; ast <- testParser ix inh

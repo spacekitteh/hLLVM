@@ -55,9 +55,10 @@ data CodeCache ad = CodeCache { insts :: [Node ad O O]
 
 type Cc ad a = Context (CodeCache ad) LocalId String a
 
-mkNode :: CInst -> Node ad O O
-mkNode c = Cinst (CInstWithDbg c [])
-
+{-
+mkNode :: Cinst -> Node ad O O
+mkNode c = Cnode c
+-}
 
 newLocalId :: LocalId -> String -> LocalId
 newLocalId l suffix = case l of
@@ -103,10 +104,10 @@ useBase nb cca = local (\_ -> baseOf nb) cca
 appendToBase :: String -> Cc ad a -> Cc ad a
 appendToBase suffix cca = local (\x -> newLocalId x suffix) cca
 
-newCInst :: CInst -> Cc ad ()
-newCInst inst = modify (\cc@CodeCache{..} -> cc { insts = (mkNode inst):insts })
+newCInst :: Cinst -> Cc ad ()
+newCInst inst = modify (\cc@CodeCache{..} -> cc { insts = (Cnode inst []):insts })
 
-new :: String -> (LocalId -> CInst) -> Cc ad LocalId
+new :: String -> (LocalId -> Cinst) -> Cc ad LocalId
 new rhsPrefix partialInst = 
   do { s <- get
      ; bs <- ask
@@ -115,14 +116,14 @@ new rhsPrefix partialInst =
                    in if S.member x (usedLhs s) 
                       then error $ (show x) ++ " is already defined in the current computation with the base: " ++ show bs
                       else modify (\cc@CodeCache{..} -> cc {usedLhs = S.insert x usedLhs}) >> return x 
-     ; modify (\cc@CodeCache{..} -> cc { insts = (mkNode $ partialInst lhs):insts})
+     ; modify (\cc@CodeCache{..} -> cc { insts = (Cnode (partialInst lhs) []):insts})
      ; return lhs
      }
 
-nativeNewValue :: String -> (LocalId -> CInst) -> Cc ad Value
+nativeNewValue :: String -> (LocalId -> Cinst) -> Cc ad Value
 nativeNewValue rhsPrefix partialInst  = liftM Val_ssa (new rhsPrefix partialInst)
   
-newValue :: String -> (LocalId -> CInst) -> Cc ad Value
+newValue :: String -> (LocalId -> Cinst) -> Cc ad Value
 newValue rhsPrefix partialInst = liftM Val_ssa (new rhsPrefix partialInst)
 
 newNode :: Node ad O O -> Cc ad ()

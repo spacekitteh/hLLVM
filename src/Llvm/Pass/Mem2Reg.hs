@@ -37,21 +37,21 @@ isReg :: FwdTransfer (Node a) Mem2RegFact
 isReg = mkFTransfer ft
 
 ft :: (Node a) e x -> Mem2RegFact -> Fact x Mem2RegFact
-ft (Nlabel _) f = f
-ft (Pinst _) f = f
-ft (Cinst cinst) f = cinstft cinst f
-ft n@(Tinst tinst) f = tinstft n tinst f
- 
+ft (Lnode _) f = f
+ft (Pnode _ _) f = f
+ft (Cnode cinst _) f = cinstft cinst f
+ft n@(Tnode tinst _) f = tinstft n tinst f
 
-tinstft :: (Node a) O C -> TerminatorInstWithDbg -> Mem2RegFact -> Fact C Mem2RegFact
-tinstft n t@(TerminatorInstWithDbg term _) f =  
+
+tinstft :: (Node a) O C -> Tinst -> Mem2RegFact -> Fact C Mem2RegFact
+tinstft n term f =  
   let targets = successors n -- targetOf term
   in case targets of
     [] -> mapEmpty
     l -> mkFactBase mem2RegLattice
          (map (\x -> (x, f)) l)
 
-cinstft :: CInstWithDbg -> Mem2RegFact -> Fact O Mem2RegFact
+cinstft :: Cinst -> Mem2RegFact -> Fact O Mem2RegFact
 cinstft = undefined
 
 {-

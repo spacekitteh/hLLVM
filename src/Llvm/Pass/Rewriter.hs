@@ -237,9 +237,9 @@ rwNode _ _  = Nothing
 -}
 
 nodeToGraph :: Node a e x -> H.Graph (Node a) e x
-nodeToGraph n@(Nlabel _) = H.mkFirst n
-nodeToGraph n@(Pinst _) = H.mkMiddle n
-nodeToGraph n@(Cinst _) = H.mkMiddle n
-nodeToGraph n@(Tinst _) = H.mkLast n
+nodeToGraph n@(Lnode _) = H.mkFirst n
+nodeToGraph n@(Pnode _ _) = H.mkMiddle n
+nodeToGraph n@(Cnode _ _) = H.mkMiddle n
+nodeToGraph n@(Tnode _ _) = H.mkLast n
 
 

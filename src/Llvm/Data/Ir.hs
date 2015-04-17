@@ -12,7 +12,6 @@ import qualified Data.Set as S
 import Data.Word (Word32)
 
 {- An intermediate representation that is suitable for Hoopl -}
-
 data Toplevel a = ToplevelTriple TlTriple
                 | ToplevelDataLayout TlDataLayout
                 | ToplevelAlias TlAlias
@@ -101,47 +100,57 @@ data TlComdat = TlComdat Ci.DollarId Ci.SelectionKind deriving (Eq, Ord, Show)
 
 data Module a = Module [Toplevel a] 
 
--- each instruction represents a node
 data Node a e x where
-  Nlabel :: H.Label -> Node a H.C H.O
-  Pinst  :: Ci.PhiInstWithDbg -> Node a H.O H.O
-  Cinst  :: Ci.CInstWithDbg -> Node a H.O H.O
+  -- | Lnode represents the name of a basic block
+  Lnode :: H.Label -> Node a H.C H.O
+  -- | Pnode, Phi nodes, if they ever exist, always follow up a Lnode in a basic block
+  Pnode  :: Ci.Pinst -> [Dbg] -> Node a H.O H.O
+  -- | Cnode, Computation nodes, it can be anyway between Lnode(+ Possibly Pnodes) and Tnode
+  Cnode  :: Ci.Cinst -> [Dbg] -> Node a H.O H.O
+  -- | It's handy if we can communicate some decisions or changes made by
+  -- | dataflow analyses/transformations back as comments, so I create this
+  -- | Comment node, it is NOOP and will display as a comment in LLVM assembly codes
   Comment :: String -> Node a H.O H.O
-  Tinst  :: Ci.TerminatorInstWithDbg -> Node a H.O H.C
-  Additional :: a -> Node a H.O H.O
+  Tnode  :: Ci.Tinst -> [Dbg] -> Node a H.O H.C
+  -- | Extension node, it could be NOOP or any customization node used by
+  -- | backends to facilitate dataflow analysis and transformations.
+  -- | The clients of this library should never handle this node. If 
+  -- | a Enode represents anything other than NOOP, which is (), it should alwasy be  
+  -- | converted back to other nodes. 
+  Enode :: a -> Node a H.O H.O
 
 instance Show a => Show (Node a e x) where
   show x = case x of
-    Nlabel v -> "Nlabel: Node C O:" ++ show v
-    Pinst v -> "Pinst : Node O O:" ++ show v
-    Cinst v -> "Cinst : Node O O:" ++ show v
-    Tinst v -> "Tinst : Node O C:" ++ show v
+    Lnode v -> "Lnode: Node C O:" ++ show v
+    Pnode v dbgs -> "Pnode : Node O O:" ++ show v ++ show dbgs
+    Cnode v dbgs -> "Cnode : Node O O:" ++ show v ++ show dbgs
+    Tnode v dbgs -> "Tnode : Node O C:" ++ show v ++ show dbgs
     Comment s -> "Comment : Node O O:" ++ s
-    Additional a -> "Additional : Node O O:" ++ show a
+    Enode a -> "Enode : Node O O:" ++ show a
 
 instance Eq a => Eq (Node a e x) where
   (==) x1 x2 = case (x1, x2) of
-    (Nlabel l1, Nlabel l2) -> l1 == l2
-    (Pinst v1, Pinst v2) -> v1 == v2
-    (Cinst v1, Cinst v2) -> v1 == v2
-    (Tinst v1, Tinst v2) -> v1 == v2
+    (Lnode l1, Lnode l2) -> l1 == l2
+    (Pnode v1 d1, Pnode v2 d2) -> v1 == v2 && d1 == d2
+    (Cnode v1 d1, Cnode v2 d2) -> v1 == v2 && d1 == d2
+    (Tnode v1 d1, Tnode v2 d2) -> v1 == v2 && d1 == d2
     (Comment v1, Comment v2) -> v1 == v2
-    (Additional a1, Additional a2) -> a1 == a2
+    (Enode a1, Enode a2) -> a1 == a2
     (_, _) -> False
 
 instance (Show a, Ord a) => Ord (Node a e x) where
   compare x1 x2 = case (x1, x2) of
-    (Nlabel l1, Nlabel l2) -> compare l1 l2
-    (Pinst v1, Pinst v2) -> compare v1 v2
-    (Cinst v1, Cinst v2) -> compare v1 v2
-    (Tinst v1, Tinst v2) -> compare v1 v2
+    (Lnode l1, Lnode l2) -> compare l1 l2
+    (Pnode v1 d1, Pnode v2 d2) -> compare (v1,d1) (v2,d2)
+    (Cnode v1 d1, Cnode v2 d2) -> compare (v1,d1) (v2,d2)
+    (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2) 
     (Comment v1, Comment v2) -> compare v1 v2
-    (Additional v1, Additional v2) -> compare v1 v2
+    (Enode v1, Enode v2) -> compare v1 v2
     (_, _) -> compare (show x1) (show x2)
 
 instance H.NonLocal (Node a) where
-  entryLabel (Nlabel l) = l
-  successors (Tinst (Ci.TerminatorInstWithDbg inst _)) = suc inst
+  entryLabel (Lnode l) = l
+  successors (Tnode inst _) = suc inst
     where
       suc (Ci.Unreachable) = []
       suc (Ci.Return _) = []

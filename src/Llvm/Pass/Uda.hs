@@ -86,7 +86,7 @@ instance Uda CallSite where
     CsConversion _ _ _ l _ -> use l
   def _ = S.empty  
 
-instance Uda CInst where 
+instance Uda Cinst where 
   use ci = case ci of
     I_alloca{..} -> use size
     I_load{..} -> use pointer
@@ -330,13 +330,3 @@ instance Uda CInst where
     I_atomicrmw{..} -> loadFrom pointer
     I_llvm_memcpy{..} -> loadFrom src
     _ -> S.empty
-
-
-instance Uda CInstWithDbg where  
-  use (CInstWithDbg ci _) = use ci
-  def (CInstWithDbg ci _) = def ci
-  storeTo (CInstWithDbg ci _) = storeTo ci
-  loadFrom (CInstWithDbg ci _) = loadFrom ci
-  
-  
-                              

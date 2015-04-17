@@ -865,7 +865,7 @@ convert_PersFn (A.PersFnNull) = return $ I.PersFnNull
 convert_PersFn (A.PersFnConst c) = Md.liftM I.PersFnConst (convert_Const c)
 
 
-convert_Expr_CInst :: (Maybe A.LocalId, A.Expr) -> (MM I.CInst)
+convert_Expr_CInst :: (Maybe A.LocalId, A.Expr) -> (MM I.Cinst)
 convert_Expr_CInst (Just lhs, A.EgEp c) = 
   do { mp <- typeDefs
      ; if getElemPtrIsTvector mp c then 
@@ -1031,7 +1031,7 @@ convert_Expr_CInst (Just lhs, A.Es a@(A.Select _ (A.Typed t _) _)) =
      }
 
 
-convert_MemOp :: (Maybe A.LocalId, A.MemOp) -> (MM I.CInst)
+convert_MemOp :: (Maybe A.LocalId, A.MemOp) -> (MM I.Cinst)
 convert_MemOp (mlhs, c) = case (mlhs, c) of
   (Just lhs, A.Alloca mar t mtv ma) -> 
     do { mp <- typeDefs
@@ -1131,7 +1131,7 @@ convert_Type_Dtype lc t = do { mp <- typeDefs
                              }
 
 
-convert_Rhs :: (Maybe A.LocalId, A.Rhs) -> MM I.CInst
+convert_Rhs :: (Maybe A.LocalId, A.Rhs) -> MM I.Cinst
 convert_Rhs (mlhs, A.RmO c) = convert_MemOp (mlhs, c)
 convert_Rhs (mlhs, A.Re e) = convert_Expr_CInst (mlhs, e)
 convert_Rhs (lhs, A.Call b cs) = 
@@ -1289,7 +1289,7 @@ convert_FunctionPrototype  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f1
      ; return $ I.FunctionPrototype f0 f1 f2 f3 f4 f5a f6 (tconvert mp f7) f8 f9 f10 f10a f11 f12 f13a f14a
      }
 
-convert_PhiInst :: A.PhiInst -> MM I.PhiInst
+convert_PhiInst :: A.PhiInst -> MM I.Pinst
 convert_PhiInst phi@(A.PhiInst mg t branches) = 
   do { mp <- typeDefs
      ; branchesa <- mapM (pairM convert_Value convert_PercentLabel) branches             
@@ -1298,14 +1298,14 @@ convert_PhiInst phi@(A.PhiInst mg t branches) =
              I.UtypeRecordD e -> I.dcast FLC (I.squeeze FLC e)
              _ -> I.dcast FLC ta 
      ; case mg of 
-       Just lhs -> return $ I.PhiInst tab (fmap (\x -> (fst x, snd x)) branchesa) lhs
+       Just lhs -> return $ I.Pinst tab (fmap (\x -> (fst x, snd x)) branchesa) lhs
        Nothing -> I.errorLoc FLC $ "unused phi" ++ show phi
      }
 
-convert_CInst :: A.ComputingInst -> (MM I.CInst)
+convert_CInst :: A.ComputingInst -> (MM I.Cinst)
 convert_CInst (A.ComputingInst mg rhs) = convert_Rhs (mg, rhs) 
 
-convert_TerminatorInst :: A.TerminatorInst -> (MM I.TerminatorInst)
+convert_TerminatorInst :: A.TerminatorInst -> MM I.Tinst
 convert_TerminatorInst (A.RetVoid) = return I.RetVoid
 convert_TerminatorInst (A.Return tvs) = Md.liftM I.Return (mapM convert_to_DtypedValue tvs)
 convert_TerminatorInst (A.Br t) = Md.liftM I.Br (convert_TargetLabel t)
@@ -1329,15 +1329,26 @@ convert_TerminatorInst A.Unwind = return I.Unwind
 convert_Dbg :: A.Dbg -> (MM I.Dbg)
 convert_Dbg (A.Dbg mv mc) = Md.liftM2 I.Dbg (convert_MdVar mv) (convert_MetaConst mc)
 
-convert_PhiInstWithDbg :: A.PhiInstWithDbg -> (MM I.PhiInstWithDbg)
-convert_PhiInstWithDbg (A.PhiInstWithDbg ins dbgs) = Md.liftM2 I.PhiInstWithDbg (convert_PhiInst ins) (mapM convert_Dbg dbgs)
+convert_PhiInstWithDbg :: A.PhiInstWithDbg -> MM (I.Pinst, [I.Dbg])
+convert_PhiInstWithDbg (A.PhiInstWithDbg ins dbgs) = 
+  do { ins0 <- convert_PhiInst ins 
+     ; dbgs0 <- mapM convert_Dbg dbgs
+     ; return (ins0, dbgs0)
+     }
 
-convert_CInstWithDbg :: A.ComputingInstWithDbg -> (MM I.CInstWithDbg)
-convert_CInstWithDbg (A.ComputingInstWithDbg ins dbgs) = Md.liftM2 I.CInstWithDbg (convert_CInst ins) (mapM convert_Dbg dbgs)
-    
-convert_TerminatorInstWithDbg :: A.TerminatorInstWithDbg -> (MM I.TerminatorInstWithDbg)
+convert_CInstWithDbg :: A.ComputingInstWithDbg -> MM (I.Cinst, [I.Dbg])
+convert_CInstWithDbg (A.ComputingInstWithDbg ins dbgs) = 
+  do { ins0 <- convert_CInst ins 
+     ; dbgs0 <- mapM convert_Dbg dbgs
+     ; return (ins0, dbgs0)
+     }
+  
+convert_TerminatorInstWithDbg :: A.TerminatorInstWithDbg -> MM (I.Tinst, [I.Dbg])
 convert_TerminatorInstWithDbg (A.TerminatorInstWithDbg term dbgs) = 
-  Md.liftM2 I.TerminatorInstWithDbg (convert_TerminatorInst term) (mapM convert_Dbg dbgs)
+  do { term0 <- convert_TerminatorInst term 
+     ; dbgs0 <- mapM convert_Dbg dbgs
+     ; return (term0, dbgs0)
+     }
 
 
 toSingleNodeGraph :: A.Block -> MM (H.Graph (I.Node a) H.C H.C)
@@ -1351,16 +1362,16 @@ toSingleNodeGraph (A.Block f  phi ms l) =
      }
 
 toFirst :: A.BlockLabel -> MM (I.Node a H.C H.O)
-toFirst x = Md.liftM I.Nlabel (convert_BlockLabel x)
+toFirst x = Md.liftM I.Lnode (convert_BlockLabel x)
 
 toPhi :: A.PhiInstWithDbg -> MM (I.Node a H.O H.O)
-toPhi phi = Md.liftM I.Pinst (convert_PhiInstWithDbg phi)
+toPhi phi = Md.liftM (uncurry I.Pnode) (convert_PhiInstWithDbg phi)
 
 toMid :: A.ComputingInstWithDbg -> MM (I.Node a H.O H.O)
-toMid inst = Md.liftM I.Cinst (convert_CInstWithDbg inst)
+toMid inst = Md.liftM (uncurry I.Cnode) (convert_CInstWithDbg inst)
 
 toLast :: A.TerminatorInstWithDbg -> MM (I.Node a H.O H.C)
-toLast inst = Md.liftM I.Tinst (convert_TerminatorInstWithDbg inst)
+toLast inst = Md.liftM (uncurry I.Tnode) (convert_TerminatorInstWithDbg inst)
 
 -- | the head must be the entry block
 getEntryAndAlist :: [A.Block] -> MM (H.Label, [A.LabelId])

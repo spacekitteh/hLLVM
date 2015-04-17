@@ -349,7 +349,7 @@ class TypeOf a t | a -> t where
   typeof :: TypeEnv -> a -> t
   
   
-instance TypeOf CInst Dtype where
+instance TypeOf Cinst Dtype where
   typeof te x = case x of
     I_getelementptr{..} -> let (T bt _) = pointer
                                et = getGetElemtPtrIndexedType te (ucast bt) indices

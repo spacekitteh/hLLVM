@@ -148,12 +148,12 @@ instance IrPrint a => IrPrint (Module a) where
 
 
 instance IrPrint a => IrPrint (Node a e x) where
-  printIr (Nlabel lbl) = printIr lbl
-  printIr (Pinst i) = printIr i
-  printIr (Cinst c) = printIr c
-  printIr (Tinst t) = printIr t
+  printIr (Lnode lbl) = printIr lbl
+  printIr (Pnode i dbgs) = commaSepList $ (printIr i):(fmap printIr dbgs)
+  printIr (Cnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)
+  printIr (Tnode t dbgs) = commaSepList $ (printIr t):(fmap printIr dbgs)
   printIr (Comment s) = text s
-  printIr (Additional a) = printIr a
+  printIr (Enode a) = printIr a
     
 instance IrPrint a => IrPrint (H.Graph (Node a) H.C H.C) where
   printIr g = braces (H.foldGraphNodes (\n -> \s -> s $$ (printIr n)) g empty)
@@ -488,12 +488,12 @@ instance IrPrint Dbg where
   printIr (Dbg mv meta) = printIr mv <+> printIr meta
 
 
-instance IrPrint PhiInst where
-  printIr (PhiInst t pairs lhs) =  printIr lhs <+> equals <+> text "phi" 
-                                   <+> printIr t <+> (commaSepList $ fmap tvToLLvm pairs)
+instance IrPrint Pinst where
+  printIr (Pinst t pairs lhs) =  printIr lhs <+> equals <+> text "phi" 
+                                 <+> printIr t <+> (commaSepList $ fmap tvToLLvm pairs)
     where tvToLLvm (h1,h2) = brackets (printIr h1 <+> comma <+> printIr h2)
 
-instance IrPrint CInst where
+instance IrPrint Cinst where
   printIr x = case x of
     (I_alloca ma t s a lhs) -> 
       hsep [printIr lhs, equals, text "alloca", printIr ma, printIr t, commaSepMaybe s, commaSepMaybe a]
@@ -651,7 +651,7 @@ instance IrPrint MemLen where
     MemLenI32 -> text "i32"
     MemLenI64 -> text "i64"
 
-instance IrPrint TerminatorInst where
+instance IrPrint Tinst where
   printIr RetVoid = text "ret" <+> text "void"
   printIr (Return x) = text "ret" <+> (commaSepList $ fmap printIr x)
   printIr (Br a) = text "br" <+> printIr a
@@ -666,17 +666,6 @@ instance IrPrint TerminatorInst where
   printIr Unreachable = text "unreachable"
   printIr (Resume a) = text "resume" <+> printIr a
   printIr Unwind = text "unwind"
-             
-
-instance IrPrint PhiInstWithDbg where
-  printIr (PhiInstWithDbg ins dbgs) = commaSepList ((printIr ins):fmap printIr dbgs)
-
-instance IrPrint TerminatorInstWithDbg where
-  printIr (TerminatorInstWithDbg ins dbgs) = commaSepList ((printIr ins):fmap printIr dbgs)
-
-instance IrPrint CInstWithDbg where
-  printIr (CInstWithDbg ins dbgs) = commaSepList ((printIr ins):fmap printIr dbgs)
-
 
 instance IrPrint Aliasee where
   printIr (AtV tv ) = printIr tv
@@ -684,7 +673,6 @@ instance IrPrint Aliasee where
   printIr (AcV c) = printIr c  
   printIr (Agep a) = printIr a
   printIr (AgepV a) = printIr a  
-                      
 
 instance IrPrint FunctionPrototype where
   printIr (FunctionPrototype fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams 

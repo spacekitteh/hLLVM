@@ -30,12 +30,12 @@ fwdTransfer :: FwdTransfer (Node a) LiveLabel
 fwdTransfer = mkFTransfer live
   where
     live :: Node a e x -> LiveLabel -> Fact x LiveLabel
-    live (Nlabel _) f = f
-    live (Pinst _) f = f 
-    live (Cinst _) f = f 
-    live t@(Tinst n) f  = tinstft t n f
-    tinstft :: Node a O C -> TerminatorInstWithDbg -> LiveLabel -> Fact C LiveLabel
-    tinstft n (TerminatorInstWithDbg term _) f =  
+    live (Lnode _) f = f
+    live (Pnode _ _) f = f 
+    live (Cnode _ _) f = f 
+    live t@(Tnode n _) f  = tinstft t n f
+    tinstft :: Node a O C -> Tinst -> LiveLabel -> Fact C LiveLabel
+    tinstft n term f =  
       let targets = successors n -- targetOf term
       in case targets of
         [] -> mapEmpty
@@ -46,22 +46,22 @@ fwdRewrite :: forall a.forall m. FuelMonad m => FwdRewrite m (Node a) LiveLabel
 fwdRewrite = mkFRewrite d
    where
      d :: Node a e x -> LiveLabel -> m (Maybe (Graph (Node a) e x))
-     d (Pinst n) f = removePhi n f 
+     d (Pnode n dbgs) f = removePhi n dbgs f 
      d _ _ = return Nothing
 
 
-removePhi :: forall a. forall m. FuelMonad m => PhiInstWithDbg -> Fact O LiveLabel -> m (Maybe (Graph (Node a) O O))
+removePhi :: forall a. forall m. FuelMonad m => Pinst -> [Dbg] -> Fact O LiveLabel -> m (Maybe (Graph (Node a) O O))
 #ifdef DEBUG
-removePhi x live | trace ("removePhi is called over " ++ show x) False = undefined
-removePhi x live | trace ("removePhi is called with " ++ show live) False = undefined
-removePhi x live | trace ("removePhi is called with " ++ show live) False = undefined
+removePhi x _ live | trace ("removePhi is called over " ++ show x) False = undefined
+removePhi x _ live | trace ("removePhi is called with " ++ show live) False = undefined
+removePhi x _ live | trace ("removePhi is called with " ++ show live) False = undefined
 #endif
-removePhi (PhiInstWithDbg (PhiInst lt ins lhs) dbgs) live = 
+removePhi (Pinst lt ins lhs) dbgs live = 
   if liveOperands == ins 
   then return $ Nothing
   else if liveOperands == [] 
        then return $ Just emptyGraph
-       else return $ Just $ nodeToGraph (Pinst $ PhiInstWithDbg (PhiInst lt liveOperands lhs) dbgs)
+       else return $ Just $ nodeToGraph (Pnode (Pinst lt liveOperands lhs) dbgs)
    where 
 #ifdef DEBUG
      isAlive x s | trace ("isAlive is called with " ++ show x ++ "  " ++ show s) False = undefined
