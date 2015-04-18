@@ -415,10 +415,15 @@ instance IrPrint TypedConstOrNull where
   printIr (TypedConst tc) = printIr tc
   printIr UntypedNull = text "null"
 
-
 instance (IrPrint t, IrPrint x) => IrPrint (T t x) where
   printIr (T t v) = printIr t <+> printIr v
   
+instance IrPrint FunPtr where  
+  printIr (FunId g) = printIr g
+  printIr (FunIdBitcast (T t g) toT) = text "bitcast" <> parens (printIr t <+> printIr g <+> text "to" <+> printIr toT)
+  printIr (FunIdInttoptr (T t g) toT) = text "inttoptr" <> parens (printIr t <+> printIr g <+> text "to" <+> printIr toT)  
+  printIr (FunSsa g) = printIr g
+
 instance IrPrint FunName where
   printIr (FunNameGlobal s) = printIr s
   printIr (FunNameString s) = text s
@@ -432,6 +437,7 @@ instance IrPrint CallSiteType where
 instance IrPrint CallSite where
   printIr (CsFun cc ra rt ident params fa) = 
     hsep [printIr cc, hsep $ fmap printIr ra, printIr rt, printIr ident, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
+    {-
   printIr (CsAsm t se as dia s1 s2 params fa) = 
     hsep [printIr t, text "asm", printIr se, printIr as, printIr dia, printIr s1 <> comma
          , printIr s2, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
@@ -439,6 +445,7 @@ instance IrPrint CallSite where
     hsep [hsep $ fmap printIr ra, printIr t, printIr convert, parens (hsep $ fmap printIr params), hsep $ fmap printIr fa]
   printIr (CsConversionV ra t convert params fa) = 
     hsep [hsep $ fmap printIr ra, printIr t, printIr convert, parens (hsep $ fmap printIr params), hsep $ fmap printIr fa]
+-}
 
 
 instance IrPrint Clause where
@@ -527,10 +534,9 @@ instance IrPrint Cinst where
     (I_atomicrmw v op p vl st ord lhs) ->
       hsep [printIr lhs, equals, text "atomicrmw", printIr v, printIr op, printIr p <> comma, printIr vl, printIr st, printIr ord]
     
-    (I_call_fun tc cc pa cstype callee actparams fna lhs) -> hsep [optSepToLlvm lhs equals, printIr tc, 
-                                                                   printIr (CsFun cc pa cstype callee actparams fna)]
-    (I_call_other tc cs lhs) -> hsep [optSepToLlvm lhs equals, printIr tc, printIr cs]    
-    
+    (I_call_fun tc cc ra cstype callee actparams fna lhs) -> 
+      hsep [optSepToLlvm lhs equals, printIr tc, 
+            printIr cc, printIr ra, printIr cstype, printIr callee, parens (printIr actparams), printIr fna]
     (I_extractelement_I tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_i", printIr tv, printIr idx]
     (I_extractelement_F tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_f", printIr tv, printIr idx]
     (I_extractelement_P tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_p", printIr tv, printIr idx]
@@ -547,8 +553,8 @@ instance IrPrint Cinst where
     (I_insertvalue vv v idx lhs) -> hsep ([printIr lhs, equals, text "insertvalue", printIr vv, printIr v] ++ fmap integral idx)
     
     I_va_arg dv t lhs -> hsep [printIr lhs, equals, text "va_arg", printIr dv, printIr t]
-    I_va_start tv -> text "call" <+> text "void" <+> text "@llvm.va_start" <+> parens(printIr tv)
-    I_va_end tv -> text "call" <+> text "void" <+> text "@llvm.va_end" <+> parens(printIr tv)
+    I_llvm_va_start tv -> text "call" <+> text "void" <+> text "@llvm.va_start" <+> parens(printIr tv)
+    I_llvm_va_end tv -> text "call" <+> text "void" <+> text "@llvm.va_end" <+> parens(printIr tv)
   
     I_landingpad rt pt tgl b clauses lhs -> 
       hsep ([printIr lhs, equals, text "landingpad", printIr rt, text "personality", printIr pt, printIr tgl, printIr b] ++ fmap printIr clauses)
@@ -645,12 +651,7 @@ instance IrPrint Cinst where
     I_llvm_memcpy mod tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr mod  <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5]) 
     
 instance IrPrint Minst where    
-  printIr (Minst fn params) = printIr fn <+> hsep (fmap printIr params)
-  {-
-                              x = case x of
-    M_llvm_dbg_declare aps ->  text "M_llvm_dbg_declare" <> parens (hsep (fmap printIr aps))
-    M_llvm_dbg_value aps ->  text "M_llvm_dbg_value" <> parens (hsep (fmap printIr aps))    
--}
+  printIr (Minst fn params lhs) = printIr fn <+> hsep (fmap printIr params)
     
 instance IrPrint MemLen where    
   printIr m = case m of
@@ -665,8 +666,9 @@ instance IrPrint Tinst where
   printIr (T_indirectbr v l) = hsep [text "indirectbr", printIr v <> comma, brackets (commaSepList $ fmap printIr l)]
   printIr (T_switch (v,d) tbl) = 
     hsep [text "switch", printIr v <> comma, printIr d, brackets (hsep $ fmap (\(p1,p2) -> printIr p1 <> comma <+> printIr p2) tbl)]
-  printIr (T_invoke callSite toL unwindL lhs) = 
-    hsep [optSepToLlvm lhs equals, text "invoke", printIr callSite, text "to", printIr toL, text "unwind", printIr unwindL]
+  printIr (T_invoke conv reta ft ptr aps fa toL unwindL lhs) = 
+    hsep [optSepToLlvm lhs equals, text "invoke", printIr conv, printIr reta, printIr ft, printIr ptr, 
+          parens (printIr aps), printIr fa, printIr toL, text "unwind", printIr unwindL]
   printIr T_unreachable = text "unreachable"
   printIr (T_resume a) = text "resume" <+> printIr a
   printIr T_unwind = text "unwind"
@@ -876,6 +878,12 @@ instance IrPrint DllStorageClass where
   printIr = P.print
   
 instance IrPrint ThreadLocalStorage where  
+  printIr = P.print
+
+instance IrPrint CallRetAttr where
+  printIr = P.print
+
+instance IrPrint CallFunAttr where
   printIr = P.print
 
 instance IrPrint ParamAttr where

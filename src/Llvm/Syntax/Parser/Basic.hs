@@ -257,6 +257,12 @@ pBlockLabel :: P BlockLabel
 pBlockLabel = choice [ try pExplicitBlockLabel
                      , pImplicitBlockLabel ]
 
+pCallRetAttr :: P CallRetAttr
+pCallRetAttr = choice [ reserved "zeroext" >> return CraZeroExt
+                      , reserved "signext" >> return CraSignExt
+                      , reserved "inreg" >> return CraInReg
+                      ]
+                      
 pParamAttr :: P ParamAttr
 pParamAttr = choice [ reserved "zeroext" >> return PaZeroExt
                     , reserved "signext" >> return PaSignExt
@@ -380,6 +386,15 @@ pTailCall :: P TailCall
 pTailCall = choice [ reserved "tail" >> return TcTailCall
                    , reserved "musttail" >> return TcMustTailCall
                    ]
+
+pCallFunAttr :: P CallFunAttr            
+pCallFunAttr = choice [ reserved "noreturn" >> return CfaNoreturn
+                      , reserved "nounwind" >> return CfaNounwind
+                      , reserved "readonly" >> return CfaReadonly
+                      , reserved "readnone" >> return CfaReadnone
+                      , reserved "optsize" >> return CfaOptsize
+                      ]
+               
 pFunAttr :: P FunAttr
 pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens unsignedInt) -- decimal)
                    , reserved "alwaysinline" >> return FaAlwaysInline
@@ -456,6 +471,11 @@ pFunAttrCollection :: P [FunAttr] -- Collection
 pFunAttrCollection = many $ choice [ char '#' >> liftM FaGroup unsignedInt -- decimal
                                    , pFunAttr
                                    ]
+                     
+pCallFunAttrCollection :: P [CallFunAttr]                     
+pCallFunAttrCollection = many $ choice [ char '#' >> liftM CfaGroup unsignedInt -- decimal
+                                       , pCallFunAttr
+                                       ]
 
 pTuple2 :: P a -> P b -> P (a, b)
 pTuple2 p1 p2 = do { a1 <- p1

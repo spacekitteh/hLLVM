@@ -414,27 +414,23 @@ instance Conversion I.CallSiteType (Rm A.Type) where
     I.CallSiteRet x -> return $ tconvert () x
     I.CallSiteFun ft as -> return $ tconvert () (I.Tpointer (I.ucast ft) as)
     
+instance Conversion I.FunPtr (Rm A.FunName) where
+  convert x = case x of
+    I.FunId g -> return $ A.FunNameGlobal (A.GolG g)
+    I.FunSsa l -> return $ A.FunNameGlobal (A.GolL l)
+    I.FunIdBitcast (I.T st c) dt -> do { tv1 <- convert (I.T st (I.C_globalAddr c))
+                                       ; return $ A.FunNameBitcast tv1 (tconvert () dt)
+                                       }
+    I.FunIdInttoptr (I.T st c) dt -> do { tv1 <- convert (I.T st c)
+                                        ; return $ A.FunNameInttoptr tv1 (tconvert () dt)
+                                        }
+
 instance Conversion I.CallSite (Rm A.CallSite) where
     convert  (I.CsFun cc pa t fn aps fa) = do { fna <- convert fn
                                               ; apsa <- mapM convert aps
                                               ; ta <- convert t
                                               ; return $ A.CsFun cc pa ta fna apsa fa
                                               }
-    convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) = do { asa <- mapM convert as
-                                                     ; ta <- convert t
-                                                     ; return $ A.CsAsm ta dia b1 b2 qs1 qs2 asa fa
-                                                     }
-    convert (I.CsConversion pa t cv as fa) = do { cva <- convert cv
-                                                ; asa <- mapM convert as
-                                                ; ta <- convert t
-                                                ; return $ A.CsConversion pa ta cva asa fa
-                                                }
-    convert (I.CsConversionV pa t cv as fa) = do { cva <- convert cv
-                                                 ; asa <- mapM convert as
-                                                 ; ta <- convert t
-                                                 ; return $ A.CsConversion pa ta cva asa fa
-                                                 }
-
 
 instance Conversion I.Clause (Rm A.Clause) where
     convert (I.Catch tv) = convert tv >>= \tv' -> return $ A.Catch tv'
@@ -455,10 +451,10 @@ instance Conversion I.PersFn (Rm A.PersFn) where
 
 
 instance Conversion I.Minst (Rm A.ComputingInst) where
-  convert (I.Minst fn params) = 
-    do { fna <- convert fn
+  convert (I.Minst fn params lhs) = 
+    do { fna <- convert (I.FunId fn)
        ; apa <- mapM convert params
-       ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid fna apa []
+       ; return $ A.ComputingInst lhs $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid fna apa []
        }
 
 instance Conversion I.Cinst (Rm A.ComputingInst) where
@@ -507,14 +503,14 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { tv1 <- convert tv
          ; return $ A.ComputingInst (Just lhs) $ A.RvA $ A.VaArg tv1 (tconvert () t)
          }
-    I.I_va_start (I.T t v) -> 
-      do { let t1 = tconvert () t
+    I.I_llvm_va_start v -> 
+      do { let t1 = tconvert () (I.ptr0 I.i8)
          ; va <- convert v
          ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.va_start") 
            [A.ActualParamData t1 [] Nothing va []] []
          }      
-    I.I_va_end (I.T t v) -> 
-      do { let t1 = tconvert () t
+    I.I_llvm_va_end v -> 
+      do { let t1 = tconvert () (I.ptr0 I.i8) -- t
          ; va <- convert v 
          ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.va_end") 
            [A.ActualParamData t1 [] Nothing va []] []
@@ -944,10 +940,11 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { csa <- convert (I.CsFun cc pa cstype fn ap fna)
          ; return $ A.ComputingInst lhs $ A.Call tc csa 
          }
-    I.I_call_other tc cs lhs->
-      do { csa <- convert cs
-         ; return $ A.ComputingInst lhs $ A.Call tc csa 
-         }
+    I.I_call_asm tc t dia b1 b2 qs1 qs2 as fa lhs -> 
+      do { asa <- mapM convert as
+         ; let ta = tconvert () t
+         ; return $ A.ComputingInst lhs $ A.Call tc (A.CsAsm ta dia b1 b2 qs1 qs2 asa fa)
+         } 
       {-
     I.I_llvm_dbg_declare ap ->
       do { apa <- mapM convert ap
@@ -1040,7 +1037,9 @@ instance Conversion I.Tinst (Rm A.TerminatorInst) where
   convert (I.T_indirectbr cnd bs) = Md.liftM2 A.IndirectBr (convert cnd) (mapM convert_to_TargetLabel bs)
   convert (I.T_switch (cnd,d) cases) = Md.liftM3 A.Switch (convert cnd) (convert_to_TargetLabel d) 
                                        (mapM (pairM convert convert_to_TargetLabel) cases)
-  convert (I.T_invoke cs t f mg) = Md.liftM3 (A.Invoke mg) (convert cs) (convert_to_TargetLabel t) (convert_to_TargetLabel f)
+  convert (I.T_invoke conv ra fty ptr aps fa  t f mg) = 
+    Md.liftM3 (A.Invoke mg) (convert (I.CsFun conv ra (I.CallSiteFun fty 0) ptr aps fa))
+    (convert_to_TargetLabel t) (convert_to_TargetLabel f)
   convert (I.T_resume tv) = Md.liftM A.Resume (convert tv)
   convert I.T_unreachable = return A.Unreachable
   convert I.T_unwind = return A.Unwind

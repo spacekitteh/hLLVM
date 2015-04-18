@@ -177,14 +177,15 @@ pConstSelect = reserved "select" >> parens (pTriple pTypedConst) >>= \(x,y,z) ->
                   
 pConstConversion :: P (Conversion Const)
 pConstConversion = do { op <- pConvertOp
-                   ; ignore $ chartok '('
-                   ; tc <- pTypedConst
-                   ; reserved "to"
-                   ; t <- pType
-                   ; ignore $ chartok ')'
-                   ; return $ Conversion op (extractTypedConst tc) t
-                   }
+                      ; ignore $ chartok '('
+                      ; tc <- pTypedConst
+                      ; reserved "to"
+                      ; t <- pType
+                      ; ignore $ chartok ')'
+                      ; return $ Conversion op (extractTypedConst tc) t
+                      }
                    
+
                    
 pConstGetElemPtr :: P (GetElementPtr Const)
 pConstGetElemPtr = do { reserved "getelementptr"

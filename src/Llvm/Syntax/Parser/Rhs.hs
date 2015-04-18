@@ -225,47 +225,56 @@ pVaArg = reserved "va_arg" >> pTuple2 pTypedValue pType >>= return . (RvA . uncu
               
 pCallFun :: P CallSite
 pCallFun = do { cc <- opt pCallConv
-              ; atts0 <- many pParamAttr
+              ; atts0 <- many pParamAttr -- CallRetAttr
               ; t <- pType
               ; i <- choice [ liftM FunNameString (choice [symbol "null", symbol "undef"])
                             , liftM FunNameGlobal pGlobalOrLocalId
+                            , pFunNameCast
                             ]
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
               ; return (CsFun cc atts0 t i params atts1)
               }
 
-pCallAsm :: P CallSite
-pCallAsm = do { t <- pType
-              ; reserved "asm"
-              ; se <- opt (reserved "sideeffect" >> return SideEffect)
-              ; as <- opt (reserved "alignstack" >> return AlignStack)
-              ; dialect <- option AsmDialectAtt (reserved "inteldialect" >> return AsmDialectIntel)
-              ; (s1, s2) <- pTuple pQuoteStr
-              ; params <- parens (sepBy pActualParam comma)
-              ; atts1 <- pFunAttrCollection
-              ; return (CsAsm t se as dialect (DqString s1) (DqString s2) params atts1)
-              }
+pAsm ::  P CallSite
+pAsm = do { t <- pType
+          ; reserved "asm"
+          ; se <- opt (reserved "sideeffect" >> return SideEffect)
+          ; as <- opt (reserved "alignstack" >> return AlignStack)
+          ; dialect <- option AsmDialectAtt (reserved "inteldialect" >> return AsmDialectIntel)
+          ; (s1, s2) <- pTuple pQuoteStr
+          ; params <- parens (sepBy pActualParam comma)
+          ; atts1 <- pFunAttrCollection
+          ; return (CsAsm t se as dialect (DqString s1) (DqString s2) params atts1)
+          }
 
-pCallConversion :: P (CallSite)
-pCallConversion = do { a <- many pParamAttr
-                     ; t <- pType
-                     ; convert <- pConstConversion
-                     ; params <- parens (sepBy pActualParam comma)
-                     ; atts1 <- pFunAttrCollection
-                     ; return (CsConversion a t convert params atts1)
-                     }
+
+pFunNameCast :: P FunName
+pFunNameCast = choice [do { reserved "bitcast"
+                          ; ignore $ chartok '('
+                          ; tc <- pTypedConst
+                          ; reserved "to"
+                          ; t <- pType
+                          ; ignore $ chartok ')'
+                          ; return $ FunNameBitcast (extractTypedConst tc) t
+                          }
+                      , do { reserved "inttoptr"
+                           ; ignore $ chartok '('
+                           ; tc <- pTypedConst
+                           ; reserved "to"
+                           ; t <- pType
+                           ; ignore $ chartok ')'
+                           ; return $ FunNameInttoptr (extractTypedConst tc) t
+                           }
+                      ]
 
 pCallSite :: P CallSite
-pCallSite = choice [ try pCallFun
-                   , try pCallAsm
-                   , pCallConversion
-                   ]
+pCallSite = choice [try pCallFun, pAsm]
          
 pCall :: P Rhs
 pCall = do { tl <- option TcNon pTailCall 
            ; reserved "call"
-           ; liftM (Call tl) pCallSite
+           ; (liftM (Call tl) pCallSite)
            }
 
 pActualParam :: P ActualParam

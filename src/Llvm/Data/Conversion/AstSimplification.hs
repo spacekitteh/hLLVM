@@ -224,6 +224,12 @@ rnRhs lhs = case lhs of
               RmO x -> S.liftM (\(b,x) -> (b, RmO x)) (rnMemOp x)
               Re x -> S.liftM (\x -> (True, Re x)) (rnExpr x)
               Call b cs -> S.liftM (\(bb, x) -> (bb, Call b x)) (rnCallSite cs)
+              {-
+              (Asm tc t dia b1 b2 qs1 qs2 aps fas) -> 
+                do { apsa <- mapM rnActualParam aps
+                   ; let (rt, _) = splitCallReturnType t
+                   ; return (not (rt == Tvoid), Asm tc t dia b1 b2 qs1 qs2 apsa fas)
+                   }-}
               ReE e -> S.liftM (\x -> (True, ReE x)) (rnExtractElem rnTypedValue e)
               RiE e -> S.liftM (\x -> (True, RiE x)) (rnInsertElem rnTypedValue e)
               RsV e -> S.liftM (\x -> (True, RsV x)) (rnShuffleVector rnTypedValue e)
@@ -312,11 +318,13 @@ rnCallSite (CsAsm t dia b1 b2 qs1 qs2 aps fas) =
      ; let (rt, _) = splitCallReturnType t
      ; return (not (rt == Tvoid),  CsAsm t dia b1 b2 qs1 qs2 apsa fas)
      }
+{-  
 rnCallSite (CsConversion pas t c aps fas) = 
   do { apsa <- mapM rnActualParam aps
      ; let (rt, _) = splitCallReturnType t
      ; return (not (rt == Tvoid), CsConversion pas t c apsa fas)
      }
+-}
 
 rnActualParam :: ActualParam -> MS ActualParam
 rnActualParam (ActualParamData t ps ma v pa) = S.liftM (\x -> ActualParamData t ps ma x pa) (rnValue v)
@@ -497,6 +505,11 @@ rnRhs2 lhs = case lhs of
   RmO x -> S.liftM RmO (rnMemOp2 x)
   Re x -> S.liftM Re (rnExpr2 x)
   Call b cs -> S.liftM (Call b) (rnCallSite2 cs)
+  {-
+  (Asm tc t dia b1 b2 qs1 qs2 aps fas) -> 
+    do { apsa <- mapM rnActualParam2 aps
+       ; return (Asm tc t dia b1 b2 qs1 qs2 apsa fas)
+       }-}
   ReE e -> S.liftM ReE (rnExtractElem2 rnTypedValue2 e)
   RiE e -> S.liftM RiE (rnInsertElem2 rnTypedValue2 e)
   RsV e -> S.liftM RsV (rnShuffleVector2 rnTypedValue2 e)
@@ -536,10 +549,12 @@ rnCallSite2 (CsAsm t dia b1 b2 qs1 qs2 aps fas) =
   do { apsa <- mapM rnActualParam2 aps
      ; return (CsAsm t dia b1 b2 qs1 qs2 apsa fas)
      }
+{-  
 rnCallSite2 (CsConversion pas t c aps fas) = 
   do { apsa <- mapM rnActualParam2 aps
      ; return (CsConversion pas t c apsa fas)
      }
+-}
   
 rnActualParam2 :: ActualParam -> RD ActualParam
 rnActualParam2 (ActualParamData t ps ma v pa) = S.liftM (\x -> ActualParamData t ps ma x pa) (rnValue2 v)

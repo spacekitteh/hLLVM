@@ -77,8 +77,8 @@ deadRmo inst live = case inst of
         localIdOfValue _ = Nothing
 -}
 
-isDeclare :: FunName -> Bool
-isDeclare (FunNameGlobal (GolG gl)) | (render $ printIr gl) == "@llvm.dbg.declare" = True
+isDeclare :: FunPtr -> Bool
+isDeclare (FunId gl) | (render $ printIr gl) == "@llvm.dbg.declare" = True
 isDeclare _ = False
 
 

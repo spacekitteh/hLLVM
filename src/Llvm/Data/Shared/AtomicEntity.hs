@@ -5,7 +5,7 @@ import Data.Word(Word32)
 -- | Double Quoted String
 data DqString = DqString String deriving (Eq, Ord, Show)
 
-data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt 
+data IcmpOp = IcmpEq | IcmpNe | IcmpUgt | IcmpUge | IcmpUlt
             | IcmpUle | IcmpSgt | IcmpSge | IcmpSlt | IcmpSle
             deriving (Eq,Ord,Show)
 
@@ -29,12 +29,12 @@ fcmpOpMap = M.fromList [(FcmpTrue, "true"), (FcmpFalse, "false")
                        ,(FcmpOeq, "oeq"), (FcmpOgt, "ogt"), (FcmpOge, "oge")
                        ,(FcmpOlt, "olt"), (FcmpOle, "ole"), (FcmpOne, "one"), (FcmpOrd, "ord")
                        ,(FcmpUeq, "ueq"), (FcmpUgt, "ugt"), (FcmpUge, "uge")
-                       ,(FcmpUlt, "ult"), (FcmpUle, "ule"), (FcmpUne, "une"), (FcmpUno, "uno") 
+                       ,(FcmpUlt, "ult"), (FcmpUle, "ule"), (FcmpUne, "une"), (FcmpUno, "uno")
                        ]
 
 -- | Linkage Types <http://llvm.org/releases/3.5.0/docs/LangRef.html#linkage-types>
 data Linkage = LinkagePrivate
-             | LinkageInternal    
+             | LinkageInternal
              | LinkageAvailableExternally
              | LinkageLinkonce
              | LinkageCommon
@@ -47,9 +47,9 @@ data Linkage = LinkagePrivate
              deriving (Eq,Ord,Show)
 
 -- | Calling Conventions <http://llvm.org/releases/3.5.0/docs/LangRef.html#calling-conventions>
-data CallConv = Ccc 
-              | CcFast 
-              | CcCold 
+data CallConv = Ccc
+              | CcFast
+              | CcCold
               | CcGhc
               | CcHiPe
               | Cc String
@@ -79,10 +79,10 @@ data CallConv = Ccc
 data Visibility = VisDefault | VisHidden | VisProtected
                   deriving (Eq,Ord,Show)
 
--- | DLL Storage Classes <http://llvm.org/releases/3.5.0/docs/LangRef.html#dll-storage-classes>              
+-- | DLL Storage Classes <http://llvm.org/releases/3.5.0/docs/LangRef.html#dll-storage-classes>
 data DllStorageClass = DscImport
                      | DscExport deriving (Eq, Ord, Show)
-                                     
+
 -- | Thread Local Storage Models <http://llvm.org/releases/3.5.0/docs/LangRef.html#thread-local-storage-models>
 data ThreadLocalStorage = TlsLocalDynamic
                         | TlsInitialExec
@@ -91,15 +91,15 @@ data ThreadLocalStorage = TlsLocalDynamic
                         deriving (Eq, Ord, Show)
 
 -- | Parameter Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#parameter-attributes>
-data ParamAttr = PaZeroExt 
+data ParamAttr = PaZeroExt
                | PaSignExt
-               | PaInReg 
-               | PaByVal 
+               | PaInReg
+               | PaByVal
                | PaInAlloca
                | PaSRet
-               | PaNoAlias 
+               | PaNoAlias
                | PaNoCapture
-               | PaNest 
+               | PaNest
                | PaReturned
                | PaNonNull
                | PaDereferenceable Word32 -- Integer
@@ -107,6 +107,19 @@ data ParamAttr = PaZeroExt
                | PaReadNone
                | PaAlign Word32 -- Integer
                  deriving (Eq,Ord,Show)
+
+data CallRetAttr = CraZeroExt
+                 | CraSignExt
+                 | CraInReg
+                 deriving (Eq, Ord, Show)
+
+data CallFunAttr = CfaNoreturn
+                 | CfaNounwind
+                 | CfaReadonly
+                 | CfaReadnone
+                 | CfaOptsize
+                 | CfaGroup Word32
+                 deriving (Eq, Ord, Show)
 
 -- | Function Attributes <http://llvm.org/releases/3.5.0/docs/LangRef.html#function-attributes>
 data FunAttr = FaAlignStack Word32 -- Integer
@@ -175,10 +188,10 @@ data LocalId = LocalIdNum Word32 -- Integer
              deriving (Eq,Ord,Show)
 
 
-data DollarId = DollarIdNum Word32 
+data DollarId = DollarIdNum Word32
               | DollarIdAlphaNum String
               | DollarIdDqString String
-              deriving (Eq, Ord, Show)                      
+              deriving (Eq, Ord, Show)
 
 data Comdat = Comdat (Maybe DollarId) deriving (Eq, Ord, Show)
 
@@ -186,51 +199,51 @@ data GlobalId = GlobalIdNum Word32
               | GlobalIdAlphaNum String
               | GlobalIdDqString String
               deriving (Eq,Ord,Show)
-                       
+
 -- | Atomic Memory Ordering Constraints <http://llvm.org/releases/3.5.0/docs/LangRef.html#atomic-memory-ordering-constraints>
-data AtomicMemoryOrdering = AmoAcquire | AmoRelease | AmoAcqRel 
+data AtomicMemoryOrdering = AmoAcquire | AmoRelease | AmoAcqRel
                           | AmoSeqCst | AmoUnordered | AmoMonotonic
                           deriving (Eq,Ord,Show)
 
-atomicMemoryOrderingMap :: M.Map AtomicMemoryOrdering String                                   
+atomicMemoryOrderingMap :: M.Map AtomicMemoryOrdering String
 atomicMemoryOrderingMap = M.fromList [(AmoAcquire, "acquire"), (AmoRelease, "release")
                                      ,(AmoAcqRel, "acq_rel"), (AmoSeqCst, "seq_cst")
                                      ,(AmoUnordered, "unordered"), (AmoMonotonic, "monotonic")
-                                     ] 
+                                     ]
 
 -- | atomicrmw operation <http://llvm.org/releases/3.5.0/docs/LangRef.html#id175>
-data AtomicOp = AoXchg | AoAdd | AoSub | AoAnd | AoNand 
-              | AoOr | AoXor 
+data AtomicOp = AoXchg | AoAdd | AoSub | AoAnd | AoNand
+              | AoOr | AoXor
               | AoMax | AoMin | AoUmax | AoUmin
               deriving (Eq,Ord,Show)
-                       
-atomicOpMap :: M.Map AtomicOp String                       
+
+atomicOpMap :: M.Map AtomicOp String
 atomicOpMap = M.fromList [(AoXchg, "xchg"), (AoAdd, "add"), (AoSub, "sub")
                          ,(AoAnd, "and"), (AoNand, "nand")
                          ,(AoOr, "or"), (AoXor, "xor")
                          ,(AoMax, "max"), (AoMin, "min"), (AoUmax, "umax"), (AoUmin, "umin")]
-                                                                                                                            
-                         
-{- syntatical representation: c"...." -}                         
+
+
+{- syntatical representation: c"...." -}
 {-- data Cstring = Cstring String deriving (Eq,Ord,Show) -}
 
-                    
+
 data Atomicity = Atomicity (IsOrIsNot SingleThread) AtomicMemoryOrdering
                deriving (Eq, Ord, Show)
-                        
+
 data Nontemporal = Nontemporal Word32 deriving (Eq, Ord, Show)
 type MaybeNontemporal = Maybe Nontemporal
-                          
+
 data InvariantLoad = InvariantLoad Word32 deriving (Eq, Ord, Show)
-                            
+
 data Nonnull = Nonnull Word32 deriving (Eq, Ord, Show)
-                             
+
 data Volatile = Volatile deriving (Eq, Ord, Show)
 
 data SingleThread = SingleThread deriving (Eq, Ord, Show)
 
 data InAllocaAttr = InAllocaAttr deriving (Eq, Ord, Show)
-  
+
 data TailCall = TcNon
               | TcTailCall
               | TcMustTailCall deriving (Eq, Ord, Show)
@@ -241,7 +254,7 @@ data Weak = Weak deriving (Eq, Ord, Show)
 data IsOrIsNot a = Is a
                  | IsNot a
                  deriving (Eq, Ord, Show)
-                          
+
 data InBounds = InBounds deriving (Eq, Ord, Show)
 
 {- short hand notations -}
@@ -257,7 +270,7 @@ data FastMathFlag = Fmfnnan
                   | Fmfarcp
                   | Fmffast
                   deriving (Eq, Ord, Show)
-                           
+
 fastMathFlagMap :: M.Map FastMathFlag String
 fastMathFlagMap = M.fromList [(Fmfnnan, "nnan"), (Fmfninf, "ninf"), (Fmfnsz, "nsz"), (Fmfarcp, "arcp"), (Fmffast, "fast")]
 
@@ -287,14 +300,14 @@ data Arch = Arch_i386
           | Arch_Mips String
           | Arch_String String
           deriving (Eq, Ord, Show)
-                           
-data Vendor = Vendor_Pc          
+
+data Vendor = Vendor_Pc
             | Vendor_Apple
             | Vendor_Unknown
             | Vendor_String String
             deriving (Eq, Ord, Show)
-                     
-data Os = Os_Linux                     
+
+data Os = Os_Linux
         | Os_Windows
         | Os_Win32
         | Os_FreeBsd String
@@ -305,8 +318,8 @@ data Os = Os_Linux
         | Os_Unknown
         | Os_String String
         deriving (Eq, Ord, Show)
-                 
-data OsEnv = OsEnv_Gnu                 
+
+data OsEnv = OsEnv_Gnu
            | OsEnv_String String
            deriving (Eq, Ord, Show)
 
@@ -317,7 +330,7 @@ data Fparam = FimplicitParam
             | FexplicitParam LocalId
             deriving (Eq,Ord,Show)
 
-data Packing = Packed                
+data Packing = Packed
              | Unpacked
              deriving (Eq, Ord, Show)
 

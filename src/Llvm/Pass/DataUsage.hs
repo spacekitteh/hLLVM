@@ -46,7 +46,7 @@ data DataUsage = DataUsage { -- | The addresses that store pointer parameters
                            , addrs_storing_values :: S.Set Value
                              -- | The addresses of local variable that store values
                            , stack_addrs_storing_values :: S.Set LocalId
-                           , callSites :: S.Set (Rtype, FunName, [Dtype])
+                           , callSites :: S.Set (Rtype, FunPtr, [Dtype])
                            } deriving (Eq, Ord, Show)
 
 
@@ -197,16 +197,17 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                 (T _ src2) = falseFirst
                             in propogateUpPtrUsage result src1
                                $ propogateUpPtrUsage result src2 f
-      I_va_start (T _ v) -> addAddrPassedToVaStart v f
-      I_va_end (T _ v) -> addAddrPassedToVaStart v f
+      I_llvm_va_start v -> addAddrPassedToVaStart v f
+      I_llvm_va_end v -> addAddrPassedToVaStart v f
       I_call_fun{..} -> 
-        let vals = getValuesFromParams actualParams
+        let vals = getValuesFromParams call_actualParams
         in foldl (\p e -> addAddrPassedToVaStart e 
                           $ addAddrCaptured e
                           $ addAddrStoringPtr e
                           $ addAddrStoringValue e
                           p
-                 ) (f { callSites = S.insert (returnType callSiteType, calleeName, typesOfActualParams actualParams) (callSites f)}) (S.toList vals)
+                 ) (f { callSites = S.insert (returnType call_type, call_ptr, typesOfActualParams call_actualParams) 
+                                    (callSites f)}) (S.toList vals)
       _ -> f
     getValuesFromParams :: [ActualParam] -> S.Set Value
     getValuesFromParams ls = foldl (\p e -> case e of

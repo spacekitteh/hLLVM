@@ -144,6 +144,19 @@ instance Print ThreadLocalStorage where
              in if isEmpty d then text "thread_local"
                 else text "thread_local" <+> parens d 
 
+instance Print CallRetAttr where
+  print CraZeroExt = text "zeroext"
+  print CraSignExt = text "signext"
+  print CraInReg = text "inreg"
+
+instance Print CallFunAttr where
+  print CfaNoreturn = text "noreturn"
+  print CfaNounwind = text "nounwind"
+  print CfaReadonly = text "readonly"
+  print CfaReadnone = text "readnone"
+  print CfaOptsize = text "optsize"
+  print (CfaGroup n) = char '#'<> (integral n)  
+
 instance Print ParamAttr where
   print PaZeroExt = text "zeroext"
   print PaSignExt = text "signext"

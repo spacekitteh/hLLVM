@@ -81,8 +81,6 @@ instance Uda x => Uda [x] where
 instance Uda CallSite where
   use x = case x of
     CsFun _ _ _ _ l _ -> use l
-    CsAsm _ _ _ _ _ _ l _ -> use l
-    CsConversion _ _ _ l _ -> use l
   def _ = S.empty  
 
 instance Uda Cinst where 
@@ -97,8 +95,8 @@ instance Uda Cinst where
     I_cmpxchg_F{..} -> S.unions [use pointer,use cmpf,use newf]
     I_cmpxchg_P{..} -> S.unions [use pointer,use cmpp,use newp]
     I_atomicrmw{..} -> S.unions [use pointer,use val]
-    I_call_fun{..} -> use actualParams
-    I_call_other{..} -> use callSite
+    I_call_fun{..} -> use call_actualParams
+    -- I_call_other{..} -> use callSite
     I_extractelement_I{..} -> S.unions [use vectorI, use index]
     I_extractelement_F{..} -> S.unions [use vectorF, use index]
     I_extractelement_P{..} -> S.unions [use vectorP, use index]
@@ -111,8 +109,8 @@ instance Uda Cinst where
     I_extractvalue{..} -> S.unions [use record]
     I_insertvalue{..} -> S.unions [use record, use element]  
     I_va_arg{..} -> use dv
-    I_va_start{..} -> use pointer
-    I_va_end{..} -> use pointer
+    I_llvm_va_start{..} -> use arglist
+    I_llvm_va_end{..} -> use arglist
     I_landingpad{..} -> errorLoc FLC $ "undefined yet"
     I_getelementptr{..} -> use pointer `mappend` (foldl (\p e -> p `mappend` (use e)) S.empty indices)
     I_getelementptr_V{..} -> use vpointer `mappend` (foldl (\p e -> p `mappend` (use e)) S.empty vindices)
@@ -209,8 +207,8 @@ instance Uda Cinst where
     I_cmpxchg_F{..} -> def result    
     I_cmpxchg_P{..} -> def result
     I_atomicrmw{..} -> S.empty
-    I_call_fun{..} -> def callReturn
-    I_call_other{..} -> def callReturn
+    I_call_fun{..} -> def call_return
+    -- I_call_other{..} -> def callReturn
     I_extractelement_I{..} -> def result
     I_extractelement_F{..} -> def result    
     I_extractelement_P{..} -> def result
@@ -223,8 +221,8 @@ instance Uda Cinst where
     I_extractvalue{..} -> def result
     I_insertvalue{..} -> def result                          
     I_va_arg{..} -> def result    
-    I_va_start{..} -> S.empty
-    I_va_end{..} -> S.empty
+    I_llvm_va_start{..} -> S.empty
+    I_llvm_va_end{..} -> S.empty
     I_landingpad _ _ _ _ _ r -> def r
     I_getelementptr{..} -> def result    
     I_getelementptr_V{..} -> def result    
@@ -316,7 +314,8 @@ instance Uda Cinst where
     I_store{..} -> storeTo pointer
     I_storeatomic{..} -> storeTo pointer
     I_atomicrmw{..} -> storeTo pointer
-    I_va_start tv -> storeTo tv
+    I_llvm_va_start tv -> storeTo tv
+    I_llvm_va_end tv -> storeTo tv
     I_llvm_memcpy{..} -> storeTo dest
     _ -> S.empty
   loadFrom ci = case ci of

@@ -161,11 +161,12 @@ instance Functor Pointer where
 
 data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameString String
-               deriving (Eq,Ord,Show)
+             | FunNameBitcast (Typed Const) Type
+             | FunNameInttoptr (Typed Const) Type               
+             deriving (Eq,Ord,Show)
 
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
               | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
-              | CsConversion [ParamAttr] Type (Conversion Const) [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
 
 data Clause = Catch (Typed Value)
@@ -188,6 +189,7 @@ data PersFn = PersFnId GlobalOrLocalId
 data Rhs = RmO MemOp
          | Re Expr
          | Call TailCall CallSite
+           -- | Asm TailCall Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
          | ReE (ExtractElement Value)
          | RiE (InsertElement Value)
          | RsV (ShuffleVector Value)

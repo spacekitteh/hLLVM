@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, RecordWildCards #-}
 module Llvm.Data.Ir
     (module Llvm.Data.Ir
     , module Llvm.Data.CoreIr
@@ -160,10 +160,10 @@ instance H.NonLocal (Node a) where
     Ci.T_return _ -> []
     Ci.T_ret_void -> []
     Ci.T_br l -> [l]
-    Ci.T_cbr _ l1 l2 -> [l1, l2]
+    Ci.T_cbr{..} -> [trueL, falseL]
     Ci.T_indirectbr _ ls -> ls
     Ci.T_switch d ls -> (snd d):(map snd ls)
-    Ci.T_invoke  _ l1 l2 _ -> [l1, l2]
+    Ci.T_invoke{..} -> [invoke_normal_label, invoke_exception_label]
     Ci.T_resume _ -> error "what is resume"
     Ci.T_unwind -> error "what is unwind"
 

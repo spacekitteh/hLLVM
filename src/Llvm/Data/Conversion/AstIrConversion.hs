@@ -792,58 +792,90 @@ convert_MetaKindedConst x =
 
 
 
-convert_FunName :: A.FunName -> (MM I.FunName)
+convert_FunName :: A.FunName -> MM I.FunName
 convert_FunName (A.FunNameGlobal g) = return $ I.FunNameGlobal g
 convert_FunName (A.FunNameString s) = return $ I.FunNameString s
+
+convert_FunPtr :: A.FunName -> MM I.FunPtr
+convert_FunPtr (A.FunNameGlobal g) = case g of
+  A.GolG g0 -> return $ I.FunId g0
+  A.GolL l0 -> return $ I.FunSsa l0
+convert_FunPtr (A.FunNameBitcast tv t) = 
+  do { mp <- typeDefs
+     ; tv1 <- convert_to_DtypedConst tv
+     ; let t1::I.Utype = tconvert mp t
+     ; case tv1 of
+       I.T st (I.C_globalAddr c) -> return $ I.FunIdBitcast (I.T st c) (I.dcast FLC t1)
+       _ -> errorLoc FLC $ show tv1
+     }
+convert_FunPtr (A.FunNameInttoptr tv t) = 
+  do { mp <- typeDefs
+     ; tv1 <- convert_to_DtypedConst tv
+     ; let t1::I.Utype = tconvert mp t
+     ; case tv1 of
+       I.T st c -> return $ I.FunIdInttoptr (I.T st c) (I.dcast FLC t1)
+       _ -> errorLoc FLC $ show tv1
+     }
+convert_FunPr x = errorLoc FLC $ show x
+
+
+convert_FunId :: A.FunName -> MM I.GlobalId
+convert_FunId (A.FunNameGlobal (A.GolG g)) = return g
+convert_FunId x = errorLoc FLC $ show x
+
 
 convert_Value :: A.Value -> (MM I.Value)
 convert_Value (A.Val_local a) = return $ I.Val_ssa a
 convert_Value (A.Val_const a) = Md.liftM I.Val_const (convert_Const a)
 
-convert_to_MetaCallSite :: A.CallSite -> MM (Maybe I.Minst)
-convert_to_MetaCallSite x = case x of
-  (A.CsFun cc pa t fn aps fa) | (fst (A.splitCallReturnType t) == A.Tvoid) && (any isMetaParam aps) ->
-    do { fna <- convert_FunName fn
-       ; apsa <- mapM convert_MetaParam aps
-       ; return (Just $ I.Minst fna apsa)
+convert_to_Minst :: Maybe A.LocalId -> A.CallSite -> MM (Maybe I.Minst)
+convert_to_Minst lhs x = case x of
+  (A.CsFun cc pa t fn aps fa) | any isMetaParam aps ->
+    do { fna <- convert_FunId fn
+       ; apsa <- mapM convert_MetaParam aps                
+       ; return (Just $ I.Minst fna apsa lhs)
        }
-  _ -> return Nothing -- errorLoc FLC $ show x ++ " is passed to convert_to_MetaCallSite"
+  _ -> return Nothing 
 
-convert_to_CallSite :: A.CallSite -> MM (Bool, I.CallSite)
-convert_to_CallSite x = case x of
+convert_to_CallSite :: Maybe A.LocalId -> A.CallSite -> MM (Bool, I.CallSite)
+convert_to_CallSite lhs x = case x of
   (A.CsFun cc pa t fn aps fa) ->
     do { mp <- typeDefs
        ; let ert = A.splitCallReturnType t
              erta = eitherRet mp ert
-       ; fna <- convert_FunName fn
+       ; fna <- convert_FunPtr fn
        ; apsa <- mapM convert_ActualParam aps
        ; return (fst ert == A.Tvoid, I.CsFun cc pa erta fna apsa fa)
        }
+
   (A.CsAsm t dia b1 b2 qs1 qs2 as fa) ->
     do { mp <- typeDefs
        ; let ert = A.splitCallReturnType t
              erta = eitherRet mp ert
        ; asa <- mapM convert_ActualParam as
-       ; return (fst ert == A.Tvoid, I.CsAsm erta dia b1 b2 qs1 qs2 asa fa)
+       ; let rt::I.Utype = tconvert mp (fst ert)
+       ; return (fst ert == A.Tvoid, I.CsAsm (I.dcast FLC rt) dia b1 b2 qs1 qs2 asa fa)
        }
-  (A.CsConversion pa t cv as fa) ->
+    {-    
+  (A.CsConversion pa t cv as fa) -> errorLoc FLC $ show x
     do { mp <- typeDefs
        ; let ert = A.splitCallReturnType t
              erta = eitherRet mp ert
        ; asa <- mapM convert_ActualParam as
-       ; if isTvector mp t then 
-           do { cva <- convert_to_Conversion_V convert_Const cv
-              ; return (fst ert == A.Tvoid, I.CsConversionV pa erta cva asa fa)
-              }
+       ; if isTvector mp t then errorLoc FLC $ show x
          else
            do { cva <- convert_to_Conversion convert_Const cv
-              ; return (fst ert == A.Tvoid, I.CsConversion pa erta cva asa fa)
+              ; case cva of
+                I.Bitcast (I.T t (I.C_globalAddr c)) dt -> 
+                  return (fst ert == A.Tvoid, I.CsFun Nothing pa erta (I.FunIdCast (I.T t c) dt) asa fa)
+                _ -> errorLoc FLC $ show x
               }
-       }
-  where eitherRet :: MP -> (A.Type, Maybe (A.Type, A.AddrSpace)) -> I.CallSiteType
-        eitherRet mp (rt, ft) = case ft of
-            Just (fta,as) -> I.CallSiteFun (I.dcast FLC ((tconvert mp fta)::I.Utype)) (tconvert mp as)
-            Nothing -> I.CallSiteRet $ I.dcast FLC ((tconvert mp rt)::I.Utype)
+       } -}
+    
+eitherRet :: MP -> (A.Type, Maybe (A.Type, A.AddrSpace)) -> I.CallSiteType
+eitherRet mp (rt, ft) = case ft of
+  Just (fta,as) -> I.CallSiteFun (I.dcast FLC ((tconvert mp fta)::I.Utype)) (tconvert mp as)
+  Nothing -> I.CallSiteRet $ I.dcast FLC ((tconvert mp rt)::I.Utype)
 
 convert_Clause :: A.Clause -> MM I.Clause
 convert_Clause x = case x of 
@@ -1145,18 +1177,18 @@ convert_Rhs :: (Maybe A.LocalId, A.Rhs) -> MM (I.Node a H.O H.O)
 convert_Rhs (mlhs, A.RmO c) = Md.liftM (\x -> I.Cnode x []) (convert_MemOp (mlhs, c))
 convert_Rhs (mlhs, A.Re e) = Md.liftM (\x -> I.Cnode x []) (convert_Expr_CInst (mlhs, e))
 convert_Rhs (lhs, A.Call b cs) = 
-  do { mc <- convert_to_MetaCallSite cs
+  do { mc <- convert_to_Minst lhs cs
      ; case mc of
        Just mi -> return $ I.Mnode mi []
        Nothing -> 
          Md.liftM (\x -> I.Cnode x []) $ 
-         do { (isvoid,csi) <- convert_to_CallSite cs
+         do { (isvoid, csi) <- convert_to_CallSite lhs cs
             ; case csi of 
-              I.CsFun Nothing [] _ (I.FunNameGlobal (I.GolG (I.GlobalIdAlphaNum "llvm.va_start"))) 
-                [I.ActualParamData t1 [] Nothing v []] [] | isvoid -> return $ I.I_va_start (I.T (I.dcast FLC t1) v)
-              I.CsFun Nothing [] _ (I.FunNameGlobal (I.GolG (I.GlobalIdAlphaNum "llvm.va_end")))
-                [I.ActualParamData t1 [] Nothing v []] [] | isvoid -> return $ I.I_va_end (I.T (I.dcast FLC t1) v)
-              I.CsFun Nothing [] _ (I.FunNameGlobal (I.GolG (I.GlobalIdAlphaNum nm)))
+              I.CsFun Nothing [] _ (I.FunId (I.GlobalIdAlphaNum "llvm.va_start"))
+                [I.ActualParamData t1 [] Nothing v []] [] | isvoid -> return $ I.I_llvm_va_start v
+              I.CsFun Nothing [] _ (I.FunId (I.GlobalIdAlphaNum "llvm.va_end"))
+                [I.ActualParamData t1 [] Nothing v []] [] | isvoid -> return $ I.I_llvm_va_end v
+              I.CsFun Nothing [] _ (I.FunId (I.GlobalIdAlphaNum nm))
                 [I.ActualParamData t1 [] Nothing v1 [] -- dest
                 ,I.ActualParamData t2 [] Nothing v2 [] -- src
                 ,I.ActualParamData t3 [] Nothing v3 [] -- len
@@ -1173,7 +1205,7 @@ convert_Rhs (lhs, A.Call b cs) =
                              (I.T (I.dcast FLC t4) v4)
                              (I.T (I.dcast FLC t5) v5)
               I.CsFun cc pa cstype fn ap fa -> return $ I.I_call_fun b cc pa cstype fn ap fa lhs
-              _ -> return $ I.I_call_other b csi lhs
+              _ -> errorLoc FLC $ show csi -- return $ I.I_call_other b csi lhs
             }
      }
 convert_Rhs (Just lhs, A.RvA (A.VaArg tv t)) = 
@@ -1341,15 +1373,14 @@ convert_TerminatorInst (A.Switch cnd d cases) =
      ; other <- mapM (pairM (convert_to_TypedValue_SI FLC) convert_TargetLabel) cases
      ; return $ I.T_switch (dc, dl) other
      }
-  {-
-  Md.liftM3 I.T_switch () 
-  () (mapM (pairM (convert_to_TypedValue_SI FLC) convert_TargetLabel) cases)
--}
 convert_TerminatorInst (A.Invoke mg cs t f) = 
-  do { (isvoid, csa) <- convert_to_CallSite cs
+  do { (_, csa) <- convert_to_CallSite Nothing cs
      ; ta <- convert_TargetLabel t
      ; fa <- convert_TargetLabel f
-     ; return $ I.T_invoke csa ta fa mg
+     ; case csa of
+       I.CsFun mcnv ra (I.CallSiteFun cst _) fptr ap cfa -> 
+         return $ I.T_invoke mcnv ra cst fptr ap cfa ta fa mg
+       _ -> errorLoc FLC $ show csa  
      }
 convert_TerminatorInst (A.Resume tv) = Md.liftM I.T_resume (convert_to_DtypedValue tv)
 convert_TerminatorInst A.Unreachable = return I.T_unreachable
