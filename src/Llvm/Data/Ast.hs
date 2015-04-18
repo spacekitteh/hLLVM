@@ -160,9 +160,11 @@ instance Functor Pointer where
   fmap f (Pointer x) = Pointer (f x)
 
 data FunName = FunNameGlobal GlobalOrLocalId
-             | FunNameString String
              | FunNameBitcast (Typed Const) Type
              | FunNameInttoptr (Typed Const) Type               
+               -- well, it's weird, but LLVM allows this
+             | FunName_null 
+             | FunName_undef
              deriving (Eq,Ord,Show)
 
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]

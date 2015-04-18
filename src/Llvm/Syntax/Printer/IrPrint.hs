@@ -423,6 +423,8 @@ instance IrPrint FunPtr where
   printIr (FunIdBitcast (T t g) toT) = text "bitcast" <> parens (printIr t <+> printIr g <+> text "to" <+> printIr toT)
   printIr (FunIdInttoptr (T t g) toT) = text "inttoptr" <> parens (printIr t <+> printIr g <+> text "to" <+> printIr toT)  
   printIr (FunSsa g) = printIr g
+  printIr Fun_null = text "null"
+  printIr Fun_undef = text "undef"
 
 instance IrPrint FunName where
   printIr (FunNameGlobal s) = printIr s
@@ -651,7 +653,7 @@ instance IrPrint Cinst where
     I_llvm_memcpy mod tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr mod  <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5]) 
     
 instance IrPrint Minst where    
-  printIr (Minst fn params lhs) = printIr fn <+> hsep (fmap printIr params)
+  printIr (Minst cs fn params lhs) = printIr cs <+> printIr fn <+> hsep (fmap printIr params)
     
 instance IrPrint MemLen where    
   printIr m = case m of
@@ -667,8 +669,12 @@ instance IrPrint Tinst where
   printIr (T_switch (v,d) tbl) = 
     hsep [text "switch", printIr v <> comma, printIr d, brackets (hsep $ fmap (\(p1,p2) -> printIr p1 <> comma <+> printIr p2) tbl)]
   printIr (T_invoke conv reta ft ptr aps fa toL unwindL lhs) = 
-    hsep [optSepToLlvm lhs equals, text "invoke", printIr conv, printIr reta, printIr ft, printIr ptr, 
-          parens (printIr aps), printIr fa, printIr toL, text "unwind", printIr unwindL]
+    hsep [optSepToLlvm lhs equals, text "invoke", printIr conv, printIr reta, printIr ft, printIr ptr
+         , parens (printIr aps), printIr fa, printIr toL, text "unwind", printIr unwindL]
+  printIr (T_invoke_asm rt mse mas dia s1 s2 aps fa toL unwindL lhs) = 
+    hsep [optSepToLlvm lhs equals, text "invoke", text "asm", printIr rt, printIr mse
+         , printIr mas, printIr dia, printIr s1, printIr s2, parens (printIr aps)
+         , printIr fa, printIr toL, text "unwind", printIr unwindL]
   printIr T_unreachable = text "unreachable"
   printIr (T_resume a) = text "resume" <+> printIr a
   printIr T_unwind = text "unwind"

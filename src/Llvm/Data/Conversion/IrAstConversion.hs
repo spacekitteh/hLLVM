@@ -401,9 +401,11 @@ instance Conversion I.MetaKindedConst (Rm A.MetaKindedConst) where
     (I.MetaKindedConst mk mc) -> Md.liftM (A.MetaKindedConst (tconvert () mk)) (convert mc)
     I.UnmetaKindedNull -> return A.UnmetaKindedNull
 
+{-
 instance Conversion I.FunName (Rm A.FunName) where
     convert (I.FunNameGlobal g) = return $ A.FunNameGlobal g
     convert (I.FunNameString s) = return $ A.FunNameString s
+-}
 
 instance Conversion I.Value (Rm A.Value) where
     convert (I.Val_ssa a) = return $ A.Val_local a
@@ -416,9 +418,11 @@ instance Conversion I.CallSiteType (Rm A.Type) where
     
 instance Conversion I.FunPtr (Rm A.FunName) where
   convert x = case x of
+    I.Fun_null -> return A.FunName_null
+    I.Fun_undef -> return A.FunName_undef    
     I.FunId g -> return $ A.FunNameGlobal (A.GolG g)
     I.FunSsa l -> return $ A.FunNameGlobal (A.GolL l)
-    I.FunIdBitcast (I.T st c) dt -> do { tv1 <- convert (I.T st (I.C_globalAddr c))
+    I.FunIdBitcast (I.T st c) dt -> do { tv1 <- convert (I.T st c)
                                        ; return $ A.FunNameBitcast tv1 (tconvert () dt)
                                        }
     I.FunIdInttoptr (I.T st c) dt -> do { tv1 <- convert (I.T st c)
@@ -426,11 +430,16 @@ instance Conversion I.FunPtr (Rm A.FunName) where
                                         }
 
 instance Conversion I.CallSite (Rm A.CallSite) where
-    convert  (I.CsFun cc pa t fn aps fa) = do { fna <- convert fn
-                                              ; apsa <- mapM convert aps
-                                              ; ta <- convert t
-                                              ; return $ A.CsFun cc pa ta fna apsa fa
-                                              }
+  convert  (I.CsFun cc pa t fn aps fa) = do { fna <- convert fn
+                                            ; apsa <- mapM convert aps
+                                            ; ta <- convert t
+                                            ; return $ A.CsFun cc pa ta fna apsa fa
+                                            }
+  convert  (I.CsAsm t mse mas dia s1 s2 aps fa) = 
+    do { apsa <- mapM convert aps
+       ; ta <- convert t
+       ; return $ A.CsAsm ta mse mas dia s1 s2 apsa fa
+       }
 
 instance Conversion I.Clause (Rm A.Clause) where
     convert (I.Catch tv) = convert tv >>= \tv' -> return $ A.Catch tv'
@@ -451,10 +460,11 @@ instance Conversion I.PersFn (Rm A.PersFn) where
 
 
 instance Conversion I.Minst (Rm A.ComputingInst) where
-  convert (I.Minst fn params lhs) = 
+  convert (I.Minst cst fn params lhs) = 
     do { fna <- convert (I.FunId fn)
+       ; cst0 <- convert cst
        ; apa <- mapM convert params
-       ; return $ A.ComputingInst lhs $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid fna apa []
+       ; return $ A.ComputingInst lhs $ A.Call A.TcNon $ A.CsFun Nothing [] cst0 fna apa []
        }
 
 instance Conversion I.Cinst (Rm A.ComputingInst) where
@@ -941,9 +951,8 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
          ; return $ A.ComputingInst lhs $ A.Call tc csa 
          }
     I.I_call_asm tc t dia b1 b2 qs1 qs2 as fa lhs -> 
-      do { asa <- mapM convert as
-         ; let ta = tconvert () t
-         ; return $ A.ComputingInst lhs $ A.Call tc (A.CsAsm ta dia b1 b2 qs1 qs2 asa fa)
+      do { csa <- convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) 
+         ; return $ A.ComputingInst lhs $ A.Call tc csa -- (A.CsAsm ta dia b1 b2 qs1 qs2 asa fa)
          } 
       {-
     I.I_llvm_dbg_declare ap ->
@@ -1038,7 +1047,10 @@ instance Conversion I.Tinst (Rm A.TerminatorInst) where
   convert (I.T_switch (cnd,d) cases) = Md.liftM3 A.Switch (convert cnd) (convert_to_TargetLabel d) 
                                        (mapM (pairM convert convert_to_TargetLabel) cases)
   convert (I.T_invoke conv ra fty ptr aps fa  t f mg) = 
-    Md.liftM3 (A.Invoke mg) (convert (I.CsFun conv ra (I.CallSiteFun fty 0) ptr aps fa))
+    Md.liftM3 (A.Invoke mg) (convert (I.CsFun conv ra fty ptr aps fa))
+    (convert_to_TargetLabel t) (convert_to_TargetLabel f)
+  convert (I.T_invoke_asm rt se as dia dq1 dq2 aps fa t f lhs) =
+    Md.liftM3 (A.Invoke lhs) (convert (I.CsAsm rt se as dia dq1 dq2 aps fa))
     (convert_to_TargetLabel t) (convert_to_TargetLabel f)
   convert (I.T_resume tv) = Md.liftM A.Resume (convert tv)
   convert I.T_unreachable = return A.Unreachable

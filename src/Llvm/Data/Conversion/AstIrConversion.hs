@@ -792,31 +792,37 @@ convert_MetaKindedConst x =
 
 
 
+{-
 convert_FunName :: A.FunName -> MM I.FunName
 convert_FunName (A.FunNameGlobal g) = return $ I.FunNameGlobal g
 convert_FunName (A.FunNameString s) = return $ I.FunNameString s
+-}
 
 convert_FunPtr :: A.FunName -> MM I.FunPtr
-convert_FunPtr (A.FunNameGlobal g) = case g of
-  A.GolG g0 -> return $ I.FunId g0
-  A.GolL l0 -> return $ I.FunSsa l0
-convert_FunPtr (A.FunNameBitcast tv t) = 
-  do { mp <- typeDefs
-     ; tv1 <- convert_to_DtypedConst tv
-     ; let t1::I.Utype = tconvert mp t
-     ; case tv1 of
-       I.T st (I.C_globalAddr c) -> return $ I.FunIdBitcast (I.T st c) (I.dcast FLC t1)
-       _ -> errorLoc FLC $ show tv1
-     }
-convert_FunPtr (A.FunNameInttoptr tv t) = 
-  do { mp <- typeDefs
-     ; tv1 <- convert_to_DtypedConst tv
-     ; let t1::I.Utype = tconvert mp t
-     ; case tv1 of
-       I.T st c -> return $ I.FunIdInttoptr (I.T st c) (I.dcast FLC t1)
-       _ -> errorLoc FLC $ show tv1
-     }
-convert_FunPr x = errorLoc FLC $ show x
+convert_FunPtr fn = 
+  case fn of
+    A.FunNameGlobal g -> case g of
+      A.GolG g0 -> return $ I.FunId g0
+      A.GolL l0 -> return $ I.FunSsa l0
+    A.FunNameBitcast tv t ->
+      do { mp <- typeDefs
+         ; tv1 <- convert_to_DtypedConst tv
+         ; let t1::I.Utype = tconvert mp t
+         ; case tv1 of
+           I.T st c -> return $ I.FunIdBitcast (I.T st c) (I.dcast FLC t1)
+           _ -> errorLoc FLC $ show tv1
+         }
+    A.FunNameInttoptr tv t -> 
+       do { mp <- typeDefs
+          ; tv1 <- convert_to_DtypedConst tv
+          ; let t1::I.Utype = tconvert mp t
+          ; case tv1 of
+             I.T st c -> return $ I.FunIdInttoptr (I.T st c) (I.dcast FLC t1)
+             _ -> errorLoc FLC $ show tv1
+          }
+    A.FunName_null -> return I.Fun_null
+    A.FunName_undef -> return I.Fun_undef
+    _ -> errorLoc FLC $ show fn
 
 
 convert_FunId :: A.FunName -> MM I.GlobalId
@@ -831,9 +837,12 @@ convert_Value (A.Val_const a) = Md.liftM I.Val_const (convert_Const a)
 convert_to_Minst :: Maybe A.LocalId -> A.CallSite -> MM (Maybe I.Minst)
 convert_to_Minst lhs x = case x of
   (A.CsFun cc pa t fn aps fa) | any isMetaParam aps ->
-    do { fna <- convert_FunId fn
+    do { mp <- typeDefs
+       ; fna <- convert_FunId fn
+       ; let ert = A.splitCallReturnType t
+             erta = eitherRet mp ert
        ; apsa <- mapM convert_MetaParam aps                
-       ; return (Just $ I.Minst fna apsa lhs)
+       ; return (Just $ I.Minst erta fna apsa lhs)
        }
   _ -> return Nothing 
 
@@ -854,7 +863,7 @@ convert_to_CallSite lhs x = case x of
              erta = eitherRet mp ert
        ; asa <- mapM convert_ActualParam as
        ; let rt::I.Utype = tconvert mp (fst ert)
-       ; return (fst ert == A.Tvoid, I.CsAsm (I.dcast FLC rt) dia b1 b2 qs1 qs2 asa fa)
+       ; return (fst ert == A.Tvoid, I.CsAsm erta dia b1 b2 qs1 qs2 asa fa)
        }
     {-    
   (A.CsConversion pa t cv as fa) -> errorLoc FLC $ show x
@@ -1205,7 +1214,7 @@ convert_Rhs (lhs, A.Call b cs) =
                              (I.T (I.dcast FLC t4) v4)
                              (I.T (I.dcast FLC t5) v5)
               I.CsFun cc pa cstype fn ap fa -> return $ I.I_call_fun b cc pa cstype fn ap fa lhs
-              _ -> errorLoc FLC $ show csi -- return $ I.I_call_other b csi lhs
+              I.CsAsm rt mse mas dia s1 s2 aps fa -> return $ I.I_call_asm b rt mse mas dia s1 s2 aps fa lhs
             }
      }
 convert_Rhs (Just lhs, A.RvA (A.VaArg tv t)) = 
@@ -1378,9 +1387,10 @@ convert_TerminatorInst (A.Invoke mg cs t f) =
      ; ta <- convert_TargetLabel t
      ; fa <- convert_TargetLabel f
      ; case csa of
-       I.CsFun mcnv ra (I.CallSiteFun cst _) fptr ap cfa -> 
+       I.CsFun mcnv ra cst fptr ap cfa -> 
          return $ I.T_invoke mcnv ra cst fptr ap cfa ta fa mg
-       _ -> errorLoc FLC $ show csa  
+       I.CsAsm rt mse mas dia s1 s2 aps cfa -> 
+         return $ I.T_invoke_asm rt mse mas dia s1 s2 aps cfa ta fa mg
      }
 convert_TerminatorInst (A.Resume tv) = Md.liftM I.T_resume (convert_to_DtypedValue tv)
 convert_TerminatorInst A.Unreachable = return I.T_unreachable

@@ -212,19 +212,17 @@ instance AsmPrint a => AsmPrint (Pointer a) where
 
 instance AsmPrint FunName where
   toLlvm (FunNameGlobal s) = toLlvm s
-  toLlvm (FunNameString s) = text s
   toLlvm (FunNameBitcast tv t) = text "bitcast" <> parens (toLlvm tv <+> text "to" <+> toLlvm t)
   toLlvm (FunNameInttoptr tv t) = text "inttoptr" <> parens (toLlvm tv <+> text "to" <+> toLlvm t)  
+  toLlvm FunName_null = text "null"  
+  toLlvm FunName_undef = text "null"                         
   
 instance AsmPrint CallSite where
   toLlvm (CsFun cc ra rt ident params fa) = 
     hsep [toLlvm cc, hsep $ fmap toLlvm ra, toLlvm rt, toLlvm ident, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
   toLlvm (CsAsm t se as dia s1 s2 params fa) = 
     hsep [toLlvm t, text "asm", toLlvm se, toLlvm as, toLlvm dia, toLlvm s1 <> comma, toLlvm s2, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
-    {-
-  toLlvm (CsConversion ra t convert params fa) = 
-    hsep [hsep $ fmap toLlvm ra, toLlvm t, toLlvm convert, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
-    -}
+   
 
 instance AsmPrint Clause where
   toLlvm (Catch tv) = text "catch" <+> toLlvm tv

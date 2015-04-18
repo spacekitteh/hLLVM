@@ -227,7 +227,8 @@ pCallFun :: P CallSite
 pCallFun = do { cc <- opt pCallConv
               ; atts0 <- many pParamAttr -- CallRetAttr
               ; t <- pType
-              ; i <- choice [ liftM FunNameString (choice [symbol "null", symbol "undef"])
+              ; i <- choice [ symbol "null" >> return FunName_null
+                            , symbol "undef" >> return FunName_undef
                             , liftM FunNameGlobal pGlobalOrLocalId
                             , pFunNameCast
                             ]

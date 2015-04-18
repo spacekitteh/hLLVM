@@ -225,9 +225,11 @@ data FunId = FunId GlobalId
 -}
 
 data FunPtr = FunId GlobalId
-            | FunIdBitcast (T Dtype GlobalId) Dtype
+            | FunIdBitcast (T Dtype Const) Dtype
             | FunIdInttoptr (T Dtype Const) Dtype              
             | FunSsa LocalId
+            | Fun_null
+            | Fun_undef
             deriving (Eq, Ord, Show)
 
 data CallSiteType = CallSiteRet Rtype
@@ -235,7 +237,7 @@ data CallSiteType = CallSiteRet Rtype
                   deriving (Eq, Ord, Show)
 
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] CallSiteType FunPtr [ActualParam] [FunAttr]
-              | CsAsm Rtype (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
+              | CsAsm CallSiteType (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
 
 data Clause = Catch (T Dtype Value)
@@ -381,7 +383,7 @@ data Cinst where {
                 } -> Cinst;
   
   I_call_asm :: { call_tail :: TailCall
-                , call_ret_type :: Rtype
+                , call_type :: CallSiteType
                 , sideeffect :: Maybe SideEffect 
                 , alignstack :: Maybe AlignStack 
                 , dialect :: AsmDialect 
@@ -1009,7 +1011,7 @@ data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)
 
 -- | LLVM metadata instructions
-data Minst = Minst GlobalId [MetaParam] (Maybe LocalId) deriving (Eq, Ord, Show)
+data Minst = Minst CallSiteType GlobalId [MetaParam] (Maybe LocalId) deriving (Eq, Ord, Show)
 
 data MetaParam = MetaParamMeta MetaKindedConst
                | MetaParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
@@ -1031,7 +1033,7 @@ data Tinst = T_unreachable
                       }
            | T_invoke { invoke_conv :: Maybe CallConv
                       , invoke_retAttrs :: [ParamAttr]
-                      , invoke_fun_type :: Type CodeFunB X
+                      , invoke_type :: CallSiteType 
                       , invoke_ptr :: FunPtr
                       , invoke_actualParams :: [ActualParam]
                       , invoke_funAttrs :: [FunAttr]
@@ -1039,7 +1041,7 @@ data Tinst = T_unreachable
                       , invoke_exception_label :: Label
                       , invoke_return :: Maybe LocalId
                       }
-           | T_invoke_asm { invoke_ret_type :: Rtype -- CallSiteType 
+           | T_invoke_asm { invoke_type :: CallSiteType
                           , invoke_sideeffect :: Maybe SideEffect 
                           , invoke_alignstack :: Maybe AlignStack 
                           , invoke_dialect :: AsmDialect 
@@ -1047,6 +1049,8 @@ data Tinst = T_unreachable
                           , invoke_dqstring2 :: DqString 
                           , invoke_actualParams :: [ActualParam] 
                           , invoke_funAttr :: [FunAttr] 
+                          , invoke_normal_label :: Label
+                          , invoke_exception_label :: Label
                           , invoke_return :: Maybe LocalId 
                           } 
            | T_resume (T Dtype Value)
