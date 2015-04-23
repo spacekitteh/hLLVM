@@ -14,10 +14,10 @@ import Data.Word (Word32)
 -- | quotation does not change a label value
 -- | it's still unclear when a quoted verion is used
 -- | we keep the original format to make llvm-as happy
-data LabelId = LabelString String -- Lstring
-             | LabelDqString String -- Lstring -- a string enclosed by double quotes
-             | LabelNumber Word32 -- Int
-             | LabelDqNumber Word32 -- Int -- a number enclosed by double quotes
+data LabelId = LabelString String 
+             | LabelDqString String -- a string enclosed by double quotes
+             | LabelNumber Word32 
+             | LabelDqNumber Word32 -- a number enclosed by double quotes
              deriving (Eq,Ord,Show)
 
 data BlockLabel = ExplicitBlockLabel LabelId
@@ -191,7 +191,6 @@ data PersFn = PersFnId GlobalOrLocalId
 data Rhs = RmO MemOp
          | Re Expr
          | Call TailCall CallSite
-           -- | Asm TailCall Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
          | ReE (ExtractElement Value)
          | RiE (InsertElement Value)
          | RsV (ShuffleVector Value)

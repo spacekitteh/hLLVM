@@ -26,7 +26,7 @@ instance (IrPrint t1, IrPrint t2) => IrPrint (t1, t2) where
   printIr (v1, v2) = parens (printIr v1 <> comma <+> printIr v2)
   
 instance IrPrint x => IrPrint [x] where  
-  printIr l = vcat $ fmap printIr l
+  printIr l = hsep $ fmap printIr l
   
 instance (IrPrint k, IrPrint v) => IrPrint (M.Map k v) where
   printIr mp = let l = M.toList mp
@@ -426,11 +426,6 @@ instance IrPrint FunPtr where
   printIr Fun_null = text "null"
   printIr Fun_undef = text "undef"
 
-instance IrPrint FunName where
-  printIr (FunNameGlobal s) = printIr s
-  printIr (FunNameString s) = text s
-  
-
 instance IrPrint CallSiteType where
   printIr (CallSiteRet e) = printIr e
   printIr (CallSiteFun e as) = printIr (Tpointer (ucast e) as) 
@@ -439,16 +434,9 @@ instance IrPrint CallSiteType where
 instance IrPrint CallSite where
   printIr (CsFun cc ra rt ident params fa) = 
     hsep [printIr cc, hsep $ fmap printIr ra, printIr rt, printIr ident, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
-    {-
   printIr (CsAsm t se as dia s1 s2 params fa) = 
     hsep [printIr t, text "asm", printIr se, printIr as, printIr dia, printIr s1 <> comma
          , printIr s2, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
-  printIr (CsConversion ra t convert params fa) = 
-    hsep [hsep $ fmap printIr ra, printIr t, printIr convert, parens (hsep $ fmap printIr params), hsep $ fmap printIr fa]
-  printIr (CsConversionV ra t convert params fa) = 
-    hsep [hsep $ fmap printIr ra, printIr t, printIr convert, parens (hsep $ fmap printIr params), hsep $ fmap printIr fa]
--}
-
 
 instance IrPrint Clause where
   printIr (Catch tv) = text "catch" <+> printIr tv

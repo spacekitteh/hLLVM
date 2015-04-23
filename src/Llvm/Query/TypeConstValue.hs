@@ -240,19 +240,26 @@ getTypeDef TypeEnv{..} t = case t of
   DtypeRecordD (TnoRecordD n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeRecordD _ -> t
   DtypeScalarI _ -> t
-  DtypeScalarP _ -> t 
+  DtypeScalarP (TnameScalarP n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeScalarP (TquoteNameScalarP n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)   
+  DtypeScalarP (TnoScalarP n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
+  DtypeScalarP _ -> t   
   DtypeScalarF _ -> t
   DtypeVectorI _ -> t
   DtypeVectorP _ -> t
   DtypeVectorF _ -> t
   DtypeFirstClassD _ -> t
 
-
 getElementType :: TypeEnv -> Dtype -> Dtype
 getElementType te t = case getTypeDef te t of
   DtypeRecordD (Tarray _ t1) -> t1
   DtypeScalarP (Tpointer t1 _) -> dcast FLC t1
-  _ -> error $ (show t) ++ " has not element type"
+  _ -> error $ (show t) ++ " has no element type"
+
+getPointsToType :: TypeEnv -> Type ScalarB P -> Dtype
+getPointsToType te t = case getTypeDef te (ucast t) of
+  DtypeScalarP (Tpointer t1 _) -> dcast FLC t1
+  _ -> errorLoc FLC $ show t ++ " has no element type"
 
 {-
 getScalarType :: TypeEnv -> Dtype -> Dtype

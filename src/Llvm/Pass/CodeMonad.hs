@@ -4,8 +4,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Llvm.Pass.CodeMonad (Cc,emitNodes,useBase, appendToBase, emitAll
-                           ,newGlobalId, newNode, theEnd,newCInst, new, newValue, getLocalBase, findGlobalAddr, newLocalId) where
+module Llvm.Pass.CodeMonad ( Cc, emitNodes, useBase, appendToBase, emitAll
+                           , newGlobalId, newNode, theEnd,newCInst, new, newValue
+                           , getLocalBase, findGlobalAddr, newLocalId
+                           ) where
 
 import Llvm.Data.Shared
 import Llvm.Data.CoreIr
@@ -80,15 +82,40 @@ getLocalBase g = case g of
         
 findGlobalAddr :: Const -> Maybe GlobalId    
 findGlobalAddr cnst = case cnst of
+  C_u8 _ -> Nothing
+  C_u16 _ -> Nothing
+  C_u32 _ -> Nothing
+  C_u64 _ -> Nothing
+  C_u96 _ -> Nothing
+  C_u128 _ -> Nothing
+  C_s8 _ -> Nothing
+  C_s16 _ -> Nothing
+  C_s32 _ -> Nothing
+  C_s64 _ -> Nothing
+  C_s96 _ -> Nothing
+  C_s128 _ -> Nothing
+  C_int _ -> Nothing
+  C_uhex_int _ -> Nothing
+  C_shex_int _ -> Nothing
+  C_float _ -> Nothing
+  C_null -> Nothing
+  C_undef -> Nothing
+  C_true -> Nothing
+  C_false -> Nothing
+  C_zeroinitializer -> Nothing
   C_globalAddr g -> Just g
   C_getelementptr _ (T _ c) _ -> findGlobalAddr c
   C_ptrtoint (T _ c) _ -> findGlobalAddr c
-  C_int _ -> Nothing
-  C_s32 _ -> Nothing
-  C_u32 _ -> Nothing
-  C_null -> Nothing
-  C_undef -> Nothing
-  _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  C_str _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  C_struct _ _ -> errorLoc FLC ("unsupported " ++ show cnst)  
+  C_vector _ -> errorLoc FLC ("unsupported " ++ show cnst)    
+  C_vectorN _ _-> errorLoc FLC ("unsupported " ++ show cnst)      
+  C_array _ -> errorLoc FLC ("unsupported " ++ show cnst)        
+  C_arrayN _ _ -> errorLoc FLC ("unsupported " ++ show cnst)  
+  C_localId _ -> errorLoc FLC ("unsupported " ++ show cnst)    
+  C_labelId _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  C_block _ _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  _ -> Nothing
                         
        
 baseOf :: Value -> LocalId       

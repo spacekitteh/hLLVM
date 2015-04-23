@@ -952,20 +952,8 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
          }
     I.I_call_asm tc t dia b1 b2 qs1 qs2 as fa lhs -> 
       do { csa <- convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) 
-         ; return $ A.ComputingInst lhs $ A.Call tc csa -- (A.CsAsm ta dia b1 b2 qs1 qs2 asa fa)
+         ; return $ A.ComputingInst lhs $ A.Call tc csa 
          } 
-      {-
-    I.I_llvm_dbg_declare ap ->
-      do { apa <- mapM convert ap
-         ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.dbg.declare")
-           apa []
-         }
-    I.I_llvm_dbg_value ap ->
-      do { apa <- mapM convert ap
-         ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.dbg.value")
-           apa []
-         }
-    -}
     I.I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
       do { (A.Typed t1 v1) <- convert tv1
          ; (A.Typed t2 v2) <- convert tv2

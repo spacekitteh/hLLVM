@@ -792,11 +792,6 @@ convert_MetaKindedConst x =
 
 
 
-{-
-convert_FunName :: A.FunName -> MM I.FunName
-convert_FunName (A.FunNameGlobal g) = return $ I.FunNameGlobal g
-convert_FunName (A.FunNameString s) = return $ I.FunNameString s
--}
 
 convert_FunPtr :: A.FunName -> MM I.FunPtr
 convert_FunPtr fn = 
@@ -806,23 +801,18 @@ convert_FunPtr fn =
       A.GolL l0 -> return $ I.FunSsa l0
     A.FunNameBitcast tv t ->
       do { mp <- typeDefs
-         ; tv1 <- convert_to_DtypedConst tv
+         ; (I.T st c) <- convert_to_DtypedConst tv
          ; let t1::I.Utype = tconvert mp t
-         ; case tv1 of
-           I.T st c -> return $ I.FunIdBitcast (I.T st c) (I.dcast FLC t1)
-           _ -> errorLoc FLC $ show tv1
+         ; return $ I.FunIdBitcast (I.T st c) (I.dcast FLC t1)
          }
     A.FunNameInttoptr tv t -> 
        do { mp <- typeDefs
-          ; tv1 <- convert_to_DtypedConst tv
+          ; (I.T st c) <- convert_to_DtypedConst tv
           ; let t1::I.Utype = tconvert mp t
-          ; case tv1 of
-             I.T st c -> return $ I.FunIdInttoptr (I.T st c) (I.dcast FLC t1)
-             _ -> errorLoc FLC $ show tv1
+          ; return $ I.FunIdInttoptr (I.T st c) (I.dcast FLC t1)
           }
     A.FunName_null -> return I.Fun_null
     A.FunName_undef -> return I.Fun_undef
-    _ -> errorLoc FLC $ show fn
 
 
 convert_FunId :: A.FunName -> MM I.GlobalId
@@ -1297,7 +1287,7 @@ isMetaParam x = case x of
   A.ActualParamMeta _ -> True
   _ -> False
 
-convert_MetaParam :: A.ActualParam -> MM I.MetaParam -- MetaKindedConst -- ActualParam
+convert_MetaParam :: A.ActualParam -> MM I.MetaParam 
 convert_MetaParam x = case x of
   A.ActualParamMeta mc -> Md.liftM I.MetaParamMeta (convert_MetaKindedConst mc)
   A.ActualParamData t pa1 ma v pa2 ->
