@@ -49,16 +49,9 @@ change_List :: (Eq t, Eq a) => (a -> Maybe a) -> [T t a] -> Maybe [T t a]
 change_List f ls = let ls' = map (\(T t x) -> T t (fromMaybe x (f x))) ls
                    in if ls == ls' then Nothing else Just ls'
 
-
 change :: (a -> Maybe a) -> a -> a
 change c a = fromMaybe a (c a)
-                                            
 
-{-
-data Changer = Changer { change_GlobalId :: MaybeChange GlobalId
-                       , change_Label :: MaybeChange Label
-                       }
--}
 
 mchange_TypedConstOrNull :: Changer -> MaybeChange TypedConstOrNull
 mchange_TypedConstOrNull chg@Changer{..} x = case x of
@@ -209,6 +202,23 @@ mchange_MetaKindedConst :: Changer -> MaybeChange MetaKindedConst
 mchange_MetaKindedConst chg@Changer{..} mk = case mk of
   MetaKindedConst mk mc -> liftM (MetaKindedConst mk) (mchange_MetaConst chg mc)
   UnmetaKindedNull -> Nothing
+  
+  
+mchange_FunPtr :: Changer -> MaybeChange FunPtr  
+mchange_FunPtr chg@Changer{..} fp = case fp of
+  FunId g -> let g0 = change_GlobalId g
+             in if g0 == g then Nothing
+                else Just $ FunId g0
+  FunIdBitcast (T st c) dt -> case mchange_Const chg c of
+    Nothing -> Nothing
+    Just c0 -> Just $ FunIdBitcast (T st c0) dt
+  FunIdInttoptr (T st c) dt -> case mchange_Const chg c of
+    Nothing -> Nothing
+    Just c0 -> Just $ FunIdInttoptr (T st c0) dt
+  Fun_null -> Nothing
+  Fun_undef -> Nothing
+
+
   
 mchange_MetaConst :: Changer -> MaybeChange MetaConst  
 mchange_MetaConst chg@Changer{..} mc = case mc of

@@ -190,8 +190,8 @@ instance Show (Type s r) where
     Tfirst_class_quoteName s -> "Tfirst_class_quoteName " ++ show s
     Tfirst_class_no s -> "Tfirst_class_no " ++ show s
 
-instance Mingle (Type s r) where
-  mingle x = case x of
+instance Mangle (Type s r) where
+  mangle x = case x of
     TpI n -> "i" ++ show n
     TpF n -> "f" ++ show n
     TpV n -> "vi" ++ show n
@@ -206,15 +206,15 @@ instance Mingle (Type s r) where
     TpNull -> "null"
     TpLabel -> "label"
     Topaque -> "opaque"
-    Tarray n d -> "a_" ++ show n ++ "_" ++ mingle d
+    Tarray n d -> "a_" ++ show n ++ "_" ++ mangle d
 
-    TvectorI n d -> "vi_" ++ show n ++ "_" ++ mingle d
-    TvectorF n d -> "vf_" ++ show n ++ "_" ++ mingle d
-    TvectorP n d -> "vp_" ++ show n ++ "_" ++ mingle d
+    TvectorI n d -> "vi_" ++ show n ++ "_" ++ mangle d
+    TvectorF n d -> "vf_" ++ show n ++ "_" ++ mangle d
+    TvectorP n d -> "vp_" ++ show n ++ "_" ++ mangle d
 
-    Tstruct p ds -> "s_" ++ show p ++ "_" ++ mingle ds
-    Tpointer e as -> "ptr_" ++ mingle e ++ "_" ++ show as
-    Tfunction rt tp fa -> "fun_" ++ mingle rt ++ " " ++ mingle tp ++ " " ++ show fa
+    Tstruct p ds -> "s_" ++ show p ++ "_" ++ mangle ds
+    Tpointer e as -> "ptr_" ++ mangle e ++ "_" ++ show as
+    Tfunction rt tp fa -> "fun_" ++ mangle rt ++ " " ++ mangle tp ++ " " ++ show fa
     {- Scalar -}
     TnameScalarI s -> show s
     TquoteNameScalarI s -> show s
@@ -436,8 +436,8 @@ data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) [FunAtt
 
 data TypeParamList = TypeParamList [Dtype] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 
-instance Mingle TypeParamList where
-  mingle (TypeParamList l va) = "(" ++ mingle l ++ show va ++ ")"
+instance Mangle TypeParamList where
+  mangle (TypeParamList l va) = "(" ++ mangle l ++ show va ++ ")"
 
 type AddrSpace = Word32
 
@@ -1041,29 +1041,29 @@ x86_fp80 :: Type ScalarB F
 x86_fp80 = TpX86Fp80
 
 
-instance Mingle Dtype where
-  mingle t = let (t0::Utype) = ucast t 
-             in mingle t0
+instance Mangle Dtype where
+  mangle t = let (t0::Utype) = ucast t 
+             in mangle t0
     
-instance Mingle Rtype where
-  mingle t = let (t0::Utype) = ucast t 
-             in mingle t0
+instance Mangle Rtype where
+  mangle t = let (t0::Utype) = ucast t 
+             in mangle t0
     
-instance Mingle Etype where
-  mingle t = let (t0::Utype) = ucast t 
-             in mingle t0
+instance Mangle Etype where
+  mangle t = let (t0::Utype) = ucast t 
+             in mangle t0
 
-instance Mingle Utype where    
-  mingle t = case t of
-    UtypeScalarI e -> mingle e
-    UtypeScalarF e -> mingle e
-    UtypeScalarP e -> mingle e
-    UtypeVectorI e -> mingle e
-    UtypeVectorF e -> mingle e
-    UtypeVectorP e -> mingle e
-    UtypeFirstClassD e -> mingle e
-    UtypeRecordD e -> mingle e
-    UtypeOpaqueD e -> mingle e
-    UtypeVoidU e -> mingle e
-    UtypeFunX e -> mingle e
-    UtypeLabelX e -> mingle e
+instance Mangle Utype where    
+  mangle t = case t of
+    UtypeScalarI e -> mangle e
+    UtypeScalarF e -> mangle e
+    UtypeScalarP e -> mangle e
+    UtypeVectorI e -> mangle e
+    UtypeVectorF e -> mangle e
+    UtypeVectorP e -> mangle e
+    UtypeFirstClassD e -> mangle e
+    UtypeRecordD e -> mangle e
+    UtypeOpaqueD e -> mangle e
+    UtypeVoidU e -> mangle e
+    UtypeFunX e -> mangle e
+    UtypeLabelX e -> mangle e

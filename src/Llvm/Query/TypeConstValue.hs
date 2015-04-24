@@ -369,3 +369,10 @@ instance TypeOf Cinst Dtype where
                   in dcast FLC et
 --    I_llvm_dbg_declare{..} -> error $ show x ++ " has no type"
     _ -> errorLoc FLC $ "unsupported " ++ show x 
+    
+    
+instance TypeOf Const Dtype where    
+  typeof te x = case x of
+    C_getelementptr b (T bt _) indices -> let et = getGetElemtPtrIndexedType te (ucast bt) (fmap ucast indices)
+                                          in (ucast $ Tpointer (ucast et) 0)
+    _ -> errorLoc FLC $ show x

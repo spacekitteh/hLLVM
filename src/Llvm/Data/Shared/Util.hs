@@ -67,8 +67,8 @@ class Hcast l1 l2 where
   hcast :: FileLoc -> l1 -> l2
   
   
-class Mingle a where  
-  mingle :: a -> String
+class Mangle a where  
+  mangle :: a -> String
   
-instance Mingle a => Mingle ([a]) where  
-  mingle l = foldl (\p e -> p ++ (mingle e)) "" l
+instance Mangle a => Mangle ([a]) where  
+  mangle l = foldl (\p e -> p ++ (mangle e)) "" l

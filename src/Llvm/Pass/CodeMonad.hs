@@ -80,7 +80,7 @@ getLocalBase g = case g of
   GlobalIdAlphaNum s -> LocalIdDqString $ "@" ++ s
   GlobalIdDqString s -> LocalIdDqString $ "@" ++ s
         
-findGlobalAddr :: Const -> Maybe GlobalId    
+findGlobalAddr :: Const -> Maybe (GlobalId, Const -> Const)
 findGlobalAddr cnst = case cnst of
   C_u8 _ -> Nothing
   C_u16 _ -> Nothing
@@ -103,9 +103,13 @@ findGlobalAddr cnst = case cnst of
   C_true -> Nothing
   C_false -> Nothing
   C_zeroinitializer -> Nothing
-  C_globalAddr g -> Just g
-  C_getelementptr _ (T _ c) _ -> findGlobalAddr c
-  C_ptrtoint (T _ c) _ -> findGlobalAddr c
+  C_globalAddr g -> Just (g, id)
+  C_getelementptr b (T t c) idx -> case findGlobalAddr c of
+    Nothing -> Nothing
+    Just (gid, f) -> Just (gid, \x -> C_getelementptr b (T t (f x)) idx)
+  C_ptrtoint (T st c) dt -> case findGlobalAddr c of
+    Nothing -> Nothing
+    Just (gid, f) -> Just (gid, \x -> C_ptrtoint (T st (f x)) dt)
   C_str _ -> errorLoc FLC ("unsupported " ++ show cnst)
   C_struct _ _ -> errorLoc FLC ("unsupported " ++ show cnst)  
   C_vector _ -> errorLoc FLC ("unsupported " ++ show cnst)    
@@ -121,9 +125,11 @@ findGlobalAddr cnst = case cnst of
 baseOf :: Value -> LocalId       
 baseOf nb = case nb of
   Val_ssa s -> s
-  Val_const c -> case findGlobalAddr c of
-    Just g -> getLocalBase g
+  Val_const c -> LocalIdDqString $ mangle c 
+                 {- case findGlobalAddr c of
+                 Just (g,_) -> getLocalBase g
     Nothing -> LocalIdDqString $ "cannot find global addr of " ++ show nb
+-}
 
 useBase :: Value -> Cc ad a -> Cc ad a
 useBase nb cca = local (\_ -> baseOf nb) cca

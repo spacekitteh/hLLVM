@@ -200,6 +200,10 @@ data Const where {
   C_insertvalue :: InsertValue Const -> Const;
   } deriving (Eq, Ord, Show)
 
+instance Mangle Const where
+  mangle c = fmap (\c -> if c == '"' then '_' else c) $ show c
+
+
 data MdVar = MdVar String deriving (Eq,Ord,Show)
 data MdNode = MdNode String deriving (Eq,Ord,Show)
 data MetaConst = McStruct [MetaKindedConst]
