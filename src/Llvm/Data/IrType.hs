@@ -1041,29 +1041,33 @@ x86_fp80 :: Type ScalarB F
 x86_fp80 = TpX86Fp80
 
 
+replaceDq :: String -> String
+replaceDq s = fmap (\x -> if x == '"' then '_' else x) s
+
 instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 
-             in mangle t0
+             in replaceDq $ mangle t0
     
 instance Mangle Rtype where
   mangle t = let (t0::Utype) = ucast t 
-             in mangle t0
+             in replaceDq $ mangle t0
     
 instance Mangle Etype where
   mangle t = let (t0::Utype) = ucast t 
-             in mangle t0
+             in replaceDq $ mangle t0
 
 instance Mangle Utype where    
-  mangle t = case t of
-    UtypeScalarI e -> mangle e
-    UtypeScalarF e -> mangle e
-    UtypeScalarP e -> mangle e
-    UtypeVectorI e -> mangle e
-    UtypeVectorF e -> mangle e
-    UtypeVectorP e -> mangle e
-    UtypeFirstClassD e -> mangle e
-    UtypeRecordD e -> mangle e
-    UtypeOpaqueD e -> mangle e
-    UtypeVoidU e -> mangle e
-    UtypeFunX e -> mangle e
-    UtypeLabelX e -> mangle e
+  mangle t = let s = case t of
+                   UtypeScalarI e -> mangle e
+                   UtypeScalarF e -> mangle e
+                   UtypeScalarP e -> mangle e
+                   UtypeVectorI e -> mangle e
+                   UtypeVectorF e -> mangle e
+                   UtypeVectorP e -> mangle e
+                   UtypeFirstClassD e -> mangle e
+                   UtypeRecordD e -> mangle e
+                   UtypeOpaqueD e -> mangle e
+                   UtypeVoidU e -> mangle e
+                   UtypeFunX e -> mangle e
+                   UtypeLabelX e -> mangle e
+             in replaceDq s

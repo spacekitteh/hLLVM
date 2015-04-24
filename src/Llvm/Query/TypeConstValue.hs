@@ -39,7 +39,7 @@ fromAlignInBit (AlignInBit n) = AlignInByte (n `div` eightBits)
 
 
 getTypeAlignment :: TypeEnv -> Dtype -> AlignType -> AlignInByte
-getTypeAlignment te@TypeEnv{..} t at = case t of
+getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
   DtypeScalarI st -> fromAlignInBit $ getTpAlignment dataLayout st
   DtypeScalarF st -> fromAlignInBit $ getTpAlignment dataLayout st  
   DtypeRecordD st -> case st of
@@ -48,16 +48,16 @@ getTypeAlignment te@TypeEnv{..} t at = case t of
       (Packed, AlignAbi)  -> AlignInByte 1
       _ -> let aa = case M.lookup (Just $ SizeInBit 0) (aggregates dataLayout) of
                  Just (aa, pa) -> selectAlignment at aa pa
-                 Nothing -> errorX
+                 Nothing -> AlignInBit 8 -- errorX FLC
                sl = getStructLayout te (p,tys)
            in (max (fromAlignInBit aa) (structAlignment sl))
   DtypeScalarP st -> case st of  
     Tpointer t a -> case (uncurry lookupOr) (ta $ Just a) (pointers dataLayout) of
       Just (s, aa, pa) -> (fromAlignInBit $ selectAlignment at aa pa)
-      Nothing -> errorX
+      Nothing -> errorX FLC
   where
-    errorX :: a
-    errorX = error $ "getTypedAlignment:unsupported " ++ show t
+    errorX :: FileLoc -> a
+    errorX flc = errorLoc flc $ "getTypeAlignment:unsupported " ++ show t ++ ", " ++ show at
     getTpAlignment :: DataLayoutInfo -> Type ScalarB x -> AlignInBit
     getTpAlignment dl tp = case tp of
       TpI n -> case M.lookup (SizeInBit n) (ints dl) of
@@ -81,16 +81,16 @@ getTypeAlignment te@TypeEnv{..} t at = case t of
       TpFp128 -> let b = getTypeSizeInBits te (ucast tp)
                  in case M.lookup b (floats dl) of
                    Just (aa, pa) -> selectAlignment at aa pa
-                   Nothing -> errorX
+                   Nothing -> errorX FLC
       TpX86Fp80 -> let b = getTypeSizeInBits te (ucast tp)
                    in case M.lookup b (floats dl) of
                      Just (aa, pa) -> selectAlignment at aa pa
-                     Nothing -> errorX
+                     Nothing -> errorX FLC
       TpPpcFp128 -> let b = getTypeSizeInBits te (ucast tp)
                     in case M.lookup b (floats dl) of
                       Just (aa, pa) -> selectAlignment at aa pa
-                      Nothing -> errorX
-      TpX86Mmx -> errorX
+                      Nothing -> errorX FLC
+      TpX86Mmx -> errorX FLC
 
 ta :: Maybe AddrSpace -> (LayoutAddrSpace, LayoutAddrSpace)
 ta x = case x of
