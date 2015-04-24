@@ -60,6 +60,12 @@ mchange_TypedConstOrNull chg@Changer{..} x = case x of
     Nothing -> Nothing
   UntypedNull -> Nothing
 
+mchange_Value :: Changer -> MaybeChange Value
+mchange_Value chg@Changer{..} cst = case cst of
+  Val_ssa lid -> let lid0 = change_LocalId lid
+                 in if lid0 == lid then Nothing
+                    else Just $ Val_ssa lid0
+  Val_const c -> fmap Val_const (mchange_Const chg c)
 
 mchange_Const :: Changer -> MaybeChange Const
 mchange_Const chg@Changer{..} cst = 
@@ -170,7 +176,6 @@ mchange_Const chg@Changer{..} cst =
         C_extractvalue _ -> cst
         C_insertvalue _ -> cst
         _ -> cst
-        
   in let cst2 = change_Const cst1
      in if cst == cst2 then Nothing
         else Just cst2
