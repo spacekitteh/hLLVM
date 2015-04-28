@@ -127,9 +127,10 @@ instance IrPrint a => IrPrint (Toplevel a) where
   printIr (ToplevelComdat x) = printIr x
 
 instance IrPrint TypeEnv where
-  printIr (TypeEnv dl tt td) = text "datalayout:" <+> printIr dl
+  printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
                                $+$ text "triple:" <+> printIr tt
                                $+$ text "typedefs:" <+> printIr td
+                               $+$ text "opaqueTypedefs:" <+> printIr otd                               
                                
 instance IrPrint GlobalCxt where
   printIr (GlobalCxt te gl) = text "typeEnv:" <+> printIr te
@@ -151,6 +152,7 @@ instance IrPrint a => IrPrint (Node a e x) where
   printIr (Lnode lbl) = printIr lbl
   printIr (Pnode i dbgs) = commaSepList $ (printIr i):(fmap printIr dbgs)
   printIr (Cnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)
+  printIr (Mnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)  
   printIr (Tnode t dbgs) = commaSepList $ (printIr t):(fmap printIr dbgs)
   printIr (Comment s) = text s
   printIr (Enode a) = printIr a
@@ -527,6 +529,10 @@ instance IrPrint Cinst where
     (I_call_fun tc cc ra cstype callee actparams fna lhs) -> 
       hsep [optSepToLlvm lhs equals, printIr tc, 
             printIr cc, printIr ra, printIr cstype, printIr callee, parens (printIr actparams), printIr fna]
+    (I_call_asm tc ct se as dia dq1 dq2 actparams fna lhs) ->  
+      hsep [optSepToLlvm lhs equals, printIr tc, 
+            printIr ct, printIr se, printIr as, printIr dia, printIr dq1, printIr dq2, parens (printIr actparams)
+           , printIr fna]
     (I_extractelement_I tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_i", printIr tv, printIr idx]
     (I_extractelement_F tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_f", printIr tv, printIr idx]
     (I_extractelement_P tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_p", printIr tv, printIr idx]
@@ -709,6 +715,15 @@ instance IrPrint (Type s x) where
     Topaque -> text "opaque"
     TpNull -> text "null"
     
+    Tfirst_class_array i t -> brackets (integral i <+> char 'x' <+> printIr t)
+    Tfirst_class_struct b ts -> let (start, end) = case b of 
+                                      Packed -> (char '<', char '>')
+                                      Unpacked -> (empty, empty)
+                                in start <+> braces (hsep $ punctuate comma $ fmap printIr ts) <+> end
+    Tfirst_class_name s -> char '%' <> text s
+    Tfirst_class_quoteName s -> char '%' <> (doubleQuotes $ text s)
+    Tfirst_class_no i -> char '%' <> integral i
+    
     TnameScalarI s -> char '%' <> text s
     TquoteNameScalarI s -> char '%'<> (doubleQuotes $ text s)
     TnoScalarI i -> char '%'<> integral i
@@ -751,6 +766,14 @@ instance IrPrint (Type s x) where
                     in start <+> braces (hsep $ punctuate comma $ fmap printIr ts) <+> end
     Tpointer t addr -> printIr t <+> integral addr <+> text "*"
     Tfunction t fp atts -> printIr t <+> printIr fp <+> (hsep $ punctuate comma $ fmap printIr atts)
+    Topaque_struct b ts -> let (start, end) = case b of 
+                                 Packed -> (char '<', char '>')
+                                 Unpacked -> (empty, empty)
+                           in start <+> braces (hsep $ punctuate comma $ fmap printIr ts) <+> end
+    Topaque_array i t -> brackets (integral i <+> char 'x' <+> printIr t)
+    TnameOpaqueD s -> char '%' <> text s
+    TquoteNameOpaqueD s -> char '%' <> text s
+    TnoOpaqueD s -> char '%' <> integral s
 
 instance IrPrint FormalParam where
   printIr x = case x of
@@ -781,6 +804,7 @@ instance IrPrint Utype where
     UtypeOpaqueD e -> printIr e
     UtypeVoidU e -> printIr e
     UtypeFunX e -> printIr e
+    UtypeLabelX e -> printIr e
 
 
 instance IrPrint Etype where

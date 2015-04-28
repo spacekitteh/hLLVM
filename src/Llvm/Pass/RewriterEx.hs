@@ -191,10 +191,21 @@ mchange_FunctionPrototype chg fp@FunctionPrototype {..} =
   if (change_GlobalId chg) fp_fun_name == fp_fun_name then Nothing
   else Just $ fp { fp_fun_name = (change_GlobalId chg) fp_fun_name }
 
+mchange_TlDeclare :: Changer -> MaybeChange TlDeclare
+mchange_TlDeclare chg tl@(TlDeclare fp) = liftM (TlDeclare) (mchange_FunctionPrototype chg fp)
+
+mchange_TlDefine :: Changer -> MaybeChange (TlDefine a)
+mchange_TlDefine chg td@(TlDefine fp e g) = let fp0 = mchange_FunctionPrototype chg fp
+                                            in case fp0 of
+                                              Just fpx -> Just $ TlDefine fpx e g
+                                              Nothing -> Nothing
+
 mchange_Toplevel :: Changer -> MaybeChange (Toplevel a)
 mchange_Toplevel chg@Changer{..} tpl = case tpl of
-  ToplevelNamedMd m -> liftM ToplevelNamedMd (mchange_TlNamedMd chg m)
-  ToplevelStandaloneMd sd -> liftM ToplevelStandaloneMd (mchange_TlStandaloneMd chg sd)
+  ToplevelNamedMd x -> liftM ToplevelNamedMd (mchange_TlNamedMd chg x)
+  ToplevelStandaloneMd x -> liftM ToplevelStandaloneMd (mchange_TlStandaloneMd chg x)
+  ToplevelDeclare x -> liftM ToplevelDeclare (mchange_TlDeclare chg x)
+  ToplevelDefine x -> liftM ToplevelDefine (mchange_TlDefine chg x)
   _ -> Nothing
 
 mchange_TlNamedMd :: Changer -> MaybeChange TlNamedMd

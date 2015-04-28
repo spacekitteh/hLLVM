@@ -337,7 +337,7 @@ instance Eq (Type s r) where
     (TnoCodeFunX n, TnoCodeFunX n1) -> n == n1
 
     {- Opaque -}
-    (TnameOpaqueD _, TnameOpaqueD _) -> errorLoc FLC "comparing opaque types"
+    (TnameOpaqueD s, TnameOpaqueD s1) -> s == s1 -- errorLoc FLC "comparing opaque types"
     (TquoteNameOpaqueD _, TquoteNameOpaqueD _) -> errorLoc FLC "comparing opaque types"
     (TnoOpaqueD _, TnoOpaqueD _) -> errorLoc FLC "comparing opaque types"
     (Topaque_struct _ _, Topaque_struct _ _) -> errorLoc FLC "comparing opaque types"
@@ -419,11 +419,11 @@ instance Ord (Type s r) where
     (TnoCodeFunX n, TnoCodeFunX n1) -> compare n n1
 
     {- Opaque -}
-    (TnameOpaqueD _, TnameOpaqueD _) -> errorLoc FLC "comparing opaque types"
+    (TnameOpaqueD s, TnameOpaqueD s1) -> compare s s1 -- errorLoc FLC "comparing opaque types"
     (TquoteNameOpaqueD _, TquoteNameOpaqueD _) -> errorLoc FLC "comparing opaque types"
     (TnoOpaqueD _, TnoOpaqueD _) -> errorLoc FLC "comparing opaque types"
     (Topaque_struct _ _, Topaque_struct _ _) -> errorLoc FLC "comparing opaque types"
-    (Topaque_array _ _, Topaque_array _ _) -> errorLoc FLC "comparing opaque types"    
+    (Topaque_array _ _, Topaque_array _ _) -> errorLoc FLC "comparing opaque types"
 
     (_,_) -> compare (show x1) (show x2)
 

@@ -150,7 +150,7 @@ instance (Show a, Ord a) => Ord (Node a e x) where
     (Mnode v1 d1, Mnode v2 d2) -> compare (v1,d1) (v2,d2)    
     (Comment v1, Comment v2) -> compare v1 v2
     (Enode v1, Enode v2) -> compare v1 v2
-    (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2)     
+    (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2)
     (_, _) -> compare (show x1) (show x2)
 
 instance H.NonLocal (Node a) where
@@ -164,6 +164,7 @@ instance H.NonLocal (Node a) where
     Ci.T_indirectbr _ ls -> ls
     Ci.T_switch d ls -> (snd d):(map snd ls)
     Ci.T_invoke{..} -> [invoke_normal_label, invoke_exception_label]
+    Ci.T_invoke_asm{..} -> [invoke_normal_label, invoke_exception_label]
     Ci.T_resume _ -> error "what is resume"
     Ci.T_unwind -> error "what is unwind"
 

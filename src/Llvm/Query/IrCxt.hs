@@ -6,6 +6,7 @@ import Llvm.Data.Ir
 data TypeEnv = TypeEnv { dataLayout :: Ci.DataLayoutInfo
                        , targetTriple :: Ci.TargetTriple
                        , typedefs :: M.Map Ci.LocalId Ci.Dtype
+                       , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
 data FunCxt = FunCxt { funName :: String 
@@ -30,14 +31,17 @@ irCxtOfModule (Module tl) =
                                                   ToplevelTriple _ -> True
                                                   _ -> False
                                               ) tl
-      tdefs = fmap (\(ToplevelTypeDef (TlDatTypeDef lhs def)) -> (lhs, def)) $ filter (\x -> case x of
-                                                                                          ToplevelTypeDef _ -> True
-                                                                                          _ -> False
-                                                                                      ) tl
-      glbs = fmap (\(ToplevelGlobal g@(TlGlobalDtype lhs _ _ _ _ _ _ _ _ t _ _ _ _)) -> (lhs, (g,t))) $ filter (\x -> case x of
-                                                                                                                   ToplevelGlobal _ -> True
-                                                                                                                   _ -> False
-                                                                                                               ) tl
+      tdefs = fmap (\(ToplevelTypeDef td) -> case td of
+                       TlDatTypeDef lhs def -> (lhs, def)) 
+              $ filter (\x -> case x of
+                           ToplevelTypeDef (TlDatTypeDef _ _) -> True
+                           _ -> False
+                       ) tl
+      glbs = fmap (\(ToplevelGlobal g@(TlGlobalDtype lhs _ _ _ _ _ _ _ _ t _ _ _ _)) -> (lhs, (g,t))) 
+             $ filter (\x -> case x of
+                          ToplevelGlobal _ -> True
+                          _ -> False
+                      ) tl
   in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
                                                        , targetTriple = tt
                                                        , typedefs = M.fromList tdefs
