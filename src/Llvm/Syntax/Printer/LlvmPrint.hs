@@ -133,7 +133,7 @@ instance AsmPrint Const where
     C_insertvalue a -> toLlvm a
     C_extractelement a -> toLlvm a
     C_insertelement a -> toLlvm a
-    C_localId v -> toLlvm v
+--    C_localId v -> toLlvm v
 
 instance AsmPrint MdVar where 
   toLlvm (MdVar s) = char '!'<> (text s)
@@ -272,19 +272,23 @@ instance AsmPrint Rhs where
   toLlvm (RiV a) = toLlvm a
   toLlvm (RvA (VaArg tv t)) = hsep [text "va_arg", toLlvm tv <> comma, toLlvm t]
   toLlvm (RlP (LandingPad rt pt tgl b clause)) = 
-    hsep ([text "landingpad", toLlvm rt, text "personality", toLlvm pt, toLlvm tgl, toLlvm b] ++ (fmap toLlvm clause))
+    hsep ([text "landingpad", toLlvm rt, text "personality", toLlvm pt, toLlvm tgl, toLlvm b] 
+          ++ (fmap toLlvm clause))
 
 instance AsmPrint ActualParam where
   toLlvm x = case x of
-    (ActualParamData t att1 align v att2) ->
+    ActualParamData t att1 align v att2 ->
       hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm align, toLlvm v, hsep $ fmap toLlvm att2]
-    (ActualParamMeta mc) -> toLlvm mc
+    ActualParamLabel t att1 align v att2 ->
+      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm align, toLlvm v, hsep $ fmap toLlvm att2]      
+    ActualParamMeta mc -> toLlvm mc
 
 instance AsmPrint Dbg where
   toLlvm (Dbg mv meta) = toLlvm mv <+> toLlvm meta
 
 instance AsmPrint PhiInst where
-  toLlvm (PhiInst lhs t pairs) =  hsep [maybe empty ((<+> equals) . toLlvm) lhs, text "phi", toLlvm t, commaSepList $ fmap tvToLLvm pairs]
+  toLlvm (PhiInst lhs t pairs) =  hsep [maybe empty ((<+> equals) . toLlvm) lhs, text "phi"
+                                       , toLlvm t, commaSepList $ fmap tvToLLvm pairs]
     where tvToLLvm (h1,h2) = brackets (toLlvm h1 <> comma <+> toLlvm h2)
 
 instance AsmPrint ComputingInst where

@@ -328,6 +328,7 @@ rnCallSite (CsConversion pas t c aps fas) =
 
 rnActualParam :: ActualParam -> MS ActualParam
 rnActualParam (ActualParamData t ps ma v pa) = S.liftM (\x -> ActualParamData t ps ma x pa) (rnValue v)
+rnActualParam (ActualParamLabel t ps ma v pa) = S.liftM (\x -> ActualParamLabel t ps ma x pa) (rnPercentLabel v)
 rnActualParam (ActualParamMeta mc) = S.liftM ActualParamMeta (rnMetaKindedConst mc)
                                         
 
@@ -408,7 +409,7 @@ mapMetaKindedConst f x = case x of
 
 rnConst :: Const -> MS Const
 rnConst (C_complex x) = S.liftM C_complex (rnComplexConstant x)
-rnConst (C_localId x) = S.liftM C_localId (rnLocalId x)
+-- rnConst (C_localId x) = S.liftM C_localId (rnLocalId x)
 rnConst (C_labelId l) = S.liftM C_labelId (rnLabelId l)
 rnConst (C_blockAddress g l) = S.liftM (C_blockAddress g) (rnPercentLabel l)
 rnConst (C_binexp bexpr) = S.liftM C_binexp (rnBinExpr rnConst bexpr)
@@ -558,6 +559,9 @@ rnCallSite2 (CsConversion pas t c aps fas) =
   
 rnActualParam2 :: ActualParam -> RD ActualParam
 rnActualParam2 (ActualParamData t ps ma v pa) = S.liftM (\x -> ActualParamData t ps ma x pa) (rnValue2 v)
+rnActualParam2 (ActualParamLabel t ps ma v pa) = do { r <- R.ask
+                                                    ; S.liftM (\x -> ActualParamLabel t ps ma x pa) (rnPercentLabel2 (fst r) v)
+                                                    }
 rnActualParam2 (ActualParamMeta mc) = S.liftM ActualParamMeta (rnMetaKindedConst2 mc)
                                         
   
@@ -595,7 +599,7 @@ rnDefFunctionPrototype2 fpt = return fpt
 
 rnConst2 :: Const -> RD Const
 rnConst2 (C_complex x) = S.liftM C_complex (rnComplexConstant2 x)
-rnConst2 (C_localId x) = S.liftM C_localId (rnLocalId2 x)
+-- rnConst2 (C_localId x) = S.liftM C_localId (rnLocalId2 x)
 rnConst2 (C_labelId l) = do { rd <- R.ask
                             ; S.liftM C_labelId (rnLabelId2 (fst rd) l)
                             }

@@ -21,6 +21,7 @@ import qualified Llvm.Pass.Changer as Cg
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.List (stripPrefix)
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -28,7 +29,14 @@ toStep _ = Nothing
 
 
 chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of 
-                             I.GlobalIdAlphaNum s -> I.GlobalIdAlphaNum (s ++ "_")
+                             I.GlobalIdAlphaNum s -> case stripPrefix "llvm." s of
+                               Nothing -> I.GlobalIdAlphaNum (s ++ "_g_")
+                               Just _ -> x
+                             _ -> x
+                        , Cg.change_LocalId = \x -> case x of  
+                             I.LocalIdAlphaNum s -> case stripPrefix "llvm." s of
+                               Nothing -> I.LocalIdAlphaNum (s ++ "_l_")
+                               Just _ -> x
                              _ -> x
                         }
       

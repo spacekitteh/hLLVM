@@ -14,3 +14,5 @@ hoopl-3.10.0.1
 *.hs~
 .hpc
 LLVM_3.5_Files
+*.html
+*.tix

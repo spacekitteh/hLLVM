@@ -265,7 +265,7 @@ instance Conversion I.Const (Rm A.Const) where
     (I.C_arrayN n fs) -> do { v <- convert fs
                             ; return (A.C_complex $ A.Carray $ (fmap (\_ -> v) [1..n]))
                             }
-    I.C_localId a -> return $ A.C_localId a
+--    I.C_localId a -> return $ A.C_localId a
     I.C_labelId a -> Md.liftM A.C_labelId (convert a)
     I.C_block g a -> do { a' <- convert_to_PercentLabel a
                         ; return $ A.C_blockAddress g a'
@@ -986,8 +986,8 @@ instance Conversion I.ActualParam (Rm A.ActualParam) where
     (I.ActualParamData t pa1 ma v pa2) -> do { va <- convert v 
                                              ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
                                              }
-    (I.ActualParamLabel t pa1 ma v pa2) -> do { va <- convert v 
-                                              ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
+    (I.ActualParamLabel t pa1 ma v pa2) -> do { va <- convert_to_PercentLabel v 
+                                              ; return $ A.ActualParamLabel (tconvert () t) pa1 ma va pa2
                                               }
 --    (I.ActualParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
 

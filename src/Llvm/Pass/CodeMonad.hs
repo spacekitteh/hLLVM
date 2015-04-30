@@ -116,7 +116,7 @@ findGlobalAddr cnst = case cnst of
   C_vectorN _ _-> errorLoc FLC ("unsupported " ++ show cnst)      
   C_array _ -> errorLoc FLC ("unsupported " ++ show cnst)        
   C_arrayN _ _ -> errorLoc FLC ("unsupported " ++ show cnst)  
-  C_localId _ -> errorLoc FLC ("unsupported " ++ show cnst)    
+--   C_localId _ -> errorLoc FLC ("unsupported " ++ show cnst)    
   C_labelId _ -> errorLoc FLC ("unsupported " ++ show cnst)
   C_block _ _ -> errorLoc FLC ("unsupported " ++ show cnst)
   _ -> Nothing

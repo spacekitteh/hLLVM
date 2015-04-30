@@ -273,7 +273,7 @@ instance IrPrint Const where
     (C_array ts) -> brackets (commaSepList $ fmap printIr ts)
     C_vectorN n e -> angleBrackets (commaSepList $ fmap (\x -> printIr e) [1..n])
     C_arrayN n e -> brackets (commaSepList $ fmap (\x -> printIr e) [1..n])    
-    C_localId l -> printIr l
+--    C_localId l -> printIr l
     C_labelId l -> printIr l
     C_block g a -> text "blockaddress" <+> parens (printIr g <> comma <+> printIr a)
     

@@ -621,7 +621,7 @@ convert_Const x =
   in case x of
     A.C_simple a -> return $ convert_SimpleConst a
     A.C_complex a -> convert_ComplexConstant a
-    A.C_localId a -> return $ I.C_localId a
+--    A.C_localId a -> return $ I.C_localId a
     A.C_labelId a -> Md.liftM I.C_labelId (convert_LabelId a)
     A.C_blockAddress g a -> do { a' <- convert_PercentLabel a
                               ; return $ I.C_block g a'
@@ -1308,10 +1308,15 @@ convert_ActualParam x = case x of
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
+       ; return $ I.ActualParamData (I.dcast FLC ta) pa1 ma va pa2
+       }
+  (A.ActualParamLabel t pa1 ma v pa2) ->
+    do { mp <- typeDefs
+       ; let (ta::I.Utype) = tconvert mp t
+       ; va <- convert_PercentLabel v
        ; case ta of
          I.UtypeLabelX lbl -> return $ I.ActualParamLabel lbl pa1 ma va pa2
-         _ -> return $ I.ActualParamData (I.dcast FLC ta) pa1 ma va pa2
-       }
+       }    
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
 isMetaParam :: A.ActualParam -> Bool

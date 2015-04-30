@@ -287,9 +287,17 @@ pActualParam :: P ActualParam
 pActualParam = choice [do { t <- pType
                           ; atts0 <- many pParamAttr
                           ; a <- opt pAlign
-                          ; v <- pValue
-                          ; atts1 <- many pParamAttr
-                          ; return $ ActualParamData t atts0 a v atts1
+                          ; case t of
+                            Tprimitive TpLabel -> 
+                              do { v <- pPercentLabel
+                                 ; atts1 <- many pParamAttr
+                                 ; return $ ActualParamLabel t atts0 a v atts1
+                                 }
+                            _  -> 
+                              do { v <- pValue
+                                 ; atts1 <- many pParamAttr
+                                 ; return $ ActualParamData t atts0 a v atts1
+                                 }
                           }
                       ,liftM ActualParamMeta pMetaKindedConst
                       ]

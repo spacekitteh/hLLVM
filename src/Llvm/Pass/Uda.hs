@@ -66,7 +66,7 @@ instance Uda Value where
 instance Uda ActualParam where
   use ap = case ap of
     ActualParamData _ _ _ v _ -> use v
-    ActualParamLabel _ _ _ v _ -> use v
+    ActualParamLabel _ _ _ v _ -> S.empty 
   def _ = errorLoc FLC $ "cannot happen"
   storeTo _ = errorLoc FLC $ "cannot happen"
   loadFrom _ = errorLoc FLC $ "cannot happen"

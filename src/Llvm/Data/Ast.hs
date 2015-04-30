@@ -96,7 +96,7 @@ data ComplexConstant = Cstruct Packing [TypedConstOrNull]
 -- | Constants <http://llvm.org/releases/3.5.0/docs/LangRef.html#constant-expressions>
 data Const = C_simple SimpleConstant
            | C_complex ComplexConstant
-           | C_localId LocalId
+--           | C_localId LocalId
            | C_labelId LabelId
            -- | Addresses of Basic Block <http://llvm.org/releases/3.0/docs/LangRef.html#blockaddress>
            | C_blockAddress GlobalId PercentLabel
@@ -165,6 +165,7 @@ data FunName = FunNameGlobal GlobalOrLocalId
                -- well, it's weird, but LLVM allows this
              | FunName_null 
              | FunName_undef
+             | FunName_zero 
              deriving (Eq,Ord,Show)
 
 data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
@@ -248,6 +249,7 @@ data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
                              deriving (Eq,Show)
 
 data ActualParam = ActualParamData Type [ParamAttr] (Maybe Alignment) Value [ParamAttr]
+                 | ActualParamLabel Type [ParamAttr] (Maybe Alignment) PercentLabel [ParamAttr]
                  | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 

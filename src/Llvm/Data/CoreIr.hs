@@ -94,7 +94,7 @@ data Const where {
   C_vectorN :: Word32 -> TypedConstOrNull -> Const;
   C_array :: [TypedConstOrNull] -> Const;
   C_arrayN :: Word32 -> TypedConstOrNull -> Const;
-  C_localId :: LocalId -> Const;
+--   C_localId :: LocalId -> Const;
   C_labelId :: Label -> Const;
   C_block :: GlobalId -> Label -> Const;
 
@@ -1060,7 +1060,7 @@ data Tinst = T_unreachable
            deriving (Eq, Ord, Show)
 
 data ActualParam = ActualParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
-                 | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Value [ParamAttr]
+                 | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label [ParamAttr]
                  -- | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 

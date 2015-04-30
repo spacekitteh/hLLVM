@@ -109,7 +109,7 @@ library {
     }
   } 
   if flag(testcoverage) {
-    ghc-options: 
+    ghc-options: -fhpc 
   }
   other-extensions: CPP
 }
@@ -133,6 +133,6 @@ executable llvm-test
                      pretty >= 1.1.1.1,
                      data-dword == 0.3
   if flag(testcoverage) {
-    ghc-options:
+    ghc-options: -fhpc
   }
 
