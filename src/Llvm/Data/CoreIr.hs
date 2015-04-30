@@ -240,6 +240,7 @@ data Clause = Catch (T Dtype Value)
             | CcoV (Conversion VectorB Value)
             deriving (Eq,Ord,Show)
 
+{-
 data PersFn = PersFnId GlobalOrLocalId
             | PersFnCastS (Conversion ScalarB GlobalOrLocalId)
             | PersFnCastV (Conversion VectorB GlobalOrLocalId)
@@ -247,6 +248,7 @@ data PersFn = PersFnId GlobalOrLocalId
             | PersFnNull
             | PersFnConst Const
             deriving (Eq, Ord, Show)
+-}
 
 data Dbg = Dbg MdVar MetaConst deriving (Eq, Ord, Show)
 
@@ -450,7 +452,13 @@ data Cinst where {
                    , result :: LocalId
                    } ->  Cinst;
 
-  I_landingpad :: Dtype -> Dtype -> PersFn -> Maybe Cleanup -> [Clause] -> LocalId -> Cinst;
+  I_landingpad :: { resultType :: Dtype 
+                  , persFnType :: Dtype 
+                  , persFn :: FunPtr -- PersFn 
+                  , cleanup :: Maybe Cleanup 
+                  , clauses :: [Clause] 
+                  , result :: LocalId 
+                  } -> Cinst;
 
   I_getelementptr :: { inBounds :: IsOrIsNot InBounds
                      , pointer :: T (Type ScalarB P) Value

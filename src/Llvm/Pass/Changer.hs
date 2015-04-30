@@ -12,6 +12,6 @@ data Changer = Changer { change_GlobalId :: GlobalId -> GlobalId
 defaultChanger = Changer { change_GlobalId = id 
                          , change_LocalId = id 
                          , change_Label = id 
-                         , change_Const = id -- no recursive version
-                         , change_TypedConstOrNull = id -- no recursive version  
+                         , change_Const = id -- non-recursive version
+                         , change_TypedConstOrNull = id -- non-recursive version  
                          }

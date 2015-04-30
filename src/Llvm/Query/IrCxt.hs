@@ -45,6 +45,7 @@ irCxtOfModule (Module tl) =
   in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
                                                        , targetTriple = tt
                                                        , typedefs = M.fromList tdefs
+                                                       , opaqueTypeDefs = M.empty
                                                        }
                                    , globals = M.fromList glbs
                                    }

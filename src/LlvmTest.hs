@@ -16,6 +16,8 @@ import qualified Llvm.Pass.Optimizer as O
 import qualified Llvm.Pass.PassTester as T
 import qualified Llvm.Pass.DataUsage as Du
 import qualified Llvm.Syntax.Printer.IrPrint as P
+import qualified Llvm.Pass.Substitution as Sub
+import qualified Llvm.Pass.Changer as Cg
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -25,6 +27,11 @@ toStep "dce" = Just Dce
 toStep _ = Nothing
 
 
+chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of 
+                             I.GlobalIdAlphaNum s -> I.GlobalIdAlphaNum (s ++ "_")
+                             _ -> x
+                        }
+      
 extractSteps :: [String] -> [Step]
 extractSteps l = map (\x -> case toStep x of
                          Just s -> s
@@ -39,6 +46,7 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | PhiFixUp { input :: FilePath, output :: Maybe String, fuel :: Int }
             | AstCanonic { input :: FilePath, output :: Maybe String }
             | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
+            | Change { input :: FilePath, output :: Maybe String}
             deriving (Show, Data, Typeable, Eq)
 
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
@@ -69,6 +77,11 @@ datause = DataUse { input = def &= typ "<INPUT>"
                   , fuel = H.infiniteFuel &= typ "FUEL" &= help "the fuel used to rewrite the code, the default is infiniteFuel"
                   } &= help "Test DataUsage Pass"
 
+changer = Change { input = def &= typ "<INPUT>"
+                  , output = outFlags Nothing
+                  } &= help "Test DataUsage Pass"
+
+
 pass = Pass { input = def &= typ "<INPUT>"
             , output = outFlags Nothing
             , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass, the default is infiniteFuel"
@@ -80,7 +93,7 @@ phifixup = PhiFixUp { input = def &= typ "<INPUT>"
                     , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
                     } &= help "Test PhiFixUp pass"
 
-mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup,datause] &= help "Test sub components"
+mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup, datause, changer] &= help "Test sub components"
        &= program "Test" &= summary "Test driver v1.0"
 
 main :: IO ()
@@ -131,6 +144,16 @@ main = do { sel <- cmdArgsRun mode
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
+            Change ix ox -> do { inh <- openFile ix ReadMode
+                                ; outh <- openFileOrStdout ox
+                                ; ast <- testParser ix inh
+                                ; let ast' = Cv.simplify ast
+                                ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
+                                      ast'' = Cv.irToAst (Sub.substitute chg $ Cv.invertMap (Cv.a2h m)) (Sub.substitute chg ir)
+                                ; writeOutLlvm ast'' outh
+                                ; hClose inh
+                                ; closeFileOrStdout ox outh
+                                }
             PhiFixUp ix ox f -> do { inh <- openFile ix ReadMode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh

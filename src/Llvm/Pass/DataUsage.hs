@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -cpp #-}
 {-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TemplateHaskell #-}
 
-module Llvm.Pass.DataUsage where
+module Llvm.Pass.DataUsage (scanModule,DataUsage(..)) where
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Map as Dm
@@ -118,7 +118,7 @@ propogateUpPtrUsage dest src du =
   bubbleUp2 (Val_ssa dest) addrs_storing_ptr_params src addAddrStoringPtrParam
   $ bubbleUp2 (Val_ssa dest) addrs_captured src addAddrCaptured
   $ bubbleUp2 (Val_ssa dest) addrs_storing_ptrs src addAddrStoringPtr
-  $ bubbleUp2 (Val_ssa dest) addrs_passed_to_va_start src addAddrPassedToVaStart
+--  $ bubbleUp2 (Val_ssa dest) addrs_passed_to_va_start src addAddrPassedToVaStart
   $ bubbleUp2 (Val_ssa dest) addrs_storing_ptrs src addAddrStoringPtr
   $ bubbleUp2 (Val_ssa dest) addrs_storing_values src addAddrStoringValue
   $ bubbleUp2 (Val_ssa dest) addrs_involving_pointer_arithmatic src addAddrInvolvingPtrArithm  

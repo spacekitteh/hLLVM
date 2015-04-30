@@ -222,16 +222,39 @@ pInsertValue = do { reserved "insertvalue"
 pVaArg :: P Rhs
 pVaArg = reserved "va_arg" >> pTuple2 pTypedValue pType >>= return . (RvA . uncurry VaArg)
          
+pFunName :: P FunName
+pFunName = choice [ symbol "null" >> return FunName_null
+                  , symbol "0" >> return FunName_null
+                  , symbol "undef" >> return FunName_undef
+                  , liftM FunNameGlobal pGlobalOrLocalId
+                  , do { reserved "bitcast"
+                       ; ignore $ chartok '('
+                       ; tc <- pTypedConst
+                       ; reserved "to"
+                       ; t <- pType
+                       ; ignore $ chartok ')'
+                       ; return $ FunNameBitcast (extractTypedConst tc) t
+                       }
+                  , do { reserved "inttoptr"
+                       ; ignore $ chartok '('
+                       ; tc <- pTypedConst
+                       ; reserved "to"
+                       ; t <- pType
+                       ; ignore $ chartok ')'
+                       ; return $ FunNameInttoptr (extractTypedConst tc) t
+                       }
+                  ]
+           
               
 pCallFun :: P CallSite
 pCallFun = do { cc <- opt pCallConv
               ; atts0 <- many pParamAttr -- CallRetAttr
               ; t <- pType
-              ; i <- choice [ symbol "null" >> return FunName_null
+              ; i <- pFunName {-choice [ symbol "null" >> return FunName_null
                             , symbol "undef" >> return FunName_undef
                             , liftM FunNameGlobal pGlobalOrLocalId
                             , pFunNameCast
-                            ]
+                            ]-}
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
               ; return (CsFun cc atts0 t i params atts1)
@@ -250,24 +273,6 @@ pAsm = do { t <- pType
           }
 
 
-pFunNameCast :: P FunName
-pFunNameCast = choice [do { reserved "bitcast"
-                          ; ignore $ chartok '('
-                          ; tc <- pTypedConst
-                          ; reserved "to"
-                          ; t <- pType
-                          ; ignore $ chartok ')'
-                          ; return $ FunNameBitcast (extractTypedConst tc) t
-                          }
-                      , do { reserved "inttoptr"
-                           ; ignore $ chartok '('
-                           ; tc <- pTypedConst
-                           ; reserved "to"
-                           ; t <- pType
-                           ; ignore $ chartok ')'
-                           ; return $ FunNameInttoptr (extractTypedConst tc) t
-                           }
-                      ]
 
 pCallSite :: P CallSite
 pCallSite = choice [try pCallFun, pAsm]
@@ -304,7 +309,7 @@ pRhs = choice [ liftM Re pExpr
        
        
 
-
+{-
 pPersFn :: P PersFn
 pPersFn = choice [ liftM PersFnId pGlobalOrLocalId
                  , do { op <- pConvertOp
@@ -320,13 +325,14 @@ pPersFn = choice [ liftM PersFnId pGlobalOrLocalId
                  , reserved "null" >> return PersFnNull
                  , liftM PersFnConst pConst
                  ]
+-}
           
 pLandingPad :: P Rhs
 pLandingPad = do { reserved "landingpad"
                  ; rt <- pType
                  ; reserved "personality"
                  ; ft <- pType
-                 ; ix <- pPersFn
+                 ; ix <- pFunName -- PersFn
                  ; cl <- option Nothing (reserved "cleanup" >> return (Just Cleanup))
                  ; c <- many pClause
                  ; return $ RlP $ LandingPad rt ft ix cl c

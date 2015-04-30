@@ -17,9 +17,23 @@ import Llvm.Util.Monadic (maybeM, pairM)
 import Llvm.Data.Conversion.TypeConversion
 import Llvm.Data.Conversion.AstScanner (typeDefOfModule)
 import Data.Maybe (fromJust)
+import Control.Monad.Reader
 
-type MM = LabelMapM H.SimpleUniqueMonad
+data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
+                              , funname :: A.GlobalId
+                              }
 
+type MM = ReaderT ReaderData (LabelMapM H.SimpleUniqueMonad)
+
+typeDefs :: MM (M.Map A.LocalId A.Type)
+typeDefs = ask >>= return . typedefs
+
+funName :: MM A.GlobalId
+funName = ask >>= return . funname
+
+withFunName :: A.GlobalId -> MM a -> MM a
+withFunName g f = withReaderT (\(ReaderData x _) -> ReaderData x g) f
+  
 {- Ast to Ir conversion -}
 -- the real differences between Ast and Ir
 -- 1. Ir uses Unique values as labels while Ast can use any strings as labels
@@ -40,7 +54,9 @@ conversionIsTvector :: MP -> A.Conversion v -> Bool
 conversionIsTvector mp (A.Conversion _ _ dt) = isTvector mp dt
 
 convert_LabelId :: A.LabelId -> MM H.Label 
-convert_LabelId = labelFor
+convert_LabelId x = do { fn <- funName
+                       ; lift (labelFor (fn, x))
+                       }
 
 
 convert_PercentLabel :: A.PercentLabel -> MM H.Label 
@@ -83,6 +99,7 @@ data FBinexp s v where {
   Fdiv :: I.FastMathFlags -> I.Type s I.F -> v -> v -> FBinexp s v;
   Frem :: I.FastMathFlags -> I.Type s I.F -> v -> v -> FBinexp s v;
   } deriving (Eq, Ord, Show)
+
 
 
 
@@ -894,6 +911,7 @@ convert_Clause x = case x of
 convert_GlobalOrLocalId :: A.GlobalOrLocalId -> (MM I.GlobalOrLocalId)
 convert_GlobalOrLocalId = return
 
+{-
 convert_PersFn :: A.PersFn -> MM I.PersFn
 convert_PersFn (A.PersFnId s) = return $ I.PersFnId s
 convert_PersFn (A.PersFnCast c) = 
@@ -904,6 +922,20 @@ convert_PersFn (A.PersFnCast c) =
 convert_PersFn (A.PersFnUndef) = return $ I.PersFnUndef
 convert_PersFn (A.PersFnNull) = return $ I.PersFnNull
 convert_PersFn (A.PersFnConst c) = Md.liftM I.PersFnConst (convert_Const c)
+-}
+
+{-
+convert_PersFn :: A.PersFn -> MM I.FunPtr
+convert_PersFn (A.PersFnId s) = return $ I.FunId s
+convert_PersFn (A.PersFnCast c) = 
+  do { mp <- typeDefs
+     ; if conversionIsTvector mp c then Md.liftM I.PersFnCastV (convert_to_Conversion_V convert_GlobalOrLocalId c)
+       else Md.liftM I.PersFnCastS (convert_to_Conversion convert_GlobalOrLocalId c)
+     }
+convert_PersFn (A.PersFnUndef) = return $ I.PersFnUndef
+convert_PersFn (A.PersFnNull) = return $ I.PersFnNull
+convert_PersFn (A.PersFnConst c) = Md.liftM I.PersFnConst (convert_Const c)
+-}
 
 
 convert_Expr_CInst :: (Maybe A.LocalId, A.Expr) -> (MM I.Cinst)
@@ -1213,7 +1245,7 @@ convert_Rhs (Just lhs, A.RvA (A.VaArg tv t)) =
      ; return (I.Cnode (I.I_va_arg tvi ti lhs) [])
      }
 convert_Rhs (Just lhs, A.RlP (A.LandingPad t1 t2 pf b cs)) = 
-  do { pfi <- convert_PersFn pf
+  do { pfi <- convert_FunPtr {-PersFn-} pf
      ; csi <- mapM convert_Clause cs
      ; t1i <- convert_Type_Dtype FLC t1
      ; t2i <- convert_Type_Dtype FLC t2
@@ -1459,7 +1491,7 @@ toGraph bs =
      }
 
 getBody :: forall n. H.Graph n H.C H.C -> MM (H.Graph n H.C H.C)
-getBody graph = LabelMapM f
+getBody graph = lift (LabelMapM f)
   where f m = return (m, graph)
 
 
@@ -1497,10 +1529,11 @@ convert_TlDeclare :: A.TlDeclare -> (MM I.TlDeclare)
 convert_TlDeclare (A.TlDeclare f) = convert_FunctionPrototype f >>= return . I.TlDeclare
   
 convert_TlDefine :: A.TlDefine -> (MM (I.TlDefine a))
-convert_TlDefine  (A.TlDefine f b) = do { fa <- convert_FunctionPrototype f
-                                        ; (e, g) <- blockToGraph f b
-                                        ; return $ I.TlDefine fa e g
-                                        }
+convert_TlDefine  (A.TlDefine f b) = let (A.FunctionPrototype _ _ _ _ _ _ gid _ _ _ _ _ _ _ _ _) = f 
+                                     in do { fa <- convert_FunctionPrototype f
+                                           ; (e, g) <- withFunName gid (blockToGraph f b)
+                                           ; return $ I.TlDefine fa e g
+                                           }
 
 convert_TlGlobal :: A.TlGlobal -> (MM I.TlGlobal)
 convert_TlGlobal (A.TlGlobal a1 a2 a3 a4 a5 a6 a7 a8 a8a a9 a10 a11 a12 a13) =
@@ -1562,4 +1595,4 @@ toplevel2Ir (A.ToplevelComdat l) = Md.liftM I.ToplevelComdat (convert_TlComdat l
 
 astToIr :: A.Module -> H.SimpleUniqueMonad (IdLabelMap, I.Module a)
 astToIr m@(A.Module ts) = let td = M.fromList $ typeDefOfModule m
-                          in runLabelMapM (emptyIdLabelMap td) $ Md.liftM I.Module (mapM toplevel2Ir ts)
+                          in runLabelMapM emptyIdLabelMap $ (runReaderT (Md.liftM I.Module (mapM toplevel2Ir ts)) (ReaderData td (I.GlobalIdNum 0)))

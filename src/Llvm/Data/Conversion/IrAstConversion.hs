@@ -23,7 +23,14 @@ import Control.Monad.Reader
 class Conversion l1 l2 | l1 -> l2 where
   convert :: l1 -> l2
 
-type Rm = Reader (M.Map H.Label A.LabelId)
+data ReaderData = ReaderData { mp :: (M.Map (A.GlobalId, H.Label) A.LabelId)
+                             , funname :: A.GlobalId
+                             }
+type Rm = Reader ReaderData
+
+withFunName :: A.GlobalId -> Rm a -> Rm a
+withFunName g = withReader (\(ReaderData x _) -> ReaderData x g)
+
 
 instance Conversion a (Rm b) => Conversion (Maybe a) (Rm (Maybe b)) where
   convert (Just x) = Md.liftM Just (convert x)
@@ -35,8 +42,8 @@ instance (Conversion a (Rm c), Conversion b (Rm c)) => Conversion (Either a b) (
 
 {- Ir to Ast conversion -} 
 instance Conversion H.Label (Rm A.LabelId) where
-  convert l = do { r <- ask
-                 ; case M.lookup l r of 
+  convert l = do { (ReaderData r fn) <- ask
+                 ; case M.lookup (fn,l) r of 
                    Just l0 -> return l0
                    Nothing -> return $  A.LabelDqString $ "_hoopl_label_" ++ show l 
                  }
@@ -450,6 +457,7 @@ instance Conversion I.Clause (Rm A.Clause) where
 instance Conversion I.GlobalOrLocalId (Rm A.GlobalOrLocalId) where
     convert g = return g
 
+{-
 instance Conversion I.PersFn (Rm A.PersFn) where
     convert (I.PersFnId s) = return $ A.PersFnId $ s
     convert (I.PersFnCastS c) = convert c >>= return . A.PersFnCast
@@ -457,6 +465,7 @@ instance Conversion I.PersFn (Rm A.PersFn) where
     convert (I.PersFnUndef) = return $ A.PersFnUndef
     convert (I.PersFnNull) = return $ A.PersFnNull
     convert (I.PersFnConst c) = Md.liftM A.PersFnConst (convert c)
+-}
 
 
 instance Conversion I.Minst (Rm A.ComputingInst) where
@@ -1086,6 +1095,7 @@ instance Conversion I.TlDeclare (Rm A.TlDeclare) where
   
 instance Conversion (I.TlDefine a) (Rm A.TlDefine) where
   convert (I.TlDefine f elbl g) = 
+    withFunName (I.fp_fun_name f) $ 
     do { (bl, bm) <- graphToBlocks g
        ; f' <- convert f
        ; elbla <- convert elbl
@@ -1204,5 +1214,5 @@ toplevel2Ast (I.ToplevelModuleAsm q) = Md.liftM A.ToplevelModuleAsm (convert q)
 toplevel2Ast (I.ToplevelComdat l) = Md.liftM A.ToplevelComdat (convert l)
 toplevel2Ast (I.ToplevelAttribute n) = Md.liftM A.ToplevelAttribute (convert n)
 
-irToAst ::  M.Map H.Label A.LabelId -> I.Module a -> A.Module
-irToAst iLm (I.Module ts) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) iLm
+irToAst ::  M.Map (A.GlobalId, H.Label) A.LabelId -> I.Module a -> A.Module
+irToAst iLm (I.Module ts) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) (ReaderData iLm (A.GlobalIdNum 0))

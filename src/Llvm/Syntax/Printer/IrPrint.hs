@@ -449,6 +449,7 @@ instance IrPrint Clause where
 instance IrPrint (Conversion s GlobalOrLocalId) where
   printIr x = printConversion x parens
   
+{-  
 instance IrPrint PersFn where
     printIr (PersFnId g) = printIr g
     printIr (PersFnCastS c) = printIr c
@@ -456,6 +457,7 @@ instance IrPrint PersFn where
     printIr PersFnUndef = text "undef"                                     
     printIr PersFnNull = text "null"
     printIr (PersFnConst c) = printIr c
+-}
 
 
 instance IrPrint (ExtractElement r Value) where

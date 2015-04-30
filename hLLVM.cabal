@@ -98,7 +98,7 @@ library {
                      Llvm.Pass.PassTester,
                      Llvm.Pass.CodeMonad,
                      Llvm.Pass.Changer,
-                     Llvm.Pass.RewriterEx,
+                     Llvm.Pass.Substitution,
                      Llvm.Pass.DataUsage,
                      ParserTester
   if flag(debug) {

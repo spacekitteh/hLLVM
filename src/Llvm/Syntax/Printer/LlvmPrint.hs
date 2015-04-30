@@ -232,12 +232,14 @@ instance AsmPrint Clause where
 instance AsmPrint (Conversion GlobalOrLocalId) where
   toLlvm (Conversion op (Typed t g) dt) = toLlvm op <+> parens (hsep [toLlvm t, toLlvm g, text "to", toLlvm dt])
   
+{-  
 instance AsmPrint PersFn where
     toLlvm (PersFnId g) = toLlvm g
     toLlvm (PersFnCast c) = toLlvm c
     toLlvm PersFnUndef = text "undef"
     toLlvm PersFnNull = text "null"
     toLlvm (PersFnConst c) = toLlvm c
+-}
 
 instance AsmPrint (ExtractElement Value) where
   toLlvm (ExtractElement tv1 tv2) = 

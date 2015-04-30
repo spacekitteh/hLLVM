@@ -180,12 +180,14 @@ data TypedConstOrNull = TypedConst (Typed Const)
                       | UntypedNull
                       deriving (Eq, Ord, Show)
 
+{-
 data PersFn = PersFnId GlobalOrLocalId
             | PersFnCast (Conversion GlobalOrLocalId)
             | PersFnUndef
             | PersFnNull
             | PersFnConst Const
             deriving (Eq, Ord, Show)
+-}
 
 
 data Rhs = RmO MemOp
@@ -202,7 +204,7 @@ data Rhs = RmO MemOp
 
 data VaArg = VaArg (Typed Value) Type deriving (Eq, Ord, Show)
 
-data LandingPad = LandingPad Type Type PersFn (Maybe Cleanup) [Clause] deriving (Eq, Ord, Show)
+data LandingPad = LandingPad Type Type FunName (Maybe Cleanup) [Clause] deriving (Eq, Ord, Show)
 
 data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
 

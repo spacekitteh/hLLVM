@@ -376,3 +376,9 @@ instance TypeOf Const Dtype where
     C_getelementptr b (T bt _) indices -> let et = getGetElemtPtrIndexedType te (ucast bt) (fmap ucast indices)
                                           in (ucast $ Tpointer (ucast et) 0)
     _ -> errorLoc FLC $ show x
+    
+    
+class SizeOf a where
+  hasSize :: a -> Bool
+  sizeOf :: a -> Word32
+    
