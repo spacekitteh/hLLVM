@@ -25,10 +25,16 @@ instance Substitutable a => Substitutable (Maybe a) where
   substitute chg (Just a) = Just $ substitute chg a
   substitute chg Nothing = Nothing
   
+instance Substitutable a => Substitutable [a] where
+  substitute chg l = fmap (substitute chg) l
+
 instance (Substitutable a, Substitutable b) => Substitutable (Either a b) where
   substitute chg (Left a) = Left $ substitute chg a
   substitute chg (Right a) = Right $ substitute chg a
   
+instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
+  substitute chg (a, b) = (substitute chg a, substitute chg b)
+
 instance Substitutable TypedConstOrNull where
   substitute chg@Changer{..} x = case x of
     TypedConst (T dt c) -> TypedConst (T dt (substitute chg c))
@@ -39,14 +45,18 @@ instance Substitutable Value where
     Val_ssa lid -> Val_ssa $ change_LocalId lid
     Val_const c -> Val_const (substitute chg c)
 
+instance Substitutable Label where
+  substitute _ = id
+
 instance Substitutable Const where
   substitute chg@Changer{..} cst = 
     let change2c cf a b = cf (substitute chg a) (substitute chg b)
         cst1 = case cst of
-          C_struct pk l -> C_struct pk (fmap (substitute chg) l)
-          C_vector l -> C_vector (fmap (substitute chg) l)
+          C_globalAddr g -> C_globalAddr (change_GlobalId g)
+          C_struct pk l -> C_struct pk (substitute chg l)
+          C_vector l -> C_vector (substitute chg l)
           C_vectorN n e -> C_vectorN n (substitute chg e)
-          C_array l -> C_array (fmap (substitute chg) l)
+          C_array l -> C_array (substitute chg l)
           C_arrayN n e -> C_arrayN n (substitute chg e)
           C_add n t c1 c2 -> change2c (C_add n t) c1 c2
           C_sub n t c1 c2 -> change2c (C_sub n t) c1 c2
@@ -115,8 +125,8 @@ instance Substitutable Const where
           C_inttoptr_V tc tdest -> C_inttoptr_V (substitute chg tc) tdest
           C_addrspacecast_V tc tdest -> C_addrspacecast_V (substitute chg tc) tdest
 
-          C_getelementptr ib (T t c) l -> cst
-          C_getelementptr_V ib (T t c) l -> cst
+          C_getelementptr ib (T t c) l -> C_getelementptr ib (T t (substitute chg c)) (substitute chg l)
+          C_getelementptr_V ib (T t c) l -> C_getelementptr_V ib (T t (substitute chg c)) (substitute chg l)
 
           C_select_I _ -> cst
           C_select_F _ -> cst
@@ -145,7 +155,6 @@ instance Substitutable Const where
 
           C_extractvalue _ -> cst
           C_insertvalue _ -> cst
-          _ -> cst
     in change_Const cst1
 
         
@@ -172,11 +181,11 @@ instance Substitutable a => Substitutable (Node a e x) where
   substitute chg node = case node of
     Lnode _ -> node
     Pnode _ _ -> node
-    Cnode ci dbgs -> Cnode (substitute chg ci) (fmap (substitute chg) dbgs)
-    Mnode mi dbgs -> Mnode (substitute chg mi) (fmap (substitute chg) dbgs)
+    Cnode ci dbgs -> Cnode (substitute chg ci) (substitute chg dbgs)
+    Mnode mi dbgs -> Mnode (substitute chg mi) (substitute chg dbgs)
     Comment _ -> node
     Enode _ -> node
-    Tnode ti dbgs -> Tnode (substitute chg ti) (fmap (substitute chg) dbgs)
+    Tnode ti dbgs -> Tnode (substitute chg ti) (substitute chg dbgs)
 
 instance Substitutable Clause where
   substitute chg c = case c of
@@ -191,120 +200,120 @@ instance Substitutable Cinst where
                             , result = cid result
                             }
         i@I_load{..} -> i { pointer = (substitute chg) pointer
-                        , result = change_LocalId chg result
-                        }
+                          , result = change_LocalId chg result
+                          }
         i@I_loadatomic{..} -> i { pointer = substitute chg pointer
-                              , result = change_LocalId chg result
-                              }
+                                , result = change_LocalId chg result
+                                }
         i@I_store{..} -> i { storedvalue = substitute chg storedvalue
-                         , pointer = substitute chg pointer
-                         } 
+                           , pointer = substitute chg pointer
+                           } 
         i@I_storeatomic{..} -> i { storedvalue = substitute chg storedvalue
-                               , pointer = substitute chg pointer
-                               }
+                                 , pointer = substitute chg pointer
+                                 }
         i@I_fence{..} -> i
         i@I_cmpxchg_I{..} -> i { pointer = substitute chg pointer
-                             , cmpi = substitute chg cmpi
-                             , newi = substitute chg newi
-                             , result = change_LocalId chg result
-                             }
+                               , cmpi = substitute chg cmpi
+                               , newi = substitute chg newi
+                               , result = change_LocalId chg result
+                               }
         i@I_cmpxchg_F{..} -> i { pointer = substitute chg pointer
-                             , cmpf = substitute chg cmpf
-                             , newf = substitute chg newf
-                             , result = change_LocalId chg result
-                             }
+                               , cmpf = substitute chg cmpf
+                               , newf = substitute chg newf
+                               , result = change_LocalId chg result
+                               }
         i@I_cmpxchg_P{..} -> i { pointer = substitute chg pointer
-                             , cmpp = substitute chg cmpp
-                             , newp = substitute chg newp
-                             , result = change_LocalId chg result
-                             }
+                               , cmpp = substitute chg cmpp
+                               , newp = substitute chg newp
+                               , result = change_LocalId chg result
+                               }
         i@I_atomicrmw{..} -> i { pointer = substitute chg pointer
-                             , val = substitute chg val
-                             , result = change_LocalId chg result
-                             }
-        i@I_call_fun{..} -> i { call_actualParams = fmap (substitute chg) call_actualParams
-                            , call_return = fmap (change_LocalId chg) call_return
-                            }
-        i@I_call_asm{..} -> i { call_actualParams = fmap (substitute chg) call_actualParams
-                            , call_return = fmap (change_LocalId chg) call_return
-                            }
+                               , val = substitute chg val
+                               , result = change_LocalId chg result
+                               }
+        i@I_call_fun{..} -> i { call_actualParams = substitute chg call_actualParams
+                              , call_return = fmap (change_LocalId chg) call_return
+                              }
+        i@I_call_asm{..} -> i { call_actualParams = substitute chg call_actualParams
+                              , call_return = fmap (change_LocalId chg) call_return
+                              }
         i@I_extractelement_I{..} -> i { vectorI = substitute chg vectorI
-                                    , index = substitute chg index
-                                    , result = change_LocalId chg result
-                                    }
+                                      , index = substitute chg index
+                                      , result = change_LocalId chg result
+                                      }
         i@I_extractelement_F{..} -> i { vectorF = substitute chg vectorF
-                                    , index = substitute chg index
-                                    , result = change_LocalId chg result
-                                    }
+                                      , index = substitute chg index
+                                      , result = change_LocalId chg result
+                                      }
         i@I_extractelement_P{..} -> i { vectorP = substitute chg vectorP
-                                    , index = substitute chg index
-                                    , result = change_LocalId chg result
-                                    }
+                                      , index = substitute chg index
+                                      , result = change_LocalId chg result
+                                      }
         i@I_insertelement_I{..} -> i { vectorI = (substitute chg) vectorI
-                                   , elementI = (substitute chg) elementI
-                                   , index = (substitute chg) index
-                                   , result = cid result
-                                   }
+                                     , elementI = (substitute chg) elementI
+                                     , index = (substitute chg) index
+                                     , result = cid result
+                                     }
         i@I_insertelement_F{..} -> i { vectorF = (substitute chg) vectorF
-                                   , elementF = (substitute chg) elementF
-                                   , index = (substitute chg) index
-                                   , result = cid result
-                                   } 
+                                     , elementF = (substitute chg) elementF
+                                     , index = (substitute chg) index
+                                     , result = cid result
+                                     } 
         i@I_insertelement_P{..} -> i { vectorP = (substitute chg) vectorP
-                                   , elementP = (substitute chg) elementP
-                                   , index = (substitute chg) index
-                                   , result = cid result
-                                   } 
+                                     , elementP = (substitute chg) elementP
+                                     , index = (substitute chg) index
+                                     , result = cid result
+                                     } 
         i@I_shufflevector_I{..} -> i { vector1I = (substitute chg) vector1I
-                                   , vector2I = (substitute chg) vector2I
-                                   , vectorIdx = (substitute chg) vectorIdx
-                                   , result = cid result
-                                   }
+                                     , vector2I = (substitute chg) vector2I
+                                     , vectorIdx = (substitute chg) vectorIdx
+                                     , result = cid result
+                                     }
         i@I_shufflevector_F{..} -> i { vector1F = (substitute chg) vector1F
-                                   , vector2F = (substitute chg) vector2F
-                                   , vectorIdx = (substitute chg) vectorIdx
-                                   , result = cid result
-                                   }
+                                     , vector2F = (substitute chg) vector2F
+                                     , vectorIdx = (substitute chg) vectorIdx
+                                     , result = cid result
+                                     }
         i@I_shufflevector_P{..} -> i { vector1P = (substitute chg) vector1P
-                                   , vector2P = (substitute chg) vector2P
-                                   , vectorIdx = (substitute chg) vectorIdx
-                                   , result = cid result
-                                   }
+                                     , vector2P = (substitute chg) vector2P
+                                     , vectorIdx = (substitute chg) vectorIdx
+                                     , result = cid result
+                                     }
         i@I_extractvalue{..} -> i { record = (substitute chg) record
+                                  , result = cid result
+                                  }
+        i@I_insertvalue{..} -> i { record = (substitute chg) record
+                                 , element = (substitute chg) element
+                                 , result = cid result
+                                 } 
+        i@I_landingpad{..} -> i { persFn = substitute chg persFn
+                                , clauses = substitute chg clauses
                                 , result = cid result
                                 }
-        i@I_insertvalue{..} -> i { record = (substitute chg) record
-                               , element = (substitute chg) element
-                               , result = cid result
-                               } 
-        i@I_landingpad{..} -> i { persFn = substitute chg persFn
-                              , clauses = fmap (substitute chg) clauses
-                              , result = cid result
-                              }
         i@I_getelementptr{..} -> i { pointer = (substitute chg) pointer
-                                 , indices = fmap (substitute chg) indices
-                                 , result = cid result
-                                 }
-        i@I_getelementptr_V{..} -> i { vpointer = (substitute chg) vpointer
-                                   , vindices = fmap (substitute chg) vindices
+                                   , indices = substitute chg indices
                                    , result = cid result
                                    }
+        i@I_getelementptr_V{..} -> i { vpointer = (substitute chg) vpointer
+                                     , vindices = substitute chg vindices
+                                     , result = cid result
+                                     }
         i@I_icmp{..} -> i { operand1 = substitute chg operand1
-                        , operand2 = substitute chg operand2
-                        , result = cid result
-                        }
+                          , operand2 = substitute chg operand2
+                          , result = cid result
+                          }
         i@I_icmp_V{..} -> i { operand1 = substitute chg operand1
-                          , operand2 = substitute chg operand2
-                          , result = cid result
-                          }
+                            , operand2 = substitute chg operand2
+                            , result = cid result
+                            }
         i@I_fcmp{..} -> i { operand1 = substitute chg operand1
-                        , operand2 = substitute chg operand2
-                        , result = cid result
-                        }
-        i@I_fcmp_V{..} -> i { operand1 = substitute chg operand1
                           , operand2 = substitute chg operand2
                           , result = cid result
                           }
+        i@I_fcmp_V{..} -> i { operand1 = substitute chg operand1
+                            , operand2 = substitute chg operand2
+                            , result = cid result
+                            }
         i@I_add{..} -> i { operand1 = substitute chg operand1
                          , operand2 = substitute chg operand2
                          , result = cid result
@@ -577,7 +586,7 @@ instance Substitutable Cinst where
         i@I_llvm_gcwrite{..} -> undefined
         i@I_llvm_returnaddress{..} -> i { level = substitute chg level }
         i@I_llvm_frameaddress{..} -> i { level = substitute chg level }
-        I_llvm_frameescape vs -> I_llvm_frameescape (fmap (substitute chg) vs)
+        I_llvm_frameescape vs -> I_llvm_frameescape (substitute chg vs)
         i@I_llvm_framerecover{..} -> undefined
         i@I_llvm_read_register{..} -> i 
         i@I_llvm_write_register{..} -> i { value = substitute chg value
@@ -639,17 +648,16 @@ instance Substitutable Tinst where
   substitute chg x = case x of
     T_unreachable -> x
     T_ret_void -> x
-    T_return tvs ->  T_return (fmap (substitute chg) tvs)
+    T_return tvs ->  T_return (substitute chg tvs)
     T_br _ -> x
     T_cbr cnd t f -> T_cbr (substitute chg cnd) t f
     T_indirectbr tv ls -> T_indirectbr (substitute chg tv) ls
-    T_switch d o -> T_switch (substitute chg (fst d), snd d)
-                    (fmap (\x -> (substitute chg (fst x), snd x)) o)
+    T_switch d o -> T_switch (substitute chg d) (substitute chg o)
     t@T_invoke{..} -> t { invoke_ptr = substitute chg invoke_ptr
-                        , invoke_actualParams = fmap (substitute chg) invoke_actualParams
+                        , invoke_actualParams = substitute chg invoke_actualParams
                         , invoke_return = fmap (change_LocalId chg) invoke_return
                         }
-    t@T_invoke_asm{..} -> t { invoke_actualParams = fmap (substitute chg) invoke_actualParams 
+    t@T_invoke_asm{..} -> t { invoke_actualParams = substitute chg invoke_actualParams 
                             , invoke_return = fmap (change_LocalId chg) invoke_return
                             }
     T_resume (T dt v) -> T_resume (T dt (substitute chg v))
@@ -668,10 +676,10 @@ instance Substitutable Dbg where
 instance Substitutable TlGlobal where
   substitute chg tg = case tg of
     tl@TlGlobalDtype{..} -> tl { tlg_lhs = fmap (change_GlobalId chg) tlg_lhs
-                               , tlg_const = fmap (substitute chg) tlg_const
+                               , tlg_const = substitute chg tlg_const
                                }
     tl@TlGlobalOpaque{..} -> tl { tlg_lhs = fmap (change_GlobalId chg) tlg_lhs
-                                , tlg_const = fmap (substitute chg) tlg_const
+                                , tlg_const = substitute chg tlg_const
                                 }                          
   
 instance Substitutable a => Substitutable (Toplevel a) where
@@ -705,7 +713,7 @@ instance Substitutable FunPtr where
 
 instance Substitutable MetaConst where  
   substitute chg@Changer{..} mc = case mc of
-    McStruct l -> McStruct (fmap (substitute chg) l)
+    McStruct l -> McStruct (substitute chg l)
     McString s -> mc
     McMn n -> mc
     McMv s -> mc
@@ -713,7 +721,7 @@ instance Substitutable MetaConst where
     McSimple c -> McSimple (substitute chg c)
 
 instance Substitutable a => Substitutable (Module a) where
-  substitute chg (Module l) = Module $ fmap (substitute chg) l
+  substitute chg (Module l) = Module $ substitute chg l
   
   
 instance Substitutable NOOP where  
