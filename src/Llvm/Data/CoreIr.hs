@@ -94,7 +94,6 @@ data Const where {
   C_vectorN :: Word32 -> TypedConstOrNull -> Const;
   C_array :: [TypedConstOrNull] -> Const;
   C_arrayN :: Word32 -> TypedConstOrNull -> Const;
---   C_localId :: LocalId -> Const;
   C_labelId :: Label -> Const;
   C_block :: GlobalId -> Label -> Const;
 
@@ -239,16 +238,6 @@ data Clause = Catch (T Dtype Value)
             | CcoS (Conversion ScalarB Value)
             | CcoV (Conversion VectorB Value)
             deriving (Eq,Ord,Show)
-
-{-
-data PersFn = PersFnId GlobalOrLocalId
-            | PersFnCastS (Conversion ScalarB GlobalOrLocalId)
-            | PersFnCastV (Conversion VectorB GlobalOrLocalId)
-            | PersFnUndef
-            | PersFnNull
-            | PersFnConst Const
-            deriving (Eq, Ord, Show)
--}
 
 data Dbg = Dbg MdVar MetaConst deriving (Eq, Ord, Show)
 
@@ -937,8 +926,14 @@ data Cinst where {
                    , metadata :: Value {- i8 * -}
                    } -> Cinst;
 
-  I_llvm_gcread :: Value -> Value -> Cinst;
-  I_llvm_gcwrite :: Value -> Value -> Value -> Cinst;
+  I_llvm_gcread :: { reference :: Value
+                   , readFrom :: Value 
+                   } -> Cinst;
+  
+  I_llvm_gcwrite :: { p1 :: Value
+                    , obj :: Value 
+                    , p2 :: Value 
+                    } -> Cinst;
 
   I_llvm_returnaddress :: { level :: Value {- i32 -} } -> Cinst;
   I_llvm_frameaddress :: { level :: Value {- i32 -} } -> Cinst;
@@ -983,31 +978,47 @@ data Cinst where {
                    , align :: T (Type ScalarB I) Value
                    , isvolatile :: T (Type ScalarB I) Value
                    } -> Cinst;
-  I_llvm_math_f32 :: MathUnaryOp -> Value -> LocalId -> Cinst;
-  I_llvm_math_f64 :: MathUnaryOp -> Value -> LocalId -> Cinst;
-  I_llvm_math_f80 :: MathUnaryOp -> Value -> LocalId -> Cinst;
-  I_llvm_math_f128 :: MathUnaryOp -> Value -> LocalId -> Cinst;
-  I_llvm_math_ppcf128 :: MathUnaryOp -> Value -> LocalId -> Cinst;
-
-  I_llvm_powi_f32 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_powi_f64 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_powi_f80 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_powi_f128 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_powi_ppcf128 :: Value -> Value -> LocalId -> Cinst;
-
-  I_llvm_pow_f32 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_pow_f64 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_pow_f80 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_pow_f128 :: Value -> Value -> LocalId -> Cinst;
-  I_llvm_pow_ppcf128 :: Value -> Value -> LocalId -> Cinst;
+  
+  I_llvm_libm_una :: { muop :: LibmUnaryExp
+                     , result :: LocalId 
+                     } -> Cinst;
+  
+  I_llvm_libm_bin :: { mbop :: LibmBinaryExp
+                     , result :: LocalId 
+                     } -> Cinst;
+  
+  I_llvm_powi :: { realOperand :: T (Type ScalarB F) Value
+                 , intOperand :: T (Type ScalarB I) Value
+                 , result :: LocalId 
+                 } -> Cinst;
 
   I_llvm_bitset_test :: Value -> Value -> LocalId -> Cinst;
   I_llvm_donothing :: Cinst;
   } deriving (Eq, Ord, Show)
 
-data MathUnaryOp = Sqrt | Sin | Cos | Exp | Exp2 | Log | Log10 | Log2 | Fabs
-                 | Floor | Ceil | Rint | NearByInt | Round deriving (Eq, Ord, Show)
 
+data LibmUnaryExp = Sqrt (Type ScalarB F) Value 
+                  | Sin (Type ScalarB F)  Value
+                  | Cos (Type ScalarB F) Value 
+                  | Exp (Type ScalarB F) Value
+                  | Exp2 (Type ScalarB F) Value 
+                  | Log (Type ScalarB F) Value 
+                  | Log10 (Type ScalarB F) Value 
+                  | Log2 (Type ScalarB F) Value 
+                  | Fabs (Type ScalarB F) Value 
+                  | Floor (Type ScalarB F) Value 
+                  | Ceil (Type ScalarB F) Value 
+                  | Ftrunc (Type ScalarB F) Value 
+                  | Rint (Type ScalarB F) Value
+                  | NearByInt (Type ScalarB F) Value 
+                  | Round (Type ScalarB F) Value 
+                  deriving (Eq, Ord, Show)
+
+data LibmBinaryExp = Pow (Type ScalarB F) Value Value 
+                   | Minnum (Type ScalarB F) Value Value 
+                   | Maxnum (Type ScalarB F) Value Value
+                   | CopySign (Type ScalarB F) Value Value 
+                   deriving (Eq, Ord, Show)
 
 data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)

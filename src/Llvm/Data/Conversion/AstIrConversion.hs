@@ -18,6 +18,7 @@ import Llvm.Data.Conversion.TypeConversion
 import Llvm.Data.Conversion.AstScanner (typeDefOfModule)
 import Data.Maybe (fromJust)
 import Control.Monad.Reader
+import Llvm.Data.Conversion.IntrinsicsSpecialization
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: A.GlobalId
@@ -1214,29 +1215,10 @@ convert_Rhs (lhs, A.Call b cs) =
        Nothing -> 
          Md.liftM (\x -> I.Cnode x []) $ 
          do { (isvoid, csi) <- convert_to_CallSite lhs cs
-            ; case csi of 
-              I.CsFun Nothing [] _ (I.FunId (I.GlobalIdAlphaNum "llvm.va_start"))
-                [I.ActualParamData t1 [] Nothing v []] [] | isvoid -> return $ I.I_llvm_va_start v
-              I.CsFun Nothing [] _ (I.FunId (I.GlobalIdAlphaNum "llvm.va_end"))
-                [I.ActualParamData t1 [] Nothing v []] [] | isvoid -> return $ I.I_llvm_va_end v
-              I.CsFun Nothing [] _ (I.FunId (I.GlobalIdAlphaNum nm))
-                [I.ActualParamData t1 [] Nothing v1 [] -- dest
-                ,I.ActualParamData t2 [] Nothing v2 [] -- src
-                ,I.ActualParamData t3 [] Nothing v3 [] -- len
-                ,I.ActualParamData t4 [] Nothing v4 [] -- align
-                ,I.ActualParamData t5 [] Nothing v5 [] -- volatile
-                ] [] | isvoid && (nm == "llvm.memcpy.p0i8.p0i8.i32" || nm == "llvm.memcpy.p0i8.p0i8.i64") 
-                       -> let mod = case nm of
-                                "llvm.memcpy.p0i8.p0i8.i32" -> I.MemLenI32
-                                "llvm.memcpy.p0i8.p0i8.i64" -> I.MemLenI64                         
-                          in return $ I.I_llvm_memcpy mod
-                             (I.T (I.dcast FLC t1) v1)
-                             (I.T (I.dcast FLC t2) v2)
-                             (I.T (I.dcast FLC t3) v3)
-                             (I.T (I.dcast FLC t4) v4)
-                             (I.T (I.dcast FLC t5) v5)
-              I.CsFun cc pa cstype fn ap fa -> return $ I.I_call_fun b cc pa cstype fn ap fa lhs
-              I.CsAsm rt mse mas dia s1 s2 aps fa -> return $ I.I_call_asm b rt mse mas dia s1 s2 aps fa lhs
+            ; return $ maybe (case csi of 
+                                 I.CsFun cc pa cstype fn ap fa -> I.I_call_fun b cc pa cstype fn ap fa lhs
+                                 I.CsAsm rt mse mas dia s1 s2 aps fa -> I.I_call_asm b rt mse mas dia s1 s2 aps fa lhs
+                             ) id (specializeCallSite lhs csi)
             }
      }
 convert_Rhs (Just lhs, A.RvA (A.VaArg tv t)) = 
@@ -1245,7 +1227,7 @@ convert_Rhs (Just lhs, A.RvA (A.VaArg tv t)) =
      ; return (I.Cnode (I.I_va_arg tvi ti lhs) [])
      }
 convert_Rhs (Just lhs, A.RlP (A.LandingPad t1 t2 pf b cs)) = 
-  do { pfi <- convert_FunPtr {-PersFn-} pf
+  do { pfi <- convert_FunPtr pf
      ; csi <- mapM convert_Clause cs
      ; t1i <- convert_Type_Dtype FLC t1
      ; t2i <- convert_Type_Dtype FLC t2

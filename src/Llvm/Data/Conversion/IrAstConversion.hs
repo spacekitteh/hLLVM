@@ -19,6 +19,8 @@ import qualified Llvm.Data.Ir as I
 import Llvm.Util.Monadic (maybeM, pairM)
 import Llvm.Data.Conversion.TypeConversion
 import Control.Monad.Reader
+import Llvm.Data.Conversion.IntrinsicsSpecialization
+
 
 class Conversion l1 l2 | l1 -> l2 where
   convert :: l1 -> l2
@@ -477,7 +479,7 @@ instance Conversion I.Minst (Rm A.ComputingInst) where
        }
 
 instance Conversion I.Cinst (Rm A.ComputingInst) where
-  convert cinst = case cinst of 
+  convert cinst = case maybe cinst id (unspecializeIntrinsics cinst) of 
     I.I_alloca mar t mtv ma lhs -> do { mtva <- maybeM convert mtv 
                                       ; return $ A.ComputingInst (Just lhs) $ A.RmO $ A.Alloca mar (tconvert () t) mtva ma
                                       }
@@ -522,6 +524,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { tv1 <- convert tv
          ; return $ A.ComputingInst (Just lhs) $ A.RvA $ A.VaArg tv1 (tconvert () t)
          }
+      {-
     I.I_llvm_va_start v -> 
       do { let t1 = tconvert () (I.ptr0 I.i8)
          ; va <- convert v
@@ -533,7 +536,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
          ; va <- convert v 
          ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.va_end") 
            [A.ActualParamData t1 [] Nothing va []] []
-         }      
+         }      -}
     I.I_landingpad t1 t2 pf b cs lhs-> 
       do { pfa <- convert pf
          ; csa <- mapM convert cs
@@ -963,6 +966,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { csa <- convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) 
          ; return $ A.ComputingInst lhs $ A.Call tc csa 
          } 
+      {-
     I.I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
       do { (A.Typed t1 v1) <- convert tv1
          ; (A.Typed t2 v2) <- convert tv2
@@ -979,7 +983,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
            ,A.ActualParamData t4 [] Nothing v4 []
            ,A.ActualParamData t5 [] Nothing v5 []
            ] []
-         }   
+         }   -}
                                       
 instance Conversion I.ActualParam (Rm A.ActualParam) where
   convert x = case x of
