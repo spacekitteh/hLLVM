@@ -973,7 +973,7 @@ data Cinst where {
 
   I_llvm_memset :: { memlen :: MemLen
                    , dest :: T (Type ScalarB P) Value
-                   , operand1 :: Value
+                   , setValue :: T (Type ScalarB I) Value
                    , len :: T (Type ScalarB I) Value
                    , align :: T (Type ScalarB I) Value
                    , isvolatile :: T (Type ScalarB I) Value

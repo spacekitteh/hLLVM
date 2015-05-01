@@ -65,6 +65,7 @@ library {
                      Llvm.Data.Conversion.AstIrConversion,
                      Llvm.Data.Conversion.AstScanner,
                      Llvm.Data.Conversion.IrAstConversion,
+                     Llvm.Data.Conversion.IntrinsicsSpecialization,
                      Llvm.Data.Conversion.TypeConversion,
                      Llvm.Data.Conversion.LabelMapM,
                      Llvm.Util.Mapping,

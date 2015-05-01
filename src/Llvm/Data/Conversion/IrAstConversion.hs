@@ -257,17 +257,15 @@ instance Conversion I.Const (Rm A.Const) where
     I.C_s96 s -> return $ A.C_simple $ A.CpBconst $ A.BconstInt96 s 
     I.C_s128 s -> return $ A.C_simple $ A.CpBconst $ A.BconstInt128 s 
 
-
-    (I.C_struct b fs) -> Md.liftM (A.C_complex . (A.Cstruct b)) (mapM convert fs)
-    (I.C_vector fs) -> Md.liftM (A.C_complex . A.Cvector) (mapM convert fs)
-    (I.C_array fs) -> Md.liftM (A.C_complex . A.Carray) (mapM convert fs)
-    (I.C_vectorN n fs) -> do { v <- convert fs
-                             ; return  (A.C_complex $ A.Cvector $ (fmap (\_ -> v) [1..n]))
-                             }
-    (I.C_arrayN n fs) -> do { v <- convert fs
-                            ; return (A.C_complex $ A.Carray $ (fmap (\_ -> v) [1..n]))
-                            }
---    I.C_localId a -> return $ A.C_localId a
+    I.C_struct b fs -> Md.liftM (A.C_complex . (A.Cstruct b)) (mapM convert fs)
+    I.C_vector fs -> Md.liftM (A.C_complex . A.Cvector) (mapM convert fs)
+    I.C_array fs -> Md.liftM (A.C_complex . A.Carray) (mapM convert fs)
+    I.C_vectorN n fs -> do { v <- convert fs
+                           ; return  (A.C_complex $ A.Cvector $ (fmap (\_ -> v) [1..n]))
+                           }
+    I.C_arrayN n fs -> do { v <- convert fs
+                          ; return (A.C_complex $ A.Carray $ (fmap (\_ -> v) [1..n]))
+                          }
     I.C_labelId a -> Md.liftM A.C_labelId (convert a)
     I.C_block g a -> do { a' <- convert_to_PercentLabel a
                         ; return $ A.C_blockAddress g a'
@@ -410,12 +408,6 @@ instance Conversion I.MetaKindedConst (Rm A.MetaKindedConst) where
     (I.MetaKindedConst mk mc) -> Md.liftM (A.MetaKindedConst (tconvert () mk)) (convert mc)
     I.UnmetaKindedNull -> return A.UnmetaKindedNull
 
-{-
-instance Conversion I.FunName (Rm A.FunName) where
-    convert (I.FunNameGlobal g) = return $ A.FunNameGlobal g
-    convert (I.FunNameString s) = return $ A.FunNameString s
--}
-
 instance Conversion I.Value (Rm A.Value) where
     convert (I.Val_ssa a) = return $ A.Val_local a
     convert (I.Val_const a) = Md.liftM A.Val_const (convert a)
@@ -458,17 +450,6 @@ instance Conversion I.Clause (Rm A.Clause) where
 
 instance Conversion I.GlobalOrLocalId (Rm A.GlobalOrLocalId) where
     convert g = return g
-
-{-
-instance Conversion I.PersFn (Rm A.PersFn) where
-    convert (I.PersFnId s) = return $ A.PersFnId $ s
-    convert (I.PersFnCastS c) = convert c >>= return . A.PersFnCast
-    convert (I.PersFnCastV c) = convert c >>= return . A.PersFnCast    
-    convert (I.PersFnUndef) = return $ A.PersFnUndef
-    convert (I.PersFnNull) = return $ A.PersFnNull
-    convert (I.PersFnConst c) = Md.liftM A.PersFnConst (convert c)
--}
-
 
 instance Conversion I.Minst (Rm A.ComputingInst) where
   convert (I.Minst cst fn params lhs) = 
@@ -524,19 +505,6 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { tv1 <- convert tv
          ; return $ A.ComputingInst (Just lhs) $ A.RvA $ A.VaArg tv1 (tconvert () t)
          }
-      {-
-    I.I_llvm_va_start v -> 
-      do { let t1 = tconvert () (I.ptr0 I.i8)
-         ; va <- convert v
-         ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.va_start") 
-           [A.ActualParamData t1 [] Nothing va []] []
-         }      
-    I.I_llvm_va_end v -> 
-      do { let t1 = tconvert () (I.ptr0 I.i8) -- t
-         ; va <- convert v 
-         ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum "llvm.va_end") 
-           [A.ActualParamData t1 [] Nothing va []] []
-         }      -}
     I.I_landingpad t1 t2 pf b cs lhs-> 
       do { pfa <- convert pf
          ; csa <- mapM convert cs
@@ -966,24 +934,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
       do { csa <- convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) 
          ; return $ A.ComputingInst lhs $ A.Call tc csa 
          } 
-      {-
-    I.I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
-      do { (A.Typed t1 v1) <- convert tv1
-         ; (A.Typed t2 v2) <- convert tv2
-         ; (A.Typed t3 v3) <- convert tv3
-         ; (A.Typed t4 v4) <- convert tv4
-         ; (A.Typed t5 v5) <- convert tv5
-         ; let nm = case memLen of
-                 I.MemLenI32 -> "llvm.memcpy.p0i8.p0i8.i32"
-                 I.MemLenI64 -> "llvm.memcpy.p0i8.p0i8.i64"
-         ; return $ A.ComputingInst Nothing $ A.Call A.TcNon $ A.CsFun Nothing [] A.Tvoid (A.FunNameGlobal $ A.GolG $ A.GlobalIdAlphaNum nm) 
-           [A.ActualParamData t1 [] Nothing v1 []
-           ,A.ActualParamData t2 [] Nothing v2 []
-           ,A.ActualParamData t3 [] Nothing v3 []
-           ,A.ActualParamData t4 [] Nothing v4 []
-           ,A.ActualParamData t5 [] Nothing v5 []
-           ] []
-         }   -}
+    _ -> I.errorLoc FLC $ show cinst
                                       
 instance Conversion I.ActualParam (Rm A.ActualParam) where
   convert x = case x of

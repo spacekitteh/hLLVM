@@ -684,7 +684,7 @@ instance Substitutable Cinst where
                                   , isvolatile = (substitute chg) isvolatile
                                   }
         i@I_llvm_memset{..} -> i { dest = (substitute chg) dest
-                                 , operand1 = substitute chg operand1
+                                 , setValue = substitute chg setValue
                                  , len = (substitute chg) len
                                  , align = (substitute chg) align
                                  , isvolatile = (substitute chg) isvolatile
