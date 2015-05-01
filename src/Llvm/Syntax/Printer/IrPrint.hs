@@ -646,7 +646,9 @@ instance IrPrint Cinst where
     (I_select_VF cnd t f lhs) -> hsep [printIr lhs, equals, text "select", printIr cnd, printIr t, printIr f]    
     (I_select_VP cnd t f lhs) -> hsep [printIr lhs, equals, text "select", printIr cnd, printIr t, printIr f]
     
-    I_llvm_memcpy mod tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr mod  <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5]) 
+    I_llvm_memcpy md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5]) 
+    I_llvm_memmove md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memmove" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])     
+    I_llvm_memset md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memset" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5]) 
     
 instance IrPrint Minst where    
   printIr (Minst cs fn params lhs) = printIr cs <+> printIr fn <+> hsep (fmap printIr params)
