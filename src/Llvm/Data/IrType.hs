@@ -419,11 +419,11 @@ instance Ord (Type s r) where
     (TnoCodeFunX n, TnoCodeFunX n1) -> compare n n1
 
     {- Opaque -}
-    (TnameOpaqueD s, TnameOpaqueD s1) -> compare s s1 -- errorLoc FLC "comparing opaque types"
+    (TnameOpaqueD s, TnameOpaqueD s1) -> compare s s1 -- this might cause false negive, two equal types return non-equal
     (TquoteNameOpaqueD _, TquoteNameOpaqueD _) -> errorLoc FLC "comparing opaque types"
     (TnoOpaqueD _, TnoOpaqueD _) -> errorLoc FLC "comparing opaque types"
-    (Topaque_struct _ _, Topaque_struct _ _) -> errorLoc FLC "comparing opaque types"
-    (Topaque_array _ _, Topaque_array _ _) -> errorLoc FLC "comparing opaque types"
+    (Topaque_struct p1 sl1, Topaque_struct p2 sl2 ) -> compare (p1, sl1) (p2, sl2) 
+    (Topaque_array n1 t1, Topaque_array n2 t2) -> compare (n1, t1) (n2, t2)
 
     (_,_) -> compare (show x1) (show x2)
 
@@ -1039,10 +1039,6 @@ fp128 = TpFp128
 
 x86_fp80 :: Type ScalarB F
 x86_fp80 = TpX86Fp80
-
-
-replaceDq :: String -> String
-replaceDq s = fmap (\x -> if x == '"' then '_' else x) s
 
 instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 

@@ -66,7 +66,7 @@ instance Uda Value where
 instance Uda ActualParam where
   use ap = case ap of
     ActualParamData _ _ _ v _ -> use v
-    ActualParamLabel _ _ _ v _ -> S.empty 
+    ActualParamLabel _ _ _ _  _ -> S.empty 
   def _ = errorLoc FLC $ "cannot happen"
   storeTo _ = errorLoc FLC $ "cannot happen"
   loadFrom _ = errorLoc FLC $ "cannot happen"
@@ -96,7 +96,7 @@ instance Uda Cinst where
     I_cmpxchg_P{..} -> S.unions [use pointer,use cmpp,use newp]
     I_atomicrmw{..} -> S.unions [use pointer,use val]
     I_call_fun{..} -> use call_actualParams
-    -- I_call_other{..} -> use callSite
+    I_call_asm{..} -> use call_actualParams
     I_extractelement_I{..} -> S.unions [use vectorI, use index]
     I_extractelement_F{..} -> S.unions [use vectorF, use index]
     I_extractelement_P{..} -> S.unions [use vectorP, use index]
@@ -194,6 +194,7 @@ instance Uda Cinst where
     I_select_VP{..} -> S.unions [use trueVP, use falseVP]
     I_select_First{..} -> S.unions [use trueFirst, use falseFirst]
     I_llvm_memcpy{..} -> S.unions [use dest, use src, use len, use align]
+    I_llvm_memmove{..} -> S.unions [use dest, use src, use len, use align]
     _ -> errorLoc FLC $ "unsupported " ++ show ci
     
   def ci = case ci of
@@ -208,7 +209,7 @@ instance Uda Cinst where
     I_cmpxchg_P{..} -> def result
     I_atomicrmw{..} -> S.empty
     I_call_fun{..} -> def call_return
-    -- I_call_other{..} -> def callReturn
+    I_call_asm{..} -> def call_return
     I_extractelement_I{..} -> def result
     I_extractelement_F{..} -> def result    
     I_extractelement_P{..} -> def result
@@ -309,6 +310,7 @@ instance Uda Cinst where
     I_select_First{..} -> def result
     
     I_llvm_memcpy{..} -> S.empty
+    I_llvm_memmove{..} -> S.empty
     _ -> errorLoc FLC $ "unsupported " ++ show ci    
   storeTo ci = case ci of
     I_store{..} -> storeTo pointer
@@ -317,10 +319,12 @@ instance Uda Cinst where
     I_llvm_va_start tv -> storeTo tv
     I_llvm_va_end tv -> storeTo tv
     I_llvm_memcpy{..} -> storeTo dest
+    I_llvm_memmove{..} -> storeTo dest    
     _ -> S.empty
   loadFrom ci = case ci of
     I_load{..} -> loadFrom pointer
     I_loadatomic{..} -> loadFrom pointer
     I_atomicrmw{..} -> loadFrom pointer
     I_llvm_memcpy{..} -> loadFrom src
+    I_llvm_memmove{..} -> loadFrom src    
     _ -> S.empty

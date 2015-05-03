@@ -165,7 +165,7 @@ instance H.NonLocal (Node a) where
     Ci.T_switch d ls -> (snd d):(map snd ls)
     Ci.T_invoke{..} -> [invoke_normal_label, invoke_exception_label]
     Ci.T_invoke_asm{..} -> [invoke_normal_label, invoke_exception_label]
-    Ci.T_resume _ -> error "what is resume"
+    Ci.T_resume _ -> []
     Ci.T_unwind -> error "what is unwind"
 
 globalIdOfModule :: (Module a) -> S.Set (Ci.Dtype, Ci.GlobalId) -- this should be a map, globalid might have an opaque type

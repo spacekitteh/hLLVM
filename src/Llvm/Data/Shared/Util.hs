@@ -51,8 +51,13 @@ srcLoc = do { (Loc f p m s e) <- location
             ; stringE (p ++ ":" ++ m ++ "@" ++ show s)
             }            
                        
+
 errorLoc :: FileLoc -> String -> a
 errorLoc (FileLoc lc) s = error (lc ++ ":" ++ s)
+
+replaceDq :: String -> String
+replaceDq s = fmap (\x -> if x == '"' then '_' else x) s
+
 
 {- up casting -}
 class Ucast l1 l2 where

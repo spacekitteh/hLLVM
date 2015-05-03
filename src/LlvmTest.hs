@@ -18,6 +18,7 @@ import qualified Llvm.Pass.DataUsage as Du
 import qualified Llvm.Syntax.Printer.IrPrint as P
 import qualified Llvm.Pass.Substitution as Sub
 import qualified Llvm.Pass.Changer as Cg
+import qualified Llvm.Pass.Visualization as Vis
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -55,6 +56,7 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | AstCanonic { input :: FilePath, output :: Maybe String }
             | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
             | Change { input :: FilePath, output :: Maybe String}
+            | Visualize { input :: FilePath, output :: Maybe String}              
             deriving (Show, Data, Typeable, Eq)
 
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
@@ -70,15 +72,15 @@ parser = Parser { input = def &= typ "<INPUT>"
 
 ast2ir = Ast2Ir { input = def &= typ "<INPUT>"
                 , output = outFlags Nothing
-                } &= help "Test Ast to Ir conversion"
+                } &= help "Test Ast2Ir conversion"
 
 ir2ast = Ir2Ast { input = def &= typ "<INPUT>"
                 , output = outFlags Nothing
-                } &= help "Test Ir to Ast conversion"
+                } &= help "Test Ir2Ast conversion"
 
 astcanonic = AstCanonic { input = def &= typ "<INPUT>"
                         , output = outFlags Nothing
-                        } &= help "Test Ir to Ast conversion"
+                        } &= help "Test AstCanonic conversion"
 
 datause = DataUse { input = def &= typ "<INPUT>"
                   , output = outFlags Nothing
@@ -86,8 +88,12 @@ datause = DataUse { input = def &= typ "<INPUT>"
                   } &= help "Test DataUsage Pass"
 
 changer = Change { input = def &= typ "<INPUT>"
-                  , output = outFlags Nothing
-                  } &= help "Test DataUsage Pass"
+                 , output = outFlags Nothing
+                 } &= help "Test Change Pass"
+
+visual = Visualize { input = def &= typ "<INPUT>"
+                   , output = outFlags Nothing
+                   } &= help "Test Visialize Pass"
 
 
 pass = Pass { input = def &= typ "<INPUT>"
@@ -101,7 +107,8 @@ phifixup = PhiFixUp { input = def &= typ "<INPUT>"
                     , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
                     } &= help "Test PhiFixUp pass"
 
-mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup, datause, changer] &= help "Test sub components"
+mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup
+                           , datause, changer, visual] &= help "Test sub components"
        &= program "Test" &= summary "Test driver v1.0"
 
 main :: IO ()
@@ -153,15 +160,26 @@ main = do { sel <- cmdArgsRun mode
                                ; closeFileOrStdout ox outh
                                }
             Change ix ox -> do { inh <- openFile ix ReadMode
-                                ; outh <- openFileOrStdout ox
-                                ; ast <- testParser ix inh
-                                ; let ast' = Cv.simplify ast
-                                ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
-                                      ast'' = Cv.irToAst (Sub.substitute chg $ Cv.invertMap (Cv.a2h m)) (Sub.substitute chg ir)
-                                ; writeOutLlvm ast'' outh
-                                ; hClose inh
-                                ; closeFileOrStdout ox outh
-                                }
+                               ; outh <- openFileOrStdout ox
+                               ; ast <- testParser ix inh
+                               ; let ast' = Cv.simplify ast
+                               ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
+                                     ast'' = Cv.irToAst (Sub.substitute chg $ Cv.invertMap (Cv.a2h m)) (Sub.substitute chg ir)
+                               ; writeOutLlvm ast'' outh
+                               ; hClose inh
+                               ; closeFileOrStdout ox outh
+                               }
+            Visualize ix ox -> do { inh <- openFile ix ReadMode
+                                  ; outh <- openFileOrStdout ox
+                                  ; ast <- testParser ix inh
+                                  ; let ast' = Cv.simplify ast
+                                  ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
+                                        ir1 = Vis.visualize Nothing ir
+                                        ast'' = testIr2Ast m ir1
+                                  ; writeOutLlvm ast'' outh
+                                  ; hClose inh
+                                  ; closeFileOrStdout ox outh
+                                  }                            
             PhiFixUp ix ox f -> do { inh <- openFile ix ReadMode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
