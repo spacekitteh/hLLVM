@@ -101,6 +101,7 @@ library {
                      Llvm.Pass.CodeMonad,
                      Llvm.Pass.Changer,
                      Llvm.Pass.Substitution,
+                     Llvm.Pass.Visualization,
                      Llvm.Pass.DataUsage,
                      ParserTester
   if flag(debug) {

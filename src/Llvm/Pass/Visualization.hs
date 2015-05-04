@@ -173,7 +173,7 @@ stringize mp =
   let l = Dm.toList mp
   in fmap (\(c,lhs) -> 
             let str = fmap (\x -> if x == '\\' then '_' else x) (replaceDq c)
-            in TlGlobalDtype { tlg_lhs = Just lhs
+            in TlGlobalDtype { tlg_lhs = lhs
                              , tlg_linkage = Just LinkagePrivate 
                              , tlg_visibility = Nothing
                              , tlg_dllstorage = Nothing
