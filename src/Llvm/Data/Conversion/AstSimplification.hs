@@ -17,18 +17,19 @@ import Data.Word (Word32)
   Assign explicit names to all implicit variables  
   Assign explicit labels to all implicit labels
 -}
-data MyState = MyState { _cnt :: Word32 -- Integer
+data MyState = MyState { _cnt :: Word32 
                        , _renaming :: String
-                       , _implicitLabelNums :: St.Set Word32 -- Integer
-                       , _explicitLabelNums :: St.Set Word32 -- Integer
-                       , _explicitLabelDqNums :: St.Set Word32 -- Integer                         
+                       , _implicitLabelNums :: St.Set Word32 
+                       , _explicitLabelNums :: St.Set Word32 
+                       , _explicitLabelDqNums :: St.Set Word32
+                       , _implicitGlobalNums :: St.Set Word32
                        } 
                
 type MS = S.State MyState
 
-data LabelNumbers = LabelNumbers { implicitNumbers :: St.Set Word32 -- Integer
-                                 , explicitNumbers :: St.Set Word32 -- Integer
-                                 , explicitDqNumbers :: St.Set Word32 -- Integer
+data LabelNumbers = LabelNumbers { implicitNumbers :: St.Set Word32
+                                 , explicitNumbers :: St.Set Word32
+                                 , explicitDqNumbers :: St.Set Word32
                                  } deriving (Eq, Ord, Show)
                                             
 idPrefix :: String
@@ -44,8 +45,9 @@ explicitLbPrefix = "_hsllvm_explicit_L"
 -- iteration 1
 ------------------------------------------------------------------------
 iter1 :: [Toplevel] -> ([Toplevel], M.Map GlobalId LabelNumbers)
-iter1 l = let (l1, m1) = unzip $ fmap rnToplevel1 l
-          in (l1, foldl M.union M.empty m1)
+iter1 l = let sl = explicitizeGlobalDefinition l
+          in let (l1, m1) = unzip $ fmap rnToplevel1 sl
+             in (l1, foldl M.union M.empty m1)
 
 rnToplevel1 :: Toplevel -> (Toplevel, M.Map GlobalId LabelNumbers)
 rnToplevel1 (ToplevelDefine (TlDefine fp bs)) = 
@@ -53,10 +55,49 @@ rnToplevel1 (ToplevelDefine (TlDefine fp bs)) =
                                          ; bsa <- S.mapM rnBlock bs
                                          ; return (fpa, bsa)
                                          }
-                                     ) (MyState 0 (show fp) St.empty St.empty St.empty)
+                                     ) (MyState 0 (show fp) St.empty St.empty St.empty St.empty)
       labelNumbers = LabelNumbers (_implicitLabelNums mys) (_explicitLabelNums mys) (_explicitLabelDqNums mys)
   in ((ToplevelDefine (TlDefine fp2 bs2)), M.insert (getGlobalId fp) labelNumbers M.empty)
+rnToplevel1 x@(ToplevelGlobal glb) = 
+  let (TlGlobal mlhs mlnk mvis mdll mtls an mas ise gt t mconst ms mcomdat malign) = glb  
+  in case mconst of
+    Just const -> let const1 = fst $ S.runState (rnConst const) (MyState 0 "" St.empty St.empty St.empty St.empty)
+                  in (ToplevelGlobal (TlGlobal mlhs mlnk mvis mdll mtls an mas ise gt t (Just const1) ms mcomdat malign), M.empty)
+    Nothing -> (x, M.empty)
 rnToplevel1 x = (x, M.empty)
+
+
+explicitizeGlobalDefinition :: [Toplevel] -> [Toplevel]
+explicitizeGlobalDefinition l = fst $ S.runState (mapM rnToplevel1Global l) 0
+  where
+    rnToplevel1Global :: Toplevel -> S.State Word32 Toplevel
+    rnToplevel1Global (ToplevelGlobal glb) = 
+      let (TlGlobal mlhs mlnk mvis mdll mtls an mas ise gt t mconst ms mcomdat malign) = glb  
+      in do { lhs <- explicitizeGlobalIdDef mlhs
+            ; return (ToplevelGlobal $ TlGlobal (Just lhs) mlnk mvis mdll mtls an mas ise gt t mconst ms mcomdat malign)
+            }
+    rnToplevel1Global x@(ToplevelDefine (TlDefine fp bs)) = 
+      let (FunctionPrototype v0 v1 v2 v3 v4 v5 gid fhParams v8 v9 v10 v11 v12 v13 fhPrefix fhPrologue) = fp
+      in do { gid0 <- explicitizeGlobalIdDef (Just gid)
+            ; return (ToplevelDefine 
+                      (TlDefine (FunctionPrototype v0 v1 v2 v3 v4 v5 gid0 fhParams v8 v9 v10 v11 v12 v13 fhPrefix fhPrologue) bs))
+            }
+    rnToplevel1Global x = return x
+    explicitizeGlobalIdDef :: Maybe GlobalId -> S.State Word32 GlobalId
+    explicitizeGlobalIdDef mg = case mg of
+      Nothing -> 
+        do { n <- S.get
+           ; S.modify (+1)
+           ; return $ GlobalIdNum n
+           }
+      Just (GlobalIdNum m) -> 
+        do { n <- S.get
+           ; S.modify (+1)
+           ; if n == m 
+             then return $ GlobalIdNum m
+             else error ("AstSimplify:expect " ++ (show m) ++ " and but found " ++ (show n) ++ " in explicitizeGlobalDefinition")
+           }
+      Just x -> return x
 
 
 getGlobalId :: FunctionPrototype -> GlobalId
@@ -101,7 +142,7 @@ rnLabelId x = return x
 
 
 
-getNext :: MS Word32 -- Integer
+getNext :: MS Word32
 getNext = do { MyState{..} <- S.get
              ; S.modify (\s@MyState {..} -> s { _cnt = _cnt + 1})
              ; return _cnt
@@ -122,8 +163,10 @@ rnDefLabel bl = case bl of
   ExplicitBlockLabel i -> S.liftM ExplicitBlockLabel (recordLabelNumber i)
   where 
     recordLabelNumber :: LabelId -> MS LabelId
-    recordLabelNumber (LabelNumber i) = S.modify (\s@MyState {..} -> s { _explicitLabelNums = St.insert i _explicitLabelNums }) >> return (LabelString (explicitLbPrefix ++ show i))
-    recordLabelNumber x@(LabelDqNumber i) = S.modify (\s@MyState {..} -> s { _explicitLabelDqNums = St.insert i _explicitLabelDqNums }) >> return x
+    recordLabelNumber (LabelNumber i) = S.modify (\s@MyState {..} -> s { _explicitLabelNums = St.insert i _explicitLabelNums }) 
+                                        >> return (LabelString (explicitLbPrefix ++ show i))
+    recordLabelNumber x@(LabelDqNumber i) = S.modify (\s@MyState {..} -> s { _explicitLabelDqNums = St.insert i _explicitLabelDqNums }) 
+                                            >> return x
     recordLabelNumber x = return x
 
 rnBlock :: Block -> MS Block
@@ -190,7 +233,7 @@ getLhs True Nothing = do { m <- getNext
 
 rnGlobalOrLocalId :: GlobalOrLocalId -> MS GlobalOrLocalId
 rnGlobalOrLocalId (GolL l) = S.liftM GolL (rnLocalId l)
-rnGlobalOrLocalId x = return x
+rnGlobalOrLocalId (GolG g) = return $ GolG (specializeGlobalId g)
 
 rnValue :: Value -> MS Value
 rnValue (Val_local x) = S.liftM Val_local (rnLocalId x)
@@ -221,22 +264,16 @@ checkImpCount _ = return ()
                                          
 rnRhs :: Rhs -> MS (Bool, Rhs)
 rnRhs lhs = case lhs of
-              RmO x -> S.liftM (\(b,x) -> (b, RmO x)) (rnMemOp x)
-              Re x -> S.liftM (\x -> (True, Re x)) (rnExpr x)
-              Call b cs -> S.liftM (\(bb, x) -> (bb, Call b x)) (rnCallSite cs)
-              {-
-              (Asm tc t dia b1 b2 qs1 qs2 aps fas) -> 
-                do { apsa <- mapM rnActualParam aps
-                   ; let (rt, _) = splitCallReturnType t
-                   ; return (not (rt == Tvoid), Asm tc t dia b1 b2 qs1 qs2 apsa fas)
-                   }-}
-              ReE e -> S.liftM (\x -> (True, ReE x)) (rnExtractElem rnTypedValue e)
-              RiE e -> S.liftM (\x -> (True, RiE x)) (rnInsertElem rnTypedValue e)
-              RsV e -> S.liftM (\x -> (True, RsV x)) (rnShuffleVector rnTypedValue e)
-              ReV e -> S.liftM (\x -> (True, ReV x)) (rnExtractValue rnTypedValue e)
-              RiV e -> S.liftM (\x -> (True, RiV x)) (rnInsertValue rnTypedValue e)
-              RvA (VaArg tv t) -> S.liftM (\x -> (True, RvA $ VaArg x t)) (rnTypedValue tv)
-              RlP (LandingPad rt ft ix cl c) -> return (True, lhs)
+              RhsMemOp x -> S.liftM (\(b,x) -> (b, RhsMemOp x)) (rnMemOp x)
+              RhsExpr x -> S.liftM (\x -> (True, RhsExpr x)) (rnExpr x)
+              RhsCall b cs -> S.liftM (\(bb, x) -> (bb, RhsCall b x)) (rnCallSite cs)
+              RhsExtractElement e -> S.liftM (\x -> (True, RhsExtractElement x)) (rnExtractElem rnTypedValue e)
+              RhsInsertElement e -> S.liftM (\x -> (True, RhsInsertElement x)) (rnInsertElem rnTypedValue e)
+              RhsShuffleVector e -> S.liftM (\x -> (True, RhsShuffleVector x)) (rnShuffleVector rnTypedValue e)
+              RhsExtractValue e -> S.liftM (\x -> (True, RhsExtractValue x)) (rnExtractValue rnTypedValue e)
+              RhsInsertValue e -> S.liftM (\x -> (True, RhsInsertValue x)) (rnInsertValue rnTypedValue e)
+              RhsVaArg (VaArg tv t) -> S.liftM (\x -> (True, RhsVaArg $ VaArg x t)) (rnTypedValue tv)
+              RhsLandingPad (LandingPad rt ft ix cl c) -> return (True, lhs)
               
 rnMemOp :: MemOp -> MS (Bool, MemOp)
 rnMemOp (Alloca m t tv a) = do { tv' <- maybeM rnTypedValue tv
@@ -263,12 +300,12 @@ rnPointer :: (a -> MS a) -> Pointer a -> MS (Pointer a)
 rnPointer f (Pointer v) = S.liftM Pointer (f v) 
 
 rnExpr :: Expr -> MS Expr
-rnExpr (EgEp e) = S.liftM EgEp (rnGetElemPtr rnTypedValue e)
-rnExpr (EiC e) = S.liftM EiC (rnIcmp rnValue e)
-rnExpr (EfC e) = S.liftM EfC (rnFcmp rnValue e)
-rnExpr (Eb e) = S.liftM Eb (rnBinExpr rnValue e)
-rnExpr (Ec e) = S.liftM Ec (rnConversion rnTypedValue e)
-rnExpr (Es e) = S.liftM Es (rnSelect rnTypedValue e)
+rnExpr (ExprGetElementPtr e) = S.liftM ExprGetElementPtr (rnGetElemPtr rnTypedValue e)
+rnExpr (ExprIcmp e) = S.liftM ExprIcmp (rnIcmp rnValue e)
+rnExpr (ExprFcmp e) = S.liftM ExprFcmp (rnFcmp rnValue e)
+rnExpr (ExprBinExpr e) = S.liftM ExprBinExpr (rnBinExpr rnValue e)
+rnExpr (ExprConversion e) = S.liftM ExprConversion (rnConversion rnTypedValue e)
+rnExpr (ExprSelect e) = S.liftM ExprSelect (rnSelect rnTypedValue e)
 
 
 rnGetElemPtr :: (Typed v -> MS (Typed v)) -> GetElementPtr v -> MS (GetElementPtr v)
@@ -307,24 +344,17 @@ rnFunName x = return x
   
 
 rnCallSite :: CallSite -> MS (Bool, CallSite)
-rnCallSite (CsFun c pa t fn aps fas) = 
+rnCallSite (CallSiteFun c pa t fn aps fas) = 
   do { fna <- rnFunName fn
      ; x <- mapM rnActualParam aps
      ; let (rt, _) = splitCallReturnType t
-     ; return (not (rt == Tvoid), CsFun c pa t fna x fas)
+     ; return (not (rt == Tvoid), CallSiteFun c pa t fna x fas)
      }
-rnCallSite (CsAsm t dia b1 b2 qs1 qs2 aps fas) = 
+rnCallSite (CallSiteAsm t dia b1 b2 qs1 qs2 aps fas) = 
   do { apsa <- mapM rnActualParam aps
      ; let (rt, _) = splitCallReturnType t
-     ; return (not (rt == Tvoid),  CsAsm t dia b1 b2 qs1 qs2 apsa fas)
+     ; return (not (rt == Tvoid),  CallSiteAsm t dia b1 b2 qs1 qs2 apsa fas)
      }
-{-  
-rnCallSite (CsConversion pas t c aps fas) = 
-  do { apsa <- mapM rnActualParam aps
-     ; let (rt, _) = splitCallReturnType t
-     ; return (not (rt == Tvoid), CsConversion pas t c apsa fas)
-     }
--}
 
 rnActualParam :: ActualParam -> MS ActualParam
 rnActualParam (ActualParamData t ps ma v pa) = S.liftM (\x -> ActualParamData t ps ma x pa) (rnValue v)
@@ -407,9 +437,13 @@ mapMetaKindedConst f x = case x of
   (MetaKindedConst mk mc) -> S.liftM (MetaKindedConst mk) (f mc)
   UnmetaKindedNull -> return UnmetaKindedNull
 
+specializeGlobalId :: GlobalId -> GlobalId
+specializeGlobalId x = case x of
+  GlobalIdNum n -> x
+  _ -> x
+
 rnConst :: Const -> MS Const
 rnConst (C_complex x) = S.liftM C_complex (rnComplexConstant x)
--- rnConst (C_localId x) = S.liftM C_localId (rnLocalId x)
 rnConst (C_labelId l) = S.liftM C_labelId (rnLabelId l)
 rnConst (C_blockAddress g l) = S.liftM (C_blockAddress g) (rnPercentLabel l)
 rnConst (C_binexp bexpr) = S.liftM C_binexp (rnBinExpr rnConst bexpr)
@@ -423,6 +457,7 @@ rnConst (C_extractvalue extract) = S.liftM C_extractvalue (rnExtractValue rnType
 rnConst (C_insertvalue insert) = S.liftM C_insertvalue (rnInsertValue rnTypedConst insert)
 rnConst (C_extractelement extract) = S.liftM C_extractelement (rnExtractElem rnTypedConst extract)
 rnConst (C_insertelement insert) = S.liftM C_insertelement (rnInsertElem rnTypedConst insert)
+rnConst (C_simple (CpGlobalAddr a)) = return (C_simple (CpGlobalAddr (specializeGlobalId a)))
 rnConst x = return x
 
 rnComplexConstant :: ComplexConstant -> MS ComplexConstant
@@ -503,21 +538,16 @@ rnComputingInst2 (ComputingInst lhs rhs) = do { rhsa <- rnRhs2 rhs
 
 rnRhs2 :: Rhs -> RD Rhs
 rnRhs2 lhs = case lhs of
-  RmO x -> S.liftM RmO (rnMemOp2 x)
-  Re x -> S.liftM Re (rnExpr2 x)
-  Call b cs -> S.liftM (Call b) (rnCallSite2 cs)
-  {-
-  (Asm tc t dia b1 b2 qs1 qs2 aps fas) -> 
-    do { apsa <- mapM rnActualParam2 aps
-       ; return (Asm tc t dia b1 b2 qs1 qs2 apsa fas)
-       }-}
-  ReE e -> S.liftM ReE (rnExtractElem2 rnTypedValue2 e)
-  RiE e -> S.liftM RiE (rnInsertElem2 rnTypedValue2 e)
-  RsV e -> S.liftM RsV (rnShuffleVector2 rnTypedValue2 e)
-  ReV e -> S.liftM ReV (rnExtractValue2 rnTypedValue2 e)
-  RiV e -> S.liftM RiV (rnInsertValue2 rnTypedValue2 e)
-  RvA (VaArg tv t) -> S.liftM (\x -> RvA $ VaArg x t) (rnTypedValue2 tv)
-  RlP (LandingPad rt ft ix cl c) -> return lhs
+  RhsMemOp x -> S.liftM RhsMemOp (rnMemOp2 x)
+  RhsExpr x -> S.liftM RhsExpr (rnExpr2 x)
+  RhsCall b cs -> S.liftM (RhsCall b) (rnCallSite2 cs)
+  RhsExtractElement e -> S.liftM RhsExtractElement (rnExtractElem2 rnTypedValue2 e)
+  RhsInsertElement e -> S.liftM RhsInsertElement (rnInsertElem2 rnTypedValue2 e)
+  RhsShuffleVector e -> S.liftM RhsShuffleVector (rnShuffleVector2 rnTypedValue2 e)
+  RhsExtractValue e -> S.liftM RhsExtractValue (rnExtractValue2 rnTypedValue2 e)
+  RhsInsertValue e -> S.liftM RhsInsertValue (rnInsertValue2 rnTypedValue2 e)
+  RhsVaArg (VaArg tv t) -> S.liftM (\x -> RhsVaArg $ VaArg x t) (rnTypedValue2 tv)
+  RhsLandingPad (LandingPad rt ft ix cl c) -> return lhs
 
 
 rnMemOp2 :: MemOp -> RD MemOp
@@ -542,26 +572,21 @@ rnMemOp2 (AtomicRmw b1 ao tp tv b2 mf) =
   (rnTypedValue2 tv)
 
 rnCallSite2 :: CallSite -> RD CallSite
-rnCallSite2 (CsFun c pa t fn aps fas) = 
+rnCallSite2 (CallSiteFun c pa t fn aps fas) = 
   do { x <- mapM rnActualParam2 aps
-     ; return (CsFun c pa t fn x fas)
+     ; return (CallSiteFun c pa t fn x fas)
      }
-rnCallSite2 (CsAsm t dia b1 b2 qs1 qs2 aps fas) = 
+rnCallSite2 (CallSiteAsm t dia b1 b2 qs1 qs2 aps fas) = 
   do { apsa <- mapM rnActualParam2 aps
-     ; return (CsAsm t dia b1 b2 qs1 qs2 apsa fas)
+     ; return (CallSiteAsm t dia b1 b2 qs1 qs2 apsa fas)
      }
-{-  
-rnCallSite2 (CsConversion pas t c aps fas) = 
-  do { apsa <- mapM rnActualParam2 aps
-     ; return (CsConversion pas t c apsa fas)
-     }
--}
   
 rnActualParam2 :: ActualParam -> RD ActualParam
 rnActualParam2 (ActualParamData t ps ma v pa) = S.liftM (\x -> ActualParamData t ps ma x pa) (rnValue2 v)
-rnActualParam2 (ActualParamLabel t ps ma v pa) = do { r <- R.ask
-                                                    ; S.liftM (\x -> ActualParamLabel t ps ma x pa) (rnPercentLabel2 (fst r) v)
-                                                    }
+rnActualParam2 (ActualParamLabel t ps ma v pa) = 
+  do { r <- R.ask
+     ; S.liftM (\x -> ActualParamLabel t ps ma x pa) (rnPercentLabel2 (fst r) v)
+     }
 rnActualParam2 (ActualParamMeta mc) = S.liftM ActualParamMeta (rnMetaKindedConst2 mc)
                                         
   
@@ -599,7 +624,6 @@ rnDefFunctionPrototype2 fpt = return fpt
 
 rnConst2 :: Const -> RD Const
 rnConst2 (C_complex x) = S.liftM C_complex (rnComplexConstant2 x)
--- rnConst2 (C_localId x) = S.liftM C_localId (rnLocalId2 x)
 rnConst2 (C_labelId l) = do { rd <- R.ask
                             ; S.liftM C_labelId (rnLabelId2 (fst rd) l)
                             }
@@ -698,12 +722,12 @@ rnPointer2 :: (a -> RD a) -> Pointer a -> RD (Pointer a)
 rnPointer2 f (Pointer v) = S.liftM Pointer (f v)
 
 rnExpr2 :: Expr -> RD Expr
-rnExpr2 (EgEp e) = S.liftM EgEp (rnGetElemPtr2 rnTypedValue2 e)
-rnExpr2 (EiC e) = S.liftM EiC (rnIcmp2 rnValue2 e)
-rnExpr2 (EfC e) = S.liftM EfC (rnFcmp2 rnValue2 e)
-rnExpr2 (Eb e) = S.liftM Eb (rnBinExpr2 rnValue2 e)
-rnExpr2 (Ec e) = S.liftM Ec (rnConversion2 rnTypedValue2 e)
-rnExpr2 (Es e) = S.liftM Es (rnSelect2 rnTypedValue2 e)
+rnExpr2 (ExprGetElementPtr e) = S.liftM ExprGetElementPtr (rnGetElemPtr2 rnTypedValue2 e)
+rnExpr2 (ExprIcmp e) = S.liftM ExprIcmp (rnIcmp2 rnValue2 e)
+rnExpr2 (ExprFcmp e) = S.liftM ExprFcmp (rnFcmp2 rnValue2 e)
+rnExpr2 (ExprBinExpr e) = S.liftM ExprBinExpr (rnBinExpr2 rnValue2 e)
+rnExpr2 (ExprConversion e) = S.liftM ExprConversion (rnConversion2 rnTypedValue2 e)
+rnExpr2 (ExprSelect e) = S.liftM ExprSelect (rnSelect2 rnTypedValue2 e)
 
 
 rnGetElemPtr2 :: (Typed v -> RD (Typed v)) -> GetElementPtr v -> RD (GetElementPtr v)

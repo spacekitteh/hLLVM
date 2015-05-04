@@ -859,11 +859,11 @@ instance Substitutable v => Substitutable (Conversion s v) where
   
 instance Substitutable Aliasee where
   substitute chg al = case al of
-    AtV x -> AtV (substitute chg x)
-    Ac x -> Ac (substitute chg x)
-    AcV x -> AcV (substitute chg x)    
-    Agep x -> Agep (substitute chg x)
-    AgepV x -> AgepV (substitute chg x)    
+    AliaseeTv x -> AliaseeTv (substitute chg x)
+    AliaseeConversion x -> AliaseeConversion (substitute chg x)
+    AliaseeConversionV x -> AliaseeConversionV (substitute chg x)
+    AliaseeGEP x -> AliaseeGEP (substitute chg x)
+    AliaseeGEPV x -> AliaseeGEPV (substitute chg x)    
 
 instance Substitutable TlNamedMd where
   substitute chg (TlNamedMd mv mns) = 

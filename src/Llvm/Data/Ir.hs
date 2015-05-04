@@ -53,7 +53,7 @@ type NOOP = ()
 
 data TlDefine a = TlDefine Ci.FunctionPrototype H.Label (H.Graph (Node a) H.C H.C) 
 
-data TlGlobal = TlGlobalDtype { tlg_lhs :: (Maybe Ci.GlobalId)
+data TlGlobal = TlGlobalDtype { tlg_lhs :: Ci.GlobalId
                               , tlg_linkage :: (Maybe Ci.Linkage)
                               , tlg_visibility :: (Maybe Ci.Visibility)
                               , tlg_dllstorage :: (Maybe Ci.DllStorageClass)
@@ -68,7 +68,7 @@ data TlGlobal = TlGlobalDtype { tlg_lhs :: (Maybe Ci.GlobalId)
                               , tlg_comdat :: (Maybe Ci.Comdat)
                               , tlg_alignment :: (Maybe Ci.Alignment)
                               }
-              | TlGlobalOpaque { tlg_lhs :: (Maybe Ci.GlobalId)
+              | TlGlobalOpaque { tlg_lhs :: Ci.GlobalId
                                , tlg_linkage :: (Maybe Ci.Linkage)
                                , tlg_visiblity :: (Maybe Ci.Visibility)
                                , tlg_dllstorage :: (Maybe Ci.DllStorageClass)
@@ -167,9 +167,3 @@ instance H.NonLocal (Node a) where
     Ci.T_invoke_asm{..} -> [invoke_normal_label, invoke_exception_label]
     Ci.T_resume _ -> []
     Ci.T_unwind -> error "what is unwind"
-
-globalIdOfModule :: (Module a) -> S.Set (Ci.Dtype, Ci.GlobalId) -- this should be a map, globalid might have an opaque type
-globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty tl
-                               where globalIdOf (ToplevelGlobal (TlGlobalDtype lhs _ _ _ _ _ _ _ _ t _ _ _ _)) =
-                                       maybe S.empty (\x -> S.singleton (t, x)) lhs
-                                     globalIdOf _ = S.empty

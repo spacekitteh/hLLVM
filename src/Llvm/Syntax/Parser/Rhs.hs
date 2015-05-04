@@ -123,12 +123,12 @@ pMemOp = choice [ pAllocate
 
 
 pExpr :: P Expr 
-pExpr = choice [ liftM Eb pBinaryOperation
-               , liftM EiC pIcmp
-               , liftM EfC pFcmp        
-               , liftM Es pSelect
-               , liftM Ec pConversion
-               , liftM EgEp pGetElemPtr
+pExpr = choice [ liftM ExprBinExpr pBinaryOperation
+               , liftM ExprIcmp pIcmp
+               , liftM ExprFcmp pFcmp
+               , liftM ExprSelect pSelect
+               , liftM ExprConversion pConversion
+               , liftM ExprGetElementPtr pGetElemPtr
                ]
 
 pIbinaryOperation :: P (IbinExpr Value)
@@ -220,7 +220,7 @@ pInsertValue = do { reserved "insertvalue"
                   
                
 pVaArg :: P Rhs
-pVaArg = reserved "va_arg" >> pTuple2 pTypedValue pType >>= return . (RvA . uncurry VaArg)
+pVaArg = reserved "va_arg" >> pTuple2 pTypedValue pType >>= return . (RhsVaArg . uncurry VaArg)
          
 pFunName :: P FunName
 pFunName = choice [ symbol "null" >> return FunName_null
@@ -250,14 +250,10 @@ pCallFun :: P CallSite
 pCallFun = do { cc <- opt pCallConv
               ; atts0 <- many pParamAttr -- CallRetAttr
               ; t <- pType
-              ; i <- pFunName {-choice [ symbol "null" >> return FunName_null
-                            , symbol "undef" >> return FunName_undef
-                            , liftM FunNameGlobal pGlobalOrLocalId
-                            , pFunNameCast
-                            ]-}
+              ; i <- pFunName
               ; params <- parens (sepBy pActualParam comma)
               ; atts1 <- pFunAttrCollection
-              ; return (CsFun cc atts0 t i params atts1)
+              ; return (CallSiteFun cc atts0 t i params atts1)
               }
 
 pAsm ::  P CallSite
@@ -269,7 +265,7 @@ pAsm = do { t <- pType
           ; (s1, s2) <- pTuple pQuoteStr
           ; params <- parens (sepBy pActualParam comma)
           ; atts1 <- pFunAttrCollection
-          ; return (CsAsm t se as dialect (DqString s1) (DqString s2) params atts1)
+          ; return (CallSiteAsm t se as dialect (DqString s1) (DqString s2) params atts1)
           }
 
 
@@ -280,7 +276,7 @@ pCallSite = choice [try pCallFun, pAsm]
 pCall :: P Rhs
 pCall = do { tl <- option TcNon pTailCall 
            ; reserved "call"
-           ; (liftM (Call tl) pCallSite)
+           ; (liftM (RhsCall tl) pCallSite)
            }
 
 pActualParam :: P ActualParam
@@ -303,38 +299,18 @@ pActualParam = choice [do { t <- pType
                       ]
                   
 pRhs :: P Rhs
-pRhs = choice [ liftM Re pExpr
-              , liftM RmO pMemOp
-              , liftM ReE pExtractElement
-              , liftM RiE pInsertElement
-              , liftM RsV pShuffleVector
-              , liftM ReV pExtractValue
-              , liftM RiV pInsertValue
+pRhs = choice [ liftM RhsExpr pExpr
+              , liftM RhsMemOp pMemOp
+              , liftM RhsExtractElement pExtractElement
+              , liftM RhsInsertElement pInsertElement
+              , liftM RhsShuffleVector pShuffleVector
+              , liftM RhsExtractValue pExtractValue
+              , liftM RhsInsertValue pInsertValue
               , pVaArg
               , pCall
               , pLandingPad
               ]
-       
-       
 
-{-
-pPersFn :: P PersFn
-pPersFn = choice [ liftM PersFnId pGlobalOrLocalId
-                 , do { op <- pConvertOp
-                      ; ignore (chartok '(')
-                      ; ot <- pType
-                      ; ix <- pGlobalOrLocalId
-                      ; reserved "to"
-                      ; dt <- pType
-                      ; ignore (chartok ')')
-                      ; return $ PersFnCast (Conversion op (Typed ot ix) dt)
-                      }
-                 , reserved "undef" >> return PersFnUndef
-                 , reserved "null" >> return PersFnNull
-                 , liftM PersFnConst pConst
-                 ]
--}
-          
 pLandingPad :: P Rhs
 pLandingPad = do { reserved "landingpad"
                  ; rt <- pType
@@ -343,8 +319,8 @@ pLandingPad = do { reserved "landingpad"
                  ; ix <- pFunName -- PersFn
                  ; cl <- option Nothing (reserved "cleanup" >> return (Just Cleanup))
                  ; c <- many pClause
-                 ; return $ RlP $ LandingPad rt ft ix cl c
+                 ; return $ RhsLandingPad $ LandingPad rt ft ix cl c
                  }
-    where pClause = choice [ reserved "catch" >> liftM Catch pTypedValue
-                           , reserved "filter" >> liftM Filter pTypedConst
+    where pClause = choice [ reserved "catch" >> liftM ClauseCatch pTypedValue
+                           , reserved "filter" >> liftM ClauseFilter pTypedConst
                            ]

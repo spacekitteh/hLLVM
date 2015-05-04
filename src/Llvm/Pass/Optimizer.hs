@@ -1,6 +1,7 @@
 module Llvm.Pass.Optimizer where
 
 import Llvm.Data.Ir
+import Llvm.Query.Ir
 import qualified Compiler.Hoopl as H 
 import qualified Data.Set as Ds
 

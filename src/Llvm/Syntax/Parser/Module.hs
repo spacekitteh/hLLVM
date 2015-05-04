@@ -28,8 +28,6 @@ toplevel = choice [ try pNamedGlobal
                   ]
 
 
--- GlobalVar '=' OptionalVisibility ALIAS ...
--- GlobalVar '=' OptionalLinkage OptionalVisibility ... -> global variable
 pNamedGlobal :: P Toplevel
 pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
                   ; linkOpt <- opt pLinkage -- (choice [try pExternalLinkage, pLinkage])
@@ -43,36 +41,20 @@ pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
                     (_, _, False) -> pGlobal lhsOpt linkOpt vis dllStorage tlm na
                   }
 
--- ParseAlias:
---   ::= GlobalVar '=' OptionalVisibility 'alias' OptionalLinkage Aliasee
--- Aliasee
---   ::= TypeAndValue
---   ::= 'bitcast' '(' TypeAndValue 'to' Type ')'
---   ::= 'getelementptr' 'inbounds'? '(' ... ')'
---
--- Everything through visibility has already been parsed.
---
 pAlias :: GlobalId -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage -> AddrNaming -> P Toplevel
 pAlias lhs vis dll tlm na = do { link <- option Nothing (liftM Just pAliasLinkage)
                                ; aliasee <- pAliasee
                                ; return $ ToplevelAlias (TlAlias lhs vis dll tlm na link aliasee)
                                }
     where pAliasee = 
-            choice [ liftM AtV pTypedValue
-                   , liftM Ac pConstConversion
-                   , liftM AgEp pConstGetElemPtr
+            choice [ liftM AliaseeTv pTypedValue
+                   , liftM AliaseeConversion pConstConversion
+                   , liftM AliaseeGetElementPtr pConstGetElemPtr
                    ]
 
 
--- ParseGlobal
---   ::= GlobalVar '=' OptionalLinkage OptionalVisibility OptionalThreadLocal
---       OptionalAddrSpace GlobalType Type Const
---   ::= OptionalLinkage OptionalVisibility OptionalThreadLocal
---       OptionalAddrSpace GlobalType Type Const
---
--- Everything through visibility has been parsed already.
---
-pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage -> AddrNaming ->  P Toplevel
+pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage 
+           -> AddrNaming ->  P Toplevel
 pGlobal lhs link vis dll tls na = 
   do { addrOpt <- opt pAddrSpace
      ; exti <- option (IsNot ExternallyInitialized) (reserved "externally_initialized" >> return (Is ExternallyInitialized))

@@ -177,12 +177,12 @@ instance AsmPrint (Select Value) where
   toLlvm (Select c t f) = hsep [text "select", toLlvm c <> comma, toLlvm t <> comma, toLlvm f]
 
 instance AsmPrint Expr where
-  toLlvm (EgEp a) = toLlvm a
-  toLlvm (EiC a) = toLlvm a
-  toLlvm (EfC a) = toLlvm a
-  toLlvm (Eb a) = toLlvm a
-  toLlvm (Ec a) = toLlvm a
-  toLlvm (Es a) = toLlvm a
+  toLlvm (ExprGetElementPtr a) = toLlvm a
+  toLlvm (ExprIcmp a) = toLlvm a
+  toLlvm (ExprFcmp a) = toLlvm a
+  toLlvm (ExprBinExpr a) = toLlvm a
+  toLlvm (ExprConversion a) = toLlvm a
+  toLlvm (ExprSelect a) = toLlvm a
 
 instance AsmPrint MemOp where  
   toLlvm (Alloca ma t s a) = hsep [text "alloca", toLlvm ma, hcat [toLlvm t, commaSepMaybe s, commaSepMaybe a]]
@@ -218,29 +218,22 @@ instance AsmPrint FunName where
   toLlvm FunName_undef = text "null"                         
   
 instance AsmPrint CallSite where
-  toLlvm (CsFun cc ra rt ident params fa) = 
-    hsep [toLlvm cc, hsep $ fmap toLlvm ra, toLlvm rt, toLlvm ident, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
-  toLlvm (CsAsm t se as dia s1 s2 params fa) = 
-    hsep [toLlvm t, text "asm", toLlvm se, toLlvm as, toLlvm dia, toLlvm s1 <> comma, toLlvm s2, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
+  toLlvm (CallSiteFun cc ra rt ident params fa) = 
+    hsep [toLlvm cc, hsep $ fmap toLlvm ra, toLlvm rt, toLlvm ident, 
+          parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
+  toLlvm (CallSiteAsm t se as dia s1 s2 params fa) = 
+    hsep [toLlvm t, text "asm", toLlvm se, toLlvm as, toLlvm dia, 
+          toLlvm s1 <> comma, toLlvm s2, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
    
 
 instance AsmPrint Clause where
-  toLlvm (Catch tv) = text "catch" <+> toLlvm tv
-  toLlvm (Filter tc) = text "filter" <+> toLlvm tc
-  toLlvm (Cco c) = toLlvm c
+  toLlvm (ClauseCatch tv) = text "catch" <+> toLlvm tv
+  toLlvm (ClauseFilter tc) = text "filter" <+> toLlvm tc
+  toLlvm (ClauseConversion c) = toLlvm c
 
 instance AsmPrint (Conversion GlobalOrLocalId) where
   toLlvm (Conversion op (Typed t g) dt) = toLlvm op <+> parens (hsep [toLlvm t, toLlvm g, text "to", toLlvm dt])
   
-{-  
-instance AsmPrint PersFn where
-    toLlvm (PersFnId g) = toLlvm g
-    toLlvm (PersFnCast c) = toLlvm c
-    toLlvm PersFnUndef = text "undef"
-    toLlvm PersFnNull = text "null"
-    toLlvm (PersFnConst c) = toLlvm c
--}
-
 instance AsmPrint (ExtractElement Value) where
   toLlvm (ExtractElement tv1 tv2) = 
     text "extractelement" <+> (commaSepList [toLlvm tv1, toLlvm tv2])
@@ -262,16 +255,16 @@ instance AsmPrint (InsertValue Value) where
 
 
 instance AsmPrint Rhs where
-  toLlvm (RmO a) = toLlvm a
-  toLlvm (Re a) = toLlvm a
-  toLlvm (Call tailc callSite) = hsep [toLlvm tailc, text "call", toLlvm callSite]
-  toLlvm (ReE a) = toLlvm a
-  toLlvm (RiE a) = toLlvm a
-  toLlvm (RsV a) = toLlvm a
-  toLlvm (ReV a) = toLlvm a
-  toLlvm (RiV a) = toLlvm a
-  toLlvm (RvA (VaArg tv t)) = hsep [text "va_arg", toLlvm tv <> comma, toLlvm t]
-  toLlvm (RlP (LandingPad rt pt tgl b clause)) = 
+  toLlvm (RhsMemOp a) = toLlvm a
+  toLlvm (RhsExpr a) = toLlvm a
+  toLlvm (RhsCall tailc callSite) = hsep [toLlvm tailc, text "call", toLlvm callSite]
+  toLlvm (RhsExtractElement a) = toLlvm a
+  toLlvm (RhsInsertElement a) = toLlvm a
+  toLlvm (RhsShuffleVector a) = toLlvm a
+  toLlvm (RhsExtractValue a) = toLlvm a
+  toLlvm (RhsInsertValue a) = toLlvm a
+  toLlvm (RhsVaArg (VaArg tv t)) = hsep [text "va_arg", toLlvm tv <> comma, toLlvm t]
+  toLlvm (RhsLandingPad (LandingPad rt pt tgl b clause)) = 
     hsep ([text "landingpad", toLlvm rt, text "personality", toLlvm pt, toLlvm tgl, toLlvm b] 
           ++ (fmap toLlvm clause))
 
@@ -301,9 +294,11 @@ instance AsmPrint TerminatorInst where
   toLlvm (Cbr v t f) = hsep [text "br",  text "i1", toLlvm v <> comma, toLlvm t <> comma, toLlvm f]
   toLlvm (IndirectBr v l) = hsep [text "indirectbr", toLlvm v <> comma, brackets (commaSepList $ fmap toLlvm l)]
   toLlvm (Switch v d tbl) = 
-    hsep [text "switch", toLlvm v <> comma, toLlvm d, brackets (hsep $ fmap (\(p1,p2) -> toLlvm p1 <> comma <+> toLlvm p2) tbl)]
+    hsep [text "switch", toLlvm v <> comma, toLlvm d
+         , brackets (hsep $ fmap (\(p1,p2) -> toLlvm p1 <> comma <+> toLlvm p2) tbl)]
   toLlvm (Invoke lhs callSite toL unwindL) = 
-    hsep [maybe empty ((<+> equals) . toLlvm) lhs, text "invoke", toLlvm callSite, text "to", toLlvm toL, text "unwind", toLlvm unwindL]
+    hsep [maybe empty ((<+> equals) . toLlvm) lhs, text "invoke", toLlvm callSite, text "to"
+         , toLlvm toL, text "unwind", toLlvm unwindL]
   toLlvm Unreachable = text "unreachable"
   toLlvm (Resume a) = text "resume" <+> toLlvm a
              
@@ -319,9 +314,9 @@ instance AsmPrint ComputingInstWithDbg where
     ComputingInstWithComment s -> char ';' <+> text s 
 
 instance AsmPrint Aliasee where
-  toLlvm (AtV tv ) = toLlvm tv
-  toLlvm (Ac c) = toLlvm c
-  toLlvm (AgEp a) = toLlvm a
+  toLlvm (AliaseeTv tv ) = toLlvm tv
+  toLlvm (AliaseeConversion c) = toLlvm c
+  toLlvm (AliaseeGetElementPtr a) = toLlvm a
 
 instance AsmPrint FunctionPrototype where
   toLlvm (FunctionPrototype fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams fnd 

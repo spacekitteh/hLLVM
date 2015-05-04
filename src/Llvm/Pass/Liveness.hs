@@ -28,18 +28,19 @@ liveness = H.mkBTransfer live
     live = undefined
     {-
     live :: Node e x -> H.Fact x Live -> Live
-    live (Nlabel _) f = f
-    live (Pinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofPinstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofPinstWithDbg n)
+    live (Lnode _) f = f
+    live (Pnode n _) f = f `Ds.union` (filterOutGlobalId $ u1ofPinstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofPinstWithDbg n)
     -- | FIXME
     -- | this is a very simplistic implementation and it does not consider function calls might have side effects.
     -- | we need to distinguish the uses of a possible side effect computation from the uses of a pure computation.
-    live (Cinst n) f = f `Ds.union` (filterOutGlobalId $ u1ofComputingInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofComputingInstWithDbg n)
+    live (Cnode n _) f = f `Ds.union` (filterOutGlobalId $ u1ofComputingInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofComputingInstWithDbg n)
     live x@(Tinst n) f = let bs = H.successors x
                              f' = foldl (\p -> \l -> p `Ds.union` (fact f l)) Ds.empty bs
                          in f' `Ds.union` (filterOutGlobalId $ u1ofTerminatorInstWithDbg n) `Ds.difference` (filterOutGlobalId $ d1ofTerminatorInstWithDbg n)
 --    fact :: FactBase (Ds.Set LocalId) -> Label -> Live
     fact f l = fromMaybe Ds.empty $ H.lookupFact l f
--}
+ -}
+
 
 deadAsstElim :: forall a. forall m. H.FuelMonad m => H.BwdRewrite m (Node a) Live
 deadAsstElim = H.mkBRewrite d
@@ -100,8 +101,9 @@ deadCallSite _ _ = return Nothing
 
 filterOutGlobalId :: Ds.Set GlobalOrLocalId -> Ds.Set LocalId
 filterOutGlobalId s = Ds.foldl (\a b -> case b of
-                                         GolL l -> Ds.insert l a
-                                         _ -> a) Ds.empty s
+                                   GolL l -> Ds.insert l a
+                                   _ -> a
+                               ) Ds.empty s
 
 
 

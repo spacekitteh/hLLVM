@@ -14,7 +14,7 @@ data FunCxt = FunCxt { funName :: String
                      } deriving (Eq, Ord, Show)
 
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
-                           , globals :: M.Map (Maybe Ci.GlobalId) (TlGlobal, Ci.Dtype)
+                           , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
                            } deriving (Eq, Ord, Show)
                                 
 data IrCxt = IrCxt { globalCxt :: GlobalCxt

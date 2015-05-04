@@ -82,10 +82,10 @@ instance IrPrint a => IrPrint (TlDefine a) where
 instance IrPrint TlGlobal where  
   printIr x = case x of
     (TlGlobalDtype lhs linkage vis dll tlm un addrspace externali gty ty c section comdat align) ->
-      hsep [optSepToLlvm lhs equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
+      hsep [printIr lhs, equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
            , printIr externali, printIr gty, printIr ty, printIr c, commaSepNonEmpty [printIr section, printIr comdat, printIr align]]
     (TlGlobalOpaque lhs linkage vis dll tlm un addrspace externali gty ty c section comdat align) ->
-      hsep [optSepToLlvm lhs equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
+      hsep [printIr lhs, equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
            , printIr externali, printIr gty, printIr ty, printIr c, commaSepNonEmpty [printIr section, printIr comdat, printIr align]]      
 
 instance IrPrint TlTypeDef where    
@@ -678,11 +678,11 @@ instance IrPrint Tinst where
   printIr T_unwind = text "unwind"
 
 instance IrPrint Aliasee where
-  printIr (AtV tv ) = printIr tv
-  printIr (Ac c) = printIr c
-  printIr (AcV c) = printIr c  
-  printIr (Agep a) = printIr a
-  printIr (AgepV a) = printIr a  
+  printIr (AliaseeTv tv ) = printIr tv
+  printIr (AliaseeConversion c) = printIr c
+  printIr (AliaseeConversionV c) = printIr c  
+  printIr (AliaseeGEP a) = printIr a
+  printIr (AliaseeGEPV a) = printIr a  
 
 instance IrPrint FunctionPrototype where
   printIr (FunctionPrototype fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams 

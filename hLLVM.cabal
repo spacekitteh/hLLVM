@@ -74,6 +74,7 @@ library {
                      Llvm.Query.Qerror,
                      Llvm.Query.Conversion,
                      Llvm.Query.IrCxt,
+                     Llvm.Query.Ir,
                      Llvm.Query.TypeDef,
                      Llvm.Syntax.Printer.Common,
                      Llvm.Syntax.Printer.SharedEntityPrint,

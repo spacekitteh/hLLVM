@@ -7,12 +7,20 @@ module Llvm.Data.CoreIr
        , module Data.Word
        , Label
        ) where
-import Llvm.Data.Shared
+import Llvm.Data.Shared -- hiding (GlobalId, LocalId)
 import Llvm.Data.IrType
 import Compiler.Hoopl (Label)
 import Data.Int
 import Data.Word (Word8, Word16, Word32, Word64)
 import Data.DoubleWord
+
+data GId = GIdAlphaNum String
+         | GIdDqString String
+         deriving (Eq, Ord, Show)
+                       
+data LId = LIdAlphaNum String
+         | LIdDqString String
+         deriving (Eq, Ord, Show)
 
 data NoWrap =
   -- | No Signed Wrap
@@ -1081,11 +1089,11 @@ data Value = Val_ssa LocalId
 
 data T t v = T t v deriving (Eq, Ord, Show)
 
-data Aliasee = AtV (T Dtype Value)
-             | Ac (Conversion ScalarB Const)
-             | AcV (Conversion VectorB Const)
-             | Agep (GetElementPtr ScalarB Const)
-             | AgepV (GetElementPtr VectorB Const)
+data Aliasee = AliaseeTv (T Dtype Value)
+             | AliaseeConversion (Conversion ScalarB Const)
+             | AliaseeConversionV (Conversion VectorB Const)
+             | AliaseeGEP (GetElementPtr ScalarB Const)
+             | AliaseeGEPV (GetElementPtr VectorB Const)
              deriving (Eq, Ord, Show)
 
 data FunctionPrototype = FunctionPrototype { fp_linkage :: Maybe Linkage

@@ -10,6 +10,10 @@ import Llvm.Data.Type
 import qualified Data.Map as M
 import Data.Word (Word32)
 
+{-
+  This AST is designed to make parsing and pretty print easy. It's not meant to be 
+  friendly to pattern matching and manual construction. 
+-}
 
 -- | quotation does not change a label value
 -- | it's still unclear when a quoted verion is used
@@ -96,7 +100,6 @@ data ComplexConstant = Cstruct Packing [TypedConstOrNull]
 -- | Constants <http://llvm.org/releases/3.5.0/docs/LangRef.html#constant-expressions>
 data Const = C_simple SimpleConstant
            | C_complex ComplexConstant
---           | C_localId LocalId
            | C_labelId LabelId
            -- | Addresses of Basic Block <http://llvm.org/releases/3.0/docs/LangRef.html#blockaddress>
            | C_blockAddress GlobalId PercentLabel
@@ -134,17 +137,18 @@ data MetaKindedConst = MetaKindedConst MetaKind MetaConst
 data GetResult = GetResult (Typed Value) String deriving (Eq, Ord, Show)
 
 
-data Expr = EgEp (GetElementPtr Value)
-          | EiC (Icmp Value)
-          | EfC (Fcmp Value)
-          | Eb (BinExpr Value)
-          | Ec (Conversion Value)
-          | Es (Select Value)
+data Expr = ExprGetElementPtr (GetElementPtr Value)
+          | ExprIcmp (Icmp Value)
+          | ExprFcmp (Fcmp Value)
+          | ExprBinExpr (BinExpr Value)
+          | ExprConversion (Conversion Value)
+          | ExprSelect (Select Value)
           deriving (Eq,Ord,Show)
 
 -- | Memory Access and Addressing Operations <http://llvm.org/releases/3.5.0/docs/LangRef.html#memory-access-and-addressing-operations>
 data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe Alignment)
-           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal) (Maybe InvariantLoad) (Maybe Nonnull)
+           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal) 
+             (Maybe InvariantLoad) (Maybe Nonnull)
            | LoadAtomic Atomicity (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment)
            | Store (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal)
            | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment)
@@ -162,45 +166,35 @@ instance Functor Pointer where
 data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameBitcast (Typed Const) Type
              | FunNameInttoptr (Typed Const) Type               
-               -- well, it's weird, but LLVM allows this
+               -- well, it's a little weird, but LLVM allows this
              | FunName_null 
              | FunName_undef
              | FunName_zero 
              deriving (Eq,Ord,Show)
 
-data CallSite = CsFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-              | CsAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
+data CallSite = CallSiteFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
+              | CallSiteAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
 
-data Clause = Catch (Typed Value)
-            | Filter TypedConstOrNull
-            | Cco (Conversion Value)
+data Clause = ClauseCatch (Typed Value)
+            | ClauseFilter TypedConstOrNull
+            | ClauseConversion (Conversion Value)
             deriving (Eq,Ord,Show)
 
 data TypedConstOrNull = TypedConst (Typed Const)
                       | UntypedNull
                       deriving (Eq, Ord, Show)
 
-{-
-data PersFn = PersFnId GlobalOrLocalId
-            | PersFnCast (Conversion GlobalOrLocalId)
-            | PersFnUndef
-            | PersFnNull
-            | PersFnConst Const
-            deriving (Eq, Ord, Show)
--}
-
-
-data Rhs = RmO MemOp
-         | Re Expr
-         | Call TailCall CallSite
-         | ReE (ExtractElement Value)
-         | RiE (InsertElement Value)
-         | RsV (ShuffleVector Value)
-         | ReV (ExtractValue Value)
-         | RiV (InsertValue Value)
-         | RvA VaArg
-         | RlP LandingPad
+data Rhs = RhsMemOp MemOp
+         | RhsExpr Expr
+         | RhsCall TailCall CallSite
+         | RhsExtractElement (ExtractElement Value)
+         | RhsInsertElement (InsertElement Value)
+         | RhsShuffleVector (ShuffleVector Value)
+         | RhsExtractValue (ExtractValue Value)
+         | RhsInsertValue (InsertValue Value)
+         | RhsVaArg VaArg
+         | RhsLandingPad LandingPad
          deriving (Eq,Ord,Show)
 
 data VaArg = VaArg (Typed Value) Type deriving (Eq, Ord, Show)
@@ -259,9 +253,9 @@ data Value = Val_local LocalId
                     
 data Typed v = Typed Type v deriving (Eq, Ord, Show)
 
-data Aliasee = AtV (Typed Value)
-             | Ac (Conversion Const)
-             | AgEp (GetElementPtr Const)
+data Aliasee = AliaseeTv (Typed Value)
+             | AliaseeConversion (Conversion Const)
+             | AliaseeGetElementPtr (GetElementPtr Const)
              deriving (Eq,Show)
 
 data FunctionPrototype = FunctionPrototype
@@ -347,7 +341,8 @@ data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Show)
 
 data TlComdat = TlComdat DollarId SelectionKind deriving (Eq, Show)
 
-data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg deriving (Eq,Show)
+data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg 
+           deriving (Eq,Show)
 
 blockLabel :: Block -> BlockLabel
 blockLabel (Block v _ _ _) = v

@@ -14,7 +14,7 @@ module Llvm.Data.IrType
        )
        where
 
-import Llvm.Data.Shared.AtomicEntity
+import Llvm.Data.Shared.AtomicEntity (Packing, FunAttr, ParamAttr, Alignment, Fparam, ParamAttr,VarArgParam)
 import Llvm.Data.Shared.Util
 import Data.Word (Word32)
 
