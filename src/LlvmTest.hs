@@ -174,7 +174,7 @@ main = do { sel <- cmdArgsRun mode
                                   ; ast <- testParser ix inh
                                   ; let ast' = Cv.simplify ast
                                   ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
-                                        ir1 = Vis.visualize Nothing ir
+                                        ir1 = Vis.visualize (Vis.sampleVisualPlugin) ir
                                         ast'' = testIr2Ast m ir1
                                   ; writeOutLlvm ast'' outh
                                   ; hClose inh

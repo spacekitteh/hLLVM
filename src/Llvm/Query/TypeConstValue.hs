@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 module Llvm.Query.TypeConstValue where
 
 #define FLC   (FileLoc $(srcLoc))
@@ -213,9 +213,11 @@ getScalarTypeSizeInBits dl x =
 getGetElemtPtrIndexedType :: TypeEnv -> Dtype -> [T (Type ScalarB I) Value] -> Dtype
 getGetElemtPtrIndexedType te x is | trace ("getGetElemtPtrIndexedType : type:" ++ show x ++ ", " ++ show is) False = undefined
 getGetElemtPtrIndexedType te x is = case is of 
+  [] -> x
   hd:tl -> case x of
     DtypeScalarP (Tpointer et _) -> if tl == [] then dcast FLC et
                                     else getGetElemtPtrIndexedType te (dcast FLC et) tl
+    DtypeScalarP (TnameScalarP _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is
     DtypeRecordD (TnameRecordD _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is
     DtypeRecordD (TquoteNameRecordD _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is    
     DtypeRecordD (TnoRecordD _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is
@@ -231,7 +233,10 @@ getTypeAtIndex te t idx =
                                    in if ii < fromIntegral (length ts) then ts !! (fromIntegral ii)
                                       else error ("Invalid structure index! " ++ show ii)
     DtypeRecordD (Tarray n et) -> et 
-    x -> error $ "Invalid indexing of " ++ show x
+    DtypeVectorI (TvectorI n et) -> ucast et
+    DtypeVectorF (TvectorF n et) -> ucast et 
+    DtypeVectorP (TvectorP n et) -> ucast et
+    x -> error $ "Invalid indexing of " ++ show x ++ ", idx: " ++ show idx
 
 getTypeDef :: TypeEnv -> Dtype -> Dtype
 getTypeDef TypeEnv{..} t = case t of
@@ -353,21 +358,43 @@ castTcToTv (T t c) = (T t (Val_const c))
 
 
 class TypeOf a t | a -> t where  
+  hasType :: a -> Bool
   typeof :: TypeEnv -> a -> t
   
-  
+
+addrSpaceOf :: TypeEnv -> Dtype -> AddrSpace  
+addrSpaceOf te (DtypeScalarP t) = addrSpaceOf_ te t
+  where
+    addrSpaceOf_ :: TypeEnv -> Type ScalarB P -> AddrSpace  
+    addrSpaceOf_ te (Tpointer _ as) = as
+    addrSpaceOf_ te n@(TnameScalarP _) = addrSpaceOf te (getTypeDef te (ucast n))
+
+
 instance TypeOf Cinst Dtype where
+  hasType x = case x of
+    I_storeatomic{..} -> False
+    I_store{..} -> False
+    I_getelementptr{..} -> True
+    I_add{..} -> True
+    I_sub{..} -> True
+    I_bitcast{..} -> True
+    I_ptrtoint{..} -> True
+    I_inttoptr{..} -> True
+    I_load{..} -> True
+    _ -> errorLoc FLC $ "unsupported " ++ show x 
   typeof te x = case x of
     I_getelementptr{..} -> let (T bt _) = pointer
-                               et = getGetElemtPtrIndexedType te (ucast bt) indices
-                           in (ucast $ Tpointer (ucast et) 0)
+                           in if indices == [] 
+                              then (ucast bt)
+                              else let et = getGetElemtPtrIndexedType te (ucast bt) indices
+                                   in (ucast $ Tpointer (ucast et) (addrSpaceOf te (ucast bt)))
     I_add{..} -> ucast typeI
+    I_sub{..} -> ucast typeI
     I_bitcast{..} -> ucast toP
     I_ptrtoint{..} -> ucast toI
     I_inttoptr{..} -> ucast toP
     I_load{..} -> let (T (Tpointer et _) _) = pointer
                   in dcast FLC et
---    I_llvm_dbg_declare{..} -> error $ show x ++ " has no type"
     _ -> errorLoc FLC $ "unsupported " ++ show x 
     
     

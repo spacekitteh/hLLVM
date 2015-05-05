@@ -33,13 +33,13 @@ data LabelNumbers = LabelNumbers { implicitNumbers :: St.Set Word32
                                  } deriving (Eq, Ord, Show)
                                             
 idPrefix :: String
-idPrefix = "_hsllvm_implicit_ID"
+idPrefix = "_impl_ID"
 
 implicitLbPrefix :: String
-implicitLbPrefix = "_hsllvm_implicit_L"
+implicitLbPrefix = "_impl_L"
 
 explicitLbPrefix :: String
-explicitLbPrefix = "_hsllvm_explicit_L"
+explicitLbPrefix = "_expl_L"
 
 ------------------------------------------------------------------------
 -- iteration 1
@@ -95,7 +95,7 @@ explicitizeGlobalDefinition l = fst $ S.runState (mapM rnToplevel1Global l) 0
            ; S.modify (+1)
            ; if n == m 
              then return $ GlobalIdNum m
-             else error ("AstSimplify:expect " ++ (show m) ++ " and but found " ++ (show n) ++ " in explicitizeGlobalDefinition")
+             else error ("AstSimplification:expect " ++ (show m) ++ " and but found " ++ (show n) ++ " in explicitizeGlobalDefinition")
            }
       Just x -> return x
 

@@ -273,7 +273,6 @@ instance IrPrint Const where
     (C_array ts) -> brackets (commaSepList $ fmap printIr ts)
     C_vectorN n e -> angleBrackets (commaSepList $ fmap (\x -> printIr e) [1..n])
     C_arrayN n e -> brackets (commaSepList $ fmap (\x -> printIr e) [1..n])    
---    C_localId l -> printIr l
     C_labelId l -> printIr l
     C_block g a -> text "blockaddress" <+> parens (printIr g <> comma <+> printIr a)
     
@@ -291,19 +290,19 @@ instance IrPrint Const where
     C_or  t v1 v2 -> printX ("or", empty, T (ucast t) v1, T (ucast t) v2)
     C_xor t v1 v2 -> printX ("xor", empty, T (ucast t) v1, T (ucast t) v2)
 
-    C_add_V x t v1 v2 -> printX ("add", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_sub_V x t v1 v2 -> printX ("sub", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_mul_V x t v1 v2 -> printX ("mul", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_udiv_V x t v1 v2 -> printX ("udiv", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_sdiv_V x t v1 v2 -> printX ("sdiv", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_urem_V t v1 v2 -> printX ("urem", empty, T (ucast t) v1, T (ucast t) v2)
-    C_srem_V t v1 v2 -> printX ("srem", empty, T (ucast t) v1, T (ucast t) v2)
-    C_shl_V x t v1 v2 -> printX ("shl", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_lshr_V x t v1 v2 -> printX ("lshr", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_ashr_V x t v1 v2 -> printX ("ashr", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_and_V  t v1 v2 -> printX ("and", empty, T (ucast t) v1, T (ucast t) v2)
-    C_or_V  t v1 v2 -> printX ("or", empty, T (ucast t) v1, T (ucast t) v2)
-    C_xor_V t v1 v2 -> printX ("xor", empty, T (ucast t) v1, T (ucast t) v2)
+    C_add_V x t v1 v2 -> printX ("add_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_sub_V x t v1 v2 -> printX ("sub_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_mul_V x t v1 v2 -> printX ("mul_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_udiv_V x t v1 v2 -> printX ("udiv_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_sdiv_V x t v1 v2 -> printX ("sdiv_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_urem_V t v1 v2 -> printX ("urem_v", empty, T (ucast t) v1, T (ucast t) v2)
+    C_srem_V t v1 v2 -> printX ("srem_v", empty, T (ucast t) v1, T (ucast t) v2)
+    C_shl_V x t v1 v2 -> printX ("shl_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_lshr_V x t v1 v2 -> printX ("lshr_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_ashr_V x t v1 v2 -> printX ("ashr_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_and_V  t v1 v2 -> printX ("and_v", empty, T (ucast t) v1, T (ucast t) v2)
+    C_or_V  t v1 v2 -> printX ("or_v", empty, T (ucast t) v1, T (ucast t) v2)
+    C_xor_V t v1 v2 -> printX ("xor_v", empty, T (ucast t) v1, T (ucast t) v2)
 
     C_fadd x t v1 v2 -> printF ("fadd", printIr x, T (ucast t) v1, T (ucast t) v2)
     C_fsub x t v1 v2 -> printF ("fsub", printIr x, T (ucast t) v1, T (ucast t) v2)
@@ -311,11 +310,11 @@ instance IrPrint Const where
     C_fdiv x t v1 v2 -> printF ("fdiv", printIr x, T (ucast t) v1, T (ucast t) v2)
     C_frem x t v1 v2 -> printF ("frem", printIr x, T (ucast t) v1, T (ucast t) v2)
 
-    C_fadd_V x t v1 v2 -> printF ("fadd", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_fsub_V x t v1 v2 -> printF ("fsub", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_fmul_V x t v1 v2 -> printF ("fmul", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_fdiv_V x t v1 v2 -> printF ("fdiv", printIr x, T (ucast t) v1, T (ucast t) v2)
-    C_frem_V x t v1 v2 -> printF ("frem", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_fadd_V x t v1 v2 -> printF ("fadd_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_fsub_V x t v1 v2 -> printF ("fsub_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_fmul_V x t v1 v2 -> printF ("fmul_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_fdiv_V x t v1 v2 -> printF ("fdiv_v", printIr x, T (ucast t) v1, T (ucast t) v2)
+    C_frem_V x t v1 v2 -> printF ("frem_v", printIr x, T (ucast t) v1, T (ucast t) v2)
 
     {- conversion -}
     C_trunc fv dt -> text "trunc" <+> parens (printIr fv <+> text "to" <+> printIr dt)
@@ -333,24 +332,24 @@ instance IrPrint Const where
 
     C_bitcast fv dt -> text "bitcast" <+> parens (printIr fv <+> text "to" <+> printIr dt)
 
-    C_trunc_V fv dt -> text "trunc" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_zext_V fv dt -> text "zext" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_sext_V fv dt -> text "sext" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_fptrunc_V fv dt -> text "fptrunc" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_fpext_V fv dt -> text "fpext" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_fptoui_V fv dt -> text "fptoui" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_fptosi_V fv dt -> text "fptosi" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_uitofp_V fv dt -> text "uitofp" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_sitofp_V fv dt -> text "sitofp" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_ptrtoint_V fv dt -> text "ptrtoint" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_inttoptr_V fv dt -> text "inttoptr" <+> parens (printIr fv <+> text "to" <+> printIr dt)
-    C_addrspacecast_V fv dt -> text "addrspacecast" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_trunc_V fv dt -> text "trunc_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_zext_V fv dt -> text "zext_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_sext_V fv dt -> text "sext_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_fptrunc_V fv dt -> text "fptrunc_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_fpext_V fv dt -> text "fpext_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_fptoui_V fv dt -> text "fptoui_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_fptosi_V fv dt -> text "fptosi_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_uitofp_V fv dt -> text "uitofp_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_sitofp_V fv dt -> text "sitofp_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_ptrtoint_V fv dt -> text "ptrtoint_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_inttoptr_V fv dt -> text "inttoptr_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
+    C_addrspacecast_V fv dt -> text "addrspacecast_v" <+> parens (printIr fv <+> text "to" <+> printIr dt)
 
     C_getelementptr b base indices ->
       hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
       
     C_getelementptr_V b base indices ->
-      hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
+      hsep [text "getelementptr_v", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
 
     C_select_I a -> printIr a
     C_select_F a -> printIr a    
@@ -449,17 +448,6 @@ instance IrPrint Clause where
 instance IrPrint (Conversion s GlobalOrLocalId) where
   printIr x = printConversion x parens
   
-{-  
-instance IrPrint PersFn where
-    printIr (PersFnId g) = printIr g
-    printIr (PersFnCastS c) = printIr c
-    printIr (PersFnCastV c) = printIr c    
-    printIr PersFnUndef = text "undef"                                     
-    printIr PersFnNull = text "null"
-    printIr (PersFnConst c) = printIr c
--}
-
-
 instance IrPrint (ExtractElement r Value) where
   printIr (ExtractElement tv1 tv2) = hsep [text "extractelement", printIr tv1 <> comma, printIr tv2]
   

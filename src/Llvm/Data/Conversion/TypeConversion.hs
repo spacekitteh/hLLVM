@@ -335,7 +335,7 @@ matchType mp t = case t of
                      Tk_ScalarI -> Tk_VectorI
                      Tk_ScalarF -> Tk_VectorF
                      Tk_ScalarP -> Tk_VectorP
-                     _ -> error $ "RRRRRRR"
+                     _ -> error $ "TypeConversion.matchType"
   A.Tname _ -> getTk mp (castTnameToLocalId t)
   A.TquoteName _ -> getTk mp (castTnameToLocalId t)
   A.Tno _ -> getTk mp (castTnameToLocalId t)
