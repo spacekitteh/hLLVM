@@ -8,11 +8,13 @@ import qualified Data.List as L
 
 import qualified Compiler.Hoopl as H
 import Compiler.Hoopl
-import Llvm.Data.Ir
-import Llvm.Query.IrCxt
+import Llvm.Hir.Data
+import Llvm.Hir.Composer
+import Llvm.Hir.Cast
+import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Llvm.Query.TypeConstValue
-import Llvm.Syntax.Printer.IrPrint
+import Llvm.Hir.Print
 import Control.Monad (liftM,foldM)
 
 {- 
@@ -183,7 +185,10 @@ rwModule visPlugin m@(Module l) duM =
 stringize :: Dm.Map String GlobalId -> ([Toplevel a], Dm.Map String Const)
 stringize mp = 
   let mp0 = Dm.mapWithKey (\c lhs -> 
-                            let str = (fmap (\x -> if x == '\\' then '_' else x) (replaceDq c)) ++ ['\00']
+                            let str = (fmap (\x -> case x of
+                                                '\\' -> '_'
+                                                '"' -> '_'
+                                                _ ->  x) c) ++ ['\00']
                                 strType = ucast (Tarray (fromIntegral $ length str) (ucast i8))
                             in (TlGlobalDtype { tlg_lhs = lhs
                                               , tlg_linkage = Just LinkagePrivate 

@@ -1,16 +1,16 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, GADTs, RecordWildCards, TemplateHaskell #-}
 
 module Llvm.Pass.DataUsage (scanModule,DataUsage(..)) where
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Map as Dm
-import Llvm.Query.IrCxt
+import Llvm.Query.HirCxt
 
 import qualified Compiler.Hoopl as H
 import Compiler.Hoopl
-import Llvm.Data.Ir
-import Llvm.Syntax.Printer.IrPrint
+import Llvm.Hir.Data
+import Llvm.Hir.Print
+import Llvm.ErrorLoc
 
 #define FLC (FileLoc $(srcLoc))
 {-| 

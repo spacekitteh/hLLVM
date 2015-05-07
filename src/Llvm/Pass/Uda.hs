@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -9,7 +8,7 @@
   This module compute the use, def, and Addr of CoreIr
 -}
 module Llvm.Pass.Uda where
-import Llvm.Data.CoreIr
+import Llvm.Hir.Data.Inst
 import qualified Data.Set as S
 import Data.Monoid
 import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Bool(False), undefined, foldl,error
@@ -17,6 +16,7 @@ import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Boo
 #ifdef DEBUG
 import Debug.Trace
 #endif
+import Llvm.ErrorLoc
 
 
 class Uda a where

@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,16 +9,18 @@ module Llvm.Query.TypeConstValue where
 #define FLC   (FileLoc $(srcLoc))
 
 
-import Llvm.Data.Shared
-import Llvm.Data.IrType
+-- import Llvm.Data.Shared
+import Llvm.Hir.Data.Type
 import qualified Data.Map as M
 import qualified Data.Bits as B
-import Llvm.Data.CoreIr
-import Llvm.Query.IrCxt 
+import Llvm.Hir.Data.Inst
+import Llvm.Hir.Cast
+import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Debug.Trace
 import Llvm.Query.TypeDef
 import Data.Word
+import Llvm.ErrorLoc
 
 eightBits :: Word32
 eightBits = 8

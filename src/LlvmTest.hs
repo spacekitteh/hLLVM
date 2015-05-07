@@ -1,21 +1,21 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 import System.IO
 import System.Console.CmdArgs
 import ParserTester
 import Llvm.Pass.Optimizer ()
 import qualified Llvm.Pass.Mem2Reg as M2R ()
 import qualified Llvm.Pass.Liveness as L ()
-import qualified Llvm.Data.Ir as I
-import Llvm.Query.IrCxt
+import qualified Llvm.Hir.Data as I
+import qualified Llvm.Asm as A
+import Llvm.Query.HirCxt
 import Llvm.Pass.PassManager
 import qualified Compiler.Hoopl as H
-import qualified Llvm.Data.Conversion as Cv
+import qualified Llvm.AsmHirConversion as Cv
 import qualified Llvm.Pass.NormalGraph as N
 import qualified Llvm.Pass.Optimizer as O
 import qualified Llvm.Pass.PassTester as T
 import qualified Llvm.Pass.DataUsage as Du
-import qualified Llvm.Syntax.Printer.IrPrint as P
+import qualified Llvm.Hir.Print as P
 import qualified Llvm.Pass.Substitution as Sub
 import qualified Llvm.Pass.Changer as Cg
 import qualified Llvm.Pass.Visualization as Vis
@@ -27,7 +27,6 @@ import Data.List (stripPrefix)
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
 toStep _ = Nothing
-
 
 chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of 
                              I.GlobalIdAlphaNum s -> case stripPrefix "llvm." s of
@@ -134,7 +133,7 @@ main = do { sel <- cmdArgsRun mode
             AstCanonic ix ox -> do { inh <- openFile ix ReadMode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
-                                   ; let ast' = Cv.simplify ast
+                                   ; let ast' = A.simplify ast
                                    ; writeOutLlvm ast' outh
                                    ; hClose inh
                                    ; closeFileOrStdout ox outh
@@ -143,8 +142,8 @@ main = do { sel <- cmdArgsRun mode
             Ast2Ir ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
-                               ; let ast' = Cv.simplify ast
-                               ; let (m, ir) = H.runSimpleUniqueMonad ((Cv.astToIr ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.Module ()))
+                               ; let ast' = A.simplify ast
+                               ; let (m, ir) = H.runSimpleUniqueMonad ((Cv.asmToHir ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.Module ()))
                                ; writeOutIr ir outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -152,7 +151,7 @@ main = do { sel <- cmdArgsRun mode
             Ir2Ast ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
-                               ; let ast' = Cv.simplify ast
+                               ; let ast' = A.simplify ast
                                ; let (m, ir) = testAst2Ir ast'
                                      ast'' = testIr2Ast m ir
                                ; writeOutLlvm ast'' outh
@@ -162,9 +161,9 @@ main = do { sel <- cmdArgsRun mode
             Change ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
-                               ; let ast' = Cv.simplify ast
+                               ; let ast' = A.simplify ast
                                ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
-                                     ast'' = Cv.irToAst (Sub.substitute chg $ Cv.invertMap (Cv.a2h m)) (Sub.substitute chg ir)
+                                     ast'' = Cv.hirToAsm (Sub.substitute chg $ Cv.invertMap (Cv.a2h m)) (Sub.substitute chg ir)
                                ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -172,7 +171,7 @@ main = do { sel <- cmdArgsRun mode
             Visualize ix ox -> do { inh <- openFile ix ReadMode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh
-                                  ; let ast' = Cv.simplify ast
+                                  ; let ast' = A.simplify ast
                                   ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
                                         ir1 = Vis.visualize (Vis.sampleVisualPlugin) ir
                                         ast'' = testIr2Ast m ir1
@@ -183,7 +182,7 @@ main = do { sel <- cmdArgsRun mode
             PhiFixUp ix ox f -> do { inh <- openFile ix ReadMode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
-                                   ; let ast1 = Cv.simplify ast
+                                   ; let ast1 = A.simplify ast
                                    ; let (m, ir) = testAst2Ir ast1
                                    ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f 
                                                ((O.optModule1 () N.fixUpPhi ir):: H.SimpleFuelMonad (I.Module ()))
@@ -195,7 +194,7 @@ main = do { sel <- cmdArgsRun mode
             DataUse ix ox f -> do { inh <- openFile ix ReadMode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh
-                                  ; let ast' = Cv.simplify ast
+                                  ; let ast' = A.simplify ast
                                   ; let (m, ir::I.Module ()) = testAst2Ir ast'
                                   ; let ic = irCxtOfModule ir
                                   ; let liv = H.runSimpleUniqueMonad $ H.runWithFuel f
@@ -207,7 +206,7 @@ main = do { sel <- cmdArgsRun mode
             Pass ix ox passes f -> do { inh <- openFile ix ReadMode
                                       ; outh <- openFileOrStdout ox
                                       ; ast <- testParser ix inh
-                                      ; let ast1 = Cv.simplify ast
+                                      ; let ast1 = A.simplify ast
                                       ; let (m, ir) = testAst2Ir ast1
                                       ; let applySteps' = applySteps (extractSteps passes) ir
                                       ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f 
@@ -222,8 +221,8 @@ main = do { sel <- cmdArgsRun mode
             _ -> error $ "unexpected option " ++ show sel
           }
    where
-      testAst2Ir e = H.runSimpleUniqueMonad $ Cv.astToIr e
-      testIr2Ast m e = Cv.irToAst (Cv.invertMap (Cv.a2h m)) e
+      testAst2Ir e = H.runSimpleUniqueMonad $ Cv.asmToHir e
+      testIr2Ast m e = Cv.hirToAsm (Cv.invertMap (Cv.a2h m)) e
 
 
 

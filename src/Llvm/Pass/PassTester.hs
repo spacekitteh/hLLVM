@@ -1,8 +1,8 @@
 module Llvm.Pass.PassTester where
 
-import Llvm.Data.Ir
-import Llvm.Query.IrCxt
-import Llvm.Query.Ir
+import Llvm.Hir.Data
+import Llvm.Query.HirCxt
+import Llvm.Query.Hir
 import qualified Compiler.Hoopl as H 
 import qualified Data.Set as Ds
 

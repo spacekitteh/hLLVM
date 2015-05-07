@@ -1,6 +1,6 @@
 module Llvm.Pass.Changer where
 
-import Llvm.Data.CoreIr
+import Llvm.Hir.Data
 
 data Changer = Changer { change_GlobalId :: GlobalId -> GlobalId
                        , change_LocalId :: LocalId -> LocalId

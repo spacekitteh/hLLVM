@@ -5,7 +5,7 @@
 module Llvm.Pass.PhiFixUp (phiFixUp) where
 
 import Compiler.Hoopl
-import Llvm.Data.Ir
+import Llvm.Hir.Data
 import Control.Monad (liftM)
 
 import Llvm.Pass.Rewriter

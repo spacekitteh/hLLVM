@@ -1,6 +1,6 @@
 module Llvm.Pass.NormalGraph where
 import Compiler.Hoopl (Graph,C,analyzeAndRewriteFwd,MaybeC(..),mapInsert,mapEmpty,LabelMap,CheckpointMonad, FuelMonad) 
-import Llvm.Data.Ir
+import Llvm.Hir.Data
 import Llvm.Pass.PhiFixUp
 import Llvm.Pass.Dominator
 

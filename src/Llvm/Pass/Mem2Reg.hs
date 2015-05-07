@@ -1,11 +1,9 @@
-{-# OPTIONS_GHC -cpp #-}
-{-# OPTIONS_GHC -Wall #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 module Llvm.Pass.Mem2Reg (mem2reg) where
 
 import Compiler.Hoopl
-import Llvm.Data.Ir
+import Llvm.Hir.Data
 import qualified Data.Map as Dm
 import qualified Data.Set as Ds
 import Control.Monad

@@ -6,9 +6,9 @@ import qualified Data.Set as Ds
 import qualified Data.List as L
 
 import qualified Compiler.Hoopl as H
-import Llvm.Data.Ir
+import Llvm.Hir.Data
 import Llvm.Pass.Uda
-import Llvm.Syntax.Printer.IrPrint
+import Llvm.Hir.Print
 
 type Live = Ds.Set LocalId
 liveLattice :: H.DataflowLattice Live
