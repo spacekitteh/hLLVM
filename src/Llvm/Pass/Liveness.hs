@@ -7,7 +7,7 @@ import qualified Data.List as L
 
 import qualified Compiler.Hoopl as H
 import Llvm.Hir.Data
-import Llvm.Pass.Uda
+import Llvm.Query.Uda
 import Llvm.Hir.Print
 
 type Live = Ds.Set LocalId

@@ -7,7 +7,7 @@
 {-
   This module compute the use, def, and Addr of CoreIr
 -}
-module Llvm.Pass.Uda where
+module Llvm.Query.Uda where
 import Llvm.Hir.Data.Inst
 import qualified Data.Set as S
 import Data.Monoid
