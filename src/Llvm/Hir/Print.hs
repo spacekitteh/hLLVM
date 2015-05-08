@@ -30,11 +30,11 @@ instance IrPrint x => IrPrint [x] where
   
 instance (IrPrint k, IrPrint v) => IrPrint (M.Map k v) where
   printIr mp = let l = M.toList mp
-               in printIr l
+               in fcat (fmap printIr l)
                                     
 instance IrPrint v => IrPrint (S.Set v) where
   printIr s = let l = S.toList s
-              in printIr l
+              in fcat (fmap printIr l)
   
 instance IrPrint () where  
   printIr _ = text "()"

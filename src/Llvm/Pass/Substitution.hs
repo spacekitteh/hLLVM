@@ -10,7 +10,7 @@ import Prelude hiding (succ)
 import qualified Compiler.Hoopl as H
 
 import Llvm.Hir.Data
-import Llvm.Query.TypeConstValue
+import Llvm.Query.HirType
 import Llvm.Util.Monadic (maybeM)
 import Debug.Trace
 import Control.Monad

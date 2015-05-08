@@ -3,13 +3,13 @@ hLLVM -- A Haskell Library for analyzing and transforming LLVM assembly codes
 
 Goal: 
 ==========================================
-- Provide functionalities for performaning analysis and transformation of LLVM codes in pure Haskell
+- Provide functionalities for analysing and transforming LLVM codes in pure Haskell
 
 The implemented functionalities:
 1) a parser to parse LLVM code in its text form; 
-2) an internal IR that is designed for Hoopl and direct composition; 
-3) a set of utility functions to convert LLVM AST to and from the internal IR; 
-4) a set of utility functions to query the IR.
+2) an internal IR (Hir) that is designed for Hoopl and direct composition; 
+3) a set of utility functions to convert LLVM Assembly AST to and from Hir;
+4) a set of utility functions to query Hir.
 
 
 Build:

@@ -132,6 +132,9 @@ getTypeSizeInBits te@TypeEnv{..} dt = case dt of
     TpFp128 -> SizeInBit 128
     TpX86Fp80 -> SizeInBit 80
     TpPpcFp128 -> SizeInBit 128
+  (DtypeVectorI t) -> case t of  
+    TvectorI n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
+                     in (SizeInBit (s * n))
   _ -> errorLoc FLC (show dt)
       
 

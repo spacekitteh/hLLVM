@@ -62,3 +62,8 @@ istore v p = I_store (IsNot Volatile) v p Nothing Nothing
 icallcmd :: GlobalId -> [(Dtype, Value)] -> Cinst
 icallcmd fname params = I_call_fun TcNon Nothing [] (CallSiteRet $ RtypeVoidU Tvoid) (FunId fname)
                         (fmap (\(dt,v) -> ActualParamData dt [] Nothing v []) params) [] Nothing
+
+icallfun :: GlobalId -> [(Dtype, Value)] -> Dtype -> LocalId -> Cinst
+icallfun fname params retType rid =
+  I_call_fun TcNon Nothing [] (CallSiteRet $ ucast retType) (FunId fname)
+  (fmap (\(dt,v) -> ActualParamData dt [] Nothing v []) params) [] (Just rid)

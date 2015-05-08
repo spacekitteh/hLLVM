@@ -13,7 +13,7 @@ import Llvm.Hir.Composer
 import Llvm.Hir.Cast
 import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
-import Llvm.Query.TypeConstValue
+import Llvm.Query.HirType
 import Llvm.Hir.Print
 import Control.Monad (liftM,foldM)
 

@@ -232,7 +232,15 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                             p
                    ) (f { callSites = S.insert (returnType call_type, call_ptr, typesOfActualParams call_actualParams) 
                                       (callSites f)}) (S.toList vals)
-        I_call_asm{..} -> errorLoc FLC $ show n ++ " is not supported."
+        I_call_asm{..} -> 
+          let vals = getValuesFromParams call_actualParams
+          in foldl (\p e -> addAddrPassedToVaStart e 
+                            $ addAddrCaptured e
+                            $ addAddrStoringPtr e
+                            $ addAddrStoringValue e
+                            p
+                   ) f (S.toList vals)
+             -- errorLoc FLC $ show n ++ " is not supported."
         _ -> f
       Mnode _ _ -> f
 #ifdef DEBUG      

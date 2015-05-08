@@ -85,7 +85,6 @@ library
                      Llvm.Hir,
                      Llvm.Util.Mapping,
                      Llvm.Util.Monadic,
-                     Llvm.Query.TypeConstValue,
                      Llvm.Query.Qerror,
                      Llvm.Query.Conversion,
                      Llvm.Query.HirCxt,
