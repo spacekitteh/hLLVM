@@ -22,12 +22,6 @@ for i in $(cat /tmp/llvmfiles.list); do
 	if [ "$?" -ne 0 ]; then
 	    exitWithError "failed to $1 $i"
 	fi
-	$LLVM_AS /tmp/llvm-test-parser.ll
-	if [ "$?" -ne 0 ]; then
-	    echocolortext ${red} "${LLVM_AS} failed to assemble the output of parsing $i"
-	    echocolortext ${red} "${LLVM_AS} failed to assemble the output: /tmp/llvm-test-parser.ll"
-	    exit 1;
-	fi
     else
         echocolortext ${red} "${LLVM_AS} failed to parse or verfiy $i, skip it."
         echo $i >> skipped.list

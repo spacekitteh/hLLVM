@@ -184,6 +184,20 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
       Enode x -> f
       Comment _ -> f
       Cnode comp _ -> case comp of
+        I_alloca{..} -> 
+          filterAlloca result addrs_storing_ptr_params addStackAddrStoringPtrParam
+          $ filterAlloca result addrs_storing_ptrs addStackAddrStoringPtr
+          $ filterAlloca result addrs_storing_values addStackAddrStoringValue
+          $ filterAlloca result addrs_captured addStackAddrCaptured
+          $ filterAlloca result addrs_passed_to_va_start addStackAddrPassedToVaStart 
+          $ filterAlloca result addrs_involving_pointer_arithmatic addStackAddrInvolvingPtrArithm f
+        
+        I_load{..} -> 
+          let (T _ ptrv) = pointer
+          in addAddrStoringValue ptrv f
+        I_loadatomic{..} -> 
+          let (T _ ptrv) = pointer
+          in addAddrStoringValue ptrv f
         I_store{..} -> 
           let (T _ ptrv) = pointer
               f0 = addAddrStoringValue ptrv f
@@ -193,26 +207,150 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                 Val_ssa v | S.member v fp -> addAddrStoringPtrParam ptrv $ addAddrCaptured sv f0
                 _ -> addAddrStoringPtr ptrv $ addAddrCaptured sv f0
             _ -> f0
-        I_alloca{..} -> 
-          filterAlloca result addrs_storing_ptr_params addStackAddrStoringPtrParam
-          $ filterAlloca result addrs_storing_ptrs addStackAddrStoringPtr
-          $ filterAlloca result addrs_storing_values addStackAddrStoringValue
-          $ filterAlloca result addrs_captured addStackAddrCaptured
-          $ filterAlloca result addrs_passed_to_va_start addStackAddrPassedToVaStart 
-          $ filterAlloca result addrs_involving_pointer_arithmatic addStackAddrInvolvingPtrArithm
-          f
+        I_storeatomic{..} -> 
+          let (T _ ptrv) = pointer
+              f0 = addAddrStoringValue ptrv f
+          in addAddrStoringValue ptrv $ case storedvalue of
+            T (DtypeScalarP _) sv -> 
+              case sv of
+                Val_ssa v | S.member v fp -> addAddrStoringPtrParam ptrv $ addAddrCaptured sv f0
+                _ -> addAddrStoringPtr ptrv $ addAddrCaptured sv f0
+            _ -> f0
+        I_fence{..} -> f    
+        I_cmpxchg_I{..} -> let (T _ v1) = cmpi
+                               (T _ v2) = newi           
+                           in propogateUpPtrUsage result v1
+                              $ propogateUpPtrUsage result v2 f
+        I_cmpxchg_F{..} -> f
+        I_cmpxchg_P{..} -> let (T _ v1) = cmpp
+                               (T _ v2) = newp           
+                           in propogateUpPtrUsage result v1
+                              $ propogateUpPtrUsage result v2 f
+        I_atomicrmw{..} -> let (T _ ptrv) = pointer
+                               (T _ v) = val
+                           in addAddrStoringValue ptrv 
+                              $ propogateUpPtrUsage result v f
+          
+        I_extractelement_I {..} -> let (T _ src) = vectorI
+                                   in propogateUpPtrUsage result src f
+        I_extractelement_F {..} -> f
+        I_extractelement_P {..} -> let (T _ src) = vectorP
+                                   in propogateUpPtrUsage result src f
+        I_insertelement_I {..} -> let (T _ src) = vectorI
+                                      (T _ e) = elementI
+                                   in propogateUpPtrUsage result src 
+                                      $ propogateUpPtrUsage result e f
+        I_insertelement_F {..} -> f
+        I_insertelement_P {..} -> let (T _ src) = vectorP
+                                      (T _ e) = elementP
+                                  in propogateUpPtrUsage result src 
+                                     $ propogateUpPtrUsage result e f                                  
+        I_shufflevector_I{..} -> let (T _ v1) = vector1I
+                                     (T _ v2) = vector2I
+                                 in propogateUpPtrUsage result v1
+                                    $ propogateUpPtrUsage result v2 f
+        I_shufflevector_F{..} -> f
+        I_shufflevector_P{..} -> let (T _ v1) = vector1P
+                                     (T _ v2) = vector2P
+                                 in propogateUpPtrUsage result v1
+                                    $ propogateUpPtrUsage result v2 f                           
+        I_extractvalue{..} -> let (T _ v) = record
+                              in propogateUpPtrUsage result v f
+        I_insertvalue{..} -> let (T _ v) = record
+                                 (T _ e) = element
+                             in propogateUpPtrUsage result v 
+                                $ propogateUpPtrUsage result e f                                 
+        I_landingpad{..} -> f
         I_getelementptr{..} -> let (T _ ptr) = pointer
                                in propogateUpPtrUsage result ptr (addAddrInvolvingPtrArithm (Val_ssa result) f)
-        I_bitcast{..} -> let (T _ src) = srcP
-                         in propogateUpPtrUsage result src f
-        I_bitcast_D{..} -> let (T _ src) = srcD
-                           in propogateUpPtrUsage result src f
+                                
+        I_getelementptr_V{..} -> let (T _ ptr) = vpointer
+                                 in propogateUpPtrUsage result ptr (addAddrInvolvingPtrArithm (Val_ssa result) f)
+
+        I_icmp{..} -> f
+        I_icmp_V{..} -> f
+        I_fcmp{..} -> f
+        I_fcmp_V{..} -> f
+        I_add{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f  
+        I_sub{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_mul{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_udiv{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_sdiv{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_urem{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_srem{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_shl{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f        
+        I_lshr{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f                
+        I_ashr{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_and{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_or{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_xor{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        
+        I_add_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f  
+        I_sub_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_mul_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_udiv_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_sdiv_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_urem_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_srem_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_shl_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f        
+        I_lshr_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f                
+        I_ashr_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_and_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_or_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        I_xor_V{..} -> propogateUpPtrUsage result operand2 $ propogateUpPtrUsage result operand1 f
+        
+        I_fadd{..} -> f
+        I_fsub{..} -> f
+        I_fmul{..} -> f
+        I_fdiv{..} -> f
+        I_frem{..} -> f
+
+        I_fadd_V{..} -> f
+        I_fsub_V{..} -> f
+        I_fmul_V{..} -> f
+        I_fdiv_V{..} -> f
+        I_frem_V{..} -> f
+
+        I_trunc{..} -> f
+        I_zext{..} -> f
+        I_sext{..} -> f
+        I_fptrunc{..} -> f
+        I_fpext{..} -> f
+        I_fptoui{..} -> f
+        I_fptosi{..} -> f
+        I_uitofp{..} -> f
+        I_sitofp{..} -> f
         I_ptrtoint{..} -> let (T _ src) = srcP
                           in propogateUpPtrUsage result src f
         I_inttoptr{..} -> let (T _ src) = srcI
                           in propogateUpPtrUsage result src f
         I_addrspacecast{..} -> let (T _ src) = srcP
                                in propogateUpPtrUsage result src f
+        I_bitcast{..} -> let (T _ src) = srcP
+                         in propogateUpPtrUsage result src f
+        I_bitcast_D{..} -> let (T _ src) = srcD
+                           in propogateUpPtrUsage result src f
+        
+        I_trunc_V{..} -> f
+        I_zext_V{..} -> f
+        I_sext_V{..} -> f
+        I_fptrunc_V{..} -> f
+        I_fpext_V{..} -> f
+        I_fptoui_V{..} -> f
+        I_fptosi_V{..} -> f
+        I_uitofp_V{..} -> f
+        I_sitofp_V{..} -> f
+        I_ptrtoint_V{..} -> let (T _ src) = srcVP
+                            in propogateUpPtrUsage result src f
+        I_inttoptr_V{..} -> let (T _ src) = srcVI
+                            in propogateUpPtrUsage result src f
+        I_addrspacecast_V{..} -> let (T _ src) = srcVP
+                                 in propogateUpPtrUsage result src f                               
+        I_select_I{..} -> let (T _ src1) = trueI
+                              (T _ src2) = falseI              
+                          in propogateUpPtrUsage result src1
+                             $ propogateUpPtrUsage result src2 f
+        I_select_F{..} -> f
         I_select_P{..} -> let (T _ src1) = trueP
                               (T _ src2) = falseP              
                           in propogateUpPtrUsage result src1
@@ -221,12 +359,18 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                   (T _ src2) = falseFirst
                               in propogateUpPtrUsage result src1
                                  $ propogateUpPtrUsage result src2 f
-        I_llvm_va_start v -> addAddrPassedToVaStart v f
-        I_llvm_va_end v -> addAddrPassedToVaStart v f
+        I_select_VI{..} -> let (T _ src1) = trueVI
+                               (T _ src2) = falseVI              
+                           in propogateUpPtrUsage result src1
+                              $ propogateUpPtrUsage result src2 f
+        I_select_VF{..} -> f
+        I_select_VP{..} -> let (T _ src1) = trueVP
+                               (T _ src2) = falseVP              
+                           in propogateUpPtrUsage result src1
+                              $ propogateUpPtrUsage result src2 f
         I_call_fun{..} -> 
           let vals = getValuesFromParams call_actualParams
-          in foldl (\p e -> addAddrPassedToVaStart e 
-                            $ addAddrCaptured e
+          in foldl (\p e -> addAddrCaptured e
                             $ addAddrStoringPtr e
                             $ addAddrStoringValue e
                             p
@@ -240,8 +384,26 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                             $ addAddrStoringValue e
                             p
                    ) f (S.toList vals)
-             -- errorLoc FLC $ show n ++ " is not supported."
-        _ -> f
+        I_va_arg{..} -> let (T _ v) = dv
+                        in addAddrPassedToVaStart v f
+        I_llvm_va_start v -> addAddrPassedToVaStart v f
+        I_llvm_va_end v -> addAddrPassedToVaStart v f
+        I_llvm_memcpy{..} -> let (T _ d) = dest
+                                 (T _ s) = src
+                             in addAddrCaptured d
+                                $ addAddrCaptured s f
+        I_llvm_memmove{..} -> let (T _ d) = dest
+                                  (T _ s) = src
+                              in addAddrCaptured d
+                                 $ addAddrCaptured s f
+        I_llvm_memset{..} -> let (T _ d) = dest
+                                 (T _ s) = setValue
+                             in addAddrCaptured d
+                                $ addAddrCaptured s f               
+        I_llvm_libm_una{..} -> f             
+        I_llvm_libm_bin{..} -> f
+        I_llvm_powi{..} -> f
+        _ -> errorLoc FLC $ show n ++ " is not supported."
       Mnode _ _ -> f
 #ifdef DEBUG      
       _ -> errorLoc FLC $ show n

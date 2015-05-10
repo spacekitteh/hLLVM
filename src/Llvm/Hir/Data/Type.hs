@@ -262,10 +262,10 @@ instance Eq (Type s r) where
 
     {- Opaque -}
     (TnameOpaqueD s, TnameOpaqueD s1) -> s == s1 -- errorLoc FLC "comparing opaque types"
-    (TquoteNameOpaqueD _, TquoteNameOpaqueD _) -> errorLoc FLC "comparing opaque types"
-    (TnoOpaqueD _, TnoOpaqueD _) -> errorLoc FLC "comparing opaque types"
-    (Topaque_struct _ _, Topaque_struct _ _) -> errorLoc FLC "comparing opaque types"
-    (Topaque_array _ _, Topaque_array _ _) -> errorLoc FLC "comparing opaque types"
+    (TquoteNameOpaqueD s, TquoteNameOpaqueD s1) -> s == s1 -- errorLoc FLC "comparing opaque types"
+    (TnoOpaqueD n, TnoOpaqueD n1) -> n == n1 -- errorLoc FLC "comparing opaque types"
+    (Topaque_struct pk l, Topaque_struct pk1 l1) -> pk == pk1 && l == l1 -- errorLoc FLC "comparing opaque types"
+    (Topaque_array n l, Topaque_array n1 l1) -> n == n1 && l == l1 -- errorLoc FLC "comparing opaque types"
 
     (_,_) -> False
 
@@ -343,9 +343,9 @@ instance Ord (Type s r) where
     (TnoCodeFunX n, TnoCodeFunX n1) -> compare n n1
 
     {- Opaque -}
-    (TnameOpaqueD s, TnameOpaqueD s1) -> compare s s1 -- this might cause false negive, two equal types return non-equal
+    (TnameOpaqueD s, TnameOpaqueD s1) -> compare s s1 -- this might cause false negative: two equal types return non-equal
     (TquoteNameOpaqueD _, TquoteNameOpaqueD _) -> errorLoc FLC "comparing opaque types"
-    (TnoOpaqueD _, TnoOpaqueD _) -> errorLoc FLC "comparing opaque types"
+    (TnoOpaqueD n, TnoOpaqueD n1) -> compare n n1 -- this might cause false negative: two equal types returns non-equal
     (Topaque_struct p1 sl1, Topaque_struct p2 sl2 ) -> compare (p1, sl1) (p2, sl2) 
     (Topaque_array n1 t1, Topaque_array n2 t2) -> compare (n1, t1) (n2, t2)
 
