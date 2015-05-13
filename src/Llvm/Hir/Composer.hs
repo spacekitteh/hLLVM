@@ -67,3 +67,10 @@ icallfun :: GlobalId -> [(Dtype, Value)] -> Dtype -> LocalId -> Cinst
 icallfun fname params retType rid =
   I_call_fun TcNon Nothing [] (CallSiteRet $ ucast retType) (FunId fname)
   (fmap (\(dt,v) -> ActualParamData dt [] Nothing v []) params) [] (Just rid)
+
+
+llvm_sizeof :: Dtype -> Type ScalarB I -> Const
+llvm_sizeof s intType = let start = C_getelementptr (Is InBounds) (T (Tpointer (ucast s) 0) C_null) [toTC (0::Word32)]
+                            end = C_getelementptr (Is InBounds) (T (Tpointer (ucast s) 0) C_null) [toTC (1::Word32)]
+                        in C_sub Nothing intType (toInt end) (toInt start)
+  where toInt ptr = C_ptrtoint (T (Tpointer (ucast s) 0) ptr) intType

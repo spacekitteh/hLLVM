@@ -19,6 +19,7 @@ import qualified Llvm.Hir.Print as P
 import qualified Llvm.Pass.Substitution as Sub
 import qualified Llvm.Pass.Changer as Cg
 import qualified Llvm.Pass.Visualization as Vis
+import qualified Llvm.Pass.SizeofVerification as Tveri
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -50,12 +51,13 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | Parser { input :: FilePath, output :: Maybe String, showAst :: Bool }
             | Ast2Ir { input :: FilePath, output :: Maybe String }
             | Ir2Ast { input :: FilePath, output :: Maybe String }
+            | SizeofVerification { input :: FilePath, output :: Maybe String }              
             | Pass { input :: FilePath, output :: Maybe String, step :: [String], fuel :: Int }
             | PhiFixUp { input :: FilePath, output :: Maybe String, fuel :: Int }
             | AstCanonic { input :: FilePath, output :: Maybe String }
             | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
             | Change { input :: FilePath, output :: Maybe String}
-            | Visualize { input :: FilePath, output :: Maybe String}              
+            | Visualize { input :: FilePath, output :: Maybe String}
             deriving (Show, Data, Typeable, Eq)
 
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
@@ -76,6 +78,10 @@ ast2ir = Ast2Ir { input = def &= typ "<INPUT>"
 ir2ast = Ir2Ast { input = def &= typ "<INPUT>"
                 , output = outFlags Nothing
                 } &= help "Test Ir2Ast conversion"
+
+typeq = SizeofVerification { input = def &= typ "<INPUT>"
+                              , output = outFlags Nothing
+                              } &= help "Test Type Query Verification pass"
 
 astcanonic = AstCanonic { input = def &= typ "<INPUT>"
                         , output = outFlags Nothing
@@ -106,8 +112,10 @@ phifixup = PhiFixUp { input = def &= typ "<INPUT>"
                     , fuel = H.infiniteFuel &= typ "FUEL" &= help "The fuel used to run the pass"
                     } &= help "Test PhiFixUp pass"
 
-mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast, pass, astcanonic, phifixup
-                           , datause, changer, visual] &= help "Test sub components"
+mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast
+                           , pass, astcanonic, phifixup
+                           , datause, changer, visual
+                           , typeq] &= help "Test sub components"
        &= program "Test" &= summary "Test driver v1.0"
 
 main :: IO ()
@@ -158,6 +166,18 @@ main = do { sel <- cmdArgsRun mode
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
+            SizeofVerification ix ox -> 
+              do { inh <- openFile ix ReadMode
+                 ; outh <- openFileOrStdout ox
+                 ; ast <- testParser ix inh
+                 ; let ast' = A.simplify ast
+                 ; let (m, ir) = testAst2Ir ast'
+                       testIr = Tveri.mkVerificationModule (ir::I.Module ())
+                       ast'' = testIr2Ast m testIr
+                 ; writeOutLlvm ast'' outh
+                 ; hClose inh
+                 ; closeFileOrStdout ox outh
+                 }                            
             Change ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh

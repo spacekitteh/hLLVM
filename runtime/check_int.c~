@@ -1,0 +1,18 @@
+#include<stdio.h>
+#include<stdlib.h>
+
+void check_int2 (int s1, int s2) {
+  if (s1 != s2) 
+    {
+      printf ("%d != %d\n", s1, s2);
+      printf ("llvm_sizeof = %d passed\n", s1);
+      printf ("Llvm.Query.HirType.sizeof = %d passed\n", s2);
+      abort();
+    }
+  else
+    {
+      printf ("llvm_sizeof = %d passed\n", s1);
+      printf ("Llvm.Query.HirType.sizeof = %d passed\n", s2);
+      return;
+    }
+}

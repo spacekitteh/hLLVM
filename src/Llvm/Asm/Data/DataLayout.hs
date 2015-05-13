@@ -45,31 +45,33 @@ data DataLayoutInfo = DataLayoutInfo
                       , ints :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign) 
                       , floats :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign) 
                       , vectors :: M.Map SizeInBit (AbiAlign, Maybe PrefAlign)
-                      , aggregates :: M.Map (Maybe SizeInBit) (AbiAlign, Maybe PrefAlign)
+                      , aggregate :: (AbiAlign, Maybe PrefAlign)
                       , nativeInt :: [SizeInBit]
                       , mangling :: Maybe Mangling
                       } deriving (Eq, Ord, Show)
                                  
-                                 
-data AlignType = AlignAbi | AlignPref deriving (Eq, Ord, Show)
-
-selectAlignment :: AlignType -> AbiAlign -> Maybe PrefAlign -> AlignInBit
-selectAlignment at (AbiAlign aba) pa = case at of
-  AlignAbi -> aba
-  AlignPref -> maybe aba (\(PrefAlign n) -> n) pa
-                                 
-
-emptyDataLayoutInfo :: DataLayoutInfo
-emptyDataLayoutInfo = DataLayoutInfo { endianess = LittleEndian
-                                     , stackAlign = StackAlignUnspecified
-                                     , pointers = M.empty -- (LayoutAddrSpaceUnspecified, SizeInBit 0, AbiAlign 0, Nothing)
-                                     , ints = M.empty
-                                     , floats = M.empty
-                                     , vectors = M.empty
-                                     , aggregates = M.empty
-                                     , nativeInt = []
-                                     , mangling = Nothing
-                                     }
+defaultDataLayoutInfo :: DataLayoutInfo
+defaultDataLayoutInfo = DataLayoutInfo { endianess = error $ show "endian is not specified in Datalayout.hs"
+                                       , stackAlign = StackAlignUnspecified
+                                       , pointers = M.empty 
+                                       , ints = M.fromList [(SizeInBit 1, (AbiAlign $ AlignInBit $ 1*8, Just $ PrefAlign $ AlignInBit $ 1*8))
+                                                           ,(SizeInBit 8, (AbiAlign $ AlignInBit $ 1*8, Just $ PrefAlign $ AlignInBit $ 1*8))
+                                                           ,(SizeInBit 16, (AbiAlign $ AlignInBit $ 2*8, Just $ PrefAlign $ AlignInBit $ 2*8))
+                                                           ,(SizeInBit 32, (AbiAlign $ AlignInBit $ 4*8, Just $ PrefAlign $ AlignInBit $ 4*8))
+                                                           ,(SizeInBit 64, (AbiAlign $ AlignInBit $ 4*8, Just $ PrefAlign $ AlignInBit $ 8*8))
+                                                           ]
+                                       , floats = M.fromList [(SizeInBit 16, (AbiAlign $ AlignInBit $ 2*8, Just $ PrefAlign $ AlignInBit $ 2*8))
+                                                             ,(SizeInBit 32, (AbiAlign $ AlignInBit $ 4*8, Just $ PrefAlign $ AlignInBit $ 4*8))
+                                                             ,(SizeInBit 64, (AbiAlign $ AlignInBit $ 8*8, Just $ PrefAlign $ AlignInBit $ 8*8))
+                                                             ,(SizeInBit 128, (AbiAlign $ AlignInBit $ 16*8, Just $ PrefAlign $ AlignInBit $ 16*8))
+                                                             ]
+                                       , vectors = M.fromList [(SizeInBit 64, (AbiAlign $ AlignInBit $ 8*8, Just $ PrefAlign $ AlignInBit $ 8*8))
+                                                              ,(SizeInBit 128, (AbiAlign $ AlignInBit $ 16*8, Just $ PrefAlign $ AlignInBit $ 16*8))
+                                                              ]
+                                       , aggregate = (AbiAlign $ AlignInBit 0, Just $ PrefAlign $ AlignInBit $ 8*8)
+                                       , nativeInt = []
+                                       , mangling = Nothing
+                                       }
   
 getDataLayoutInfo :: DataLayout -> DataLayoutInfo                                 
 getDataLayoutInfo (DataLayout ls) = foldl (\p v -> case v of
@@ -79,8 +81,9 @@ getDataLayoutInfo (DataLayout ls) = foldl (\p v -> case v of
                                                  DlI s aa pa -> p { ints = M.insert s (aa, pa) (ints p) }
                                                  DlF s aa pa -> p { floats = M.insert s (aa, pa) (floats p) }
                                                  DlV s aa pa -> p { vectors = M.insert s (aa, pa) (vectors p) }
-                                                 DlA s aa pa -> p { aggregates = M.insert s (aa, pa) (aggregates p) }
+                                                 DlA _ aa pa -> p { aggregate = (aa, pa) }
                                                  DlN l -> p { nativeInt = l }
                                                  DlM m -> p { mangling = Just m }
+                                                 DlLittleS _ _ _ -> p
                                                  _ -> error $ "unexpected case " ++ show v
-                                          ) emptyDataLayoutInfo ls
+                                          ) defaultDataLayoutInfo ls

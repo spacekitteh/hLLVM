@@ -11,6 +11,7 @@ import Compiler.Hoopl
 import Llvm.Hir.Data
 import Llvm.Hir.Composer
 import Llvm.Hir.Cast
+import Llvm.Hir.Internalization
 import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Llvm.Query.HirType
@@ -48,15 +49,16 @@ sampleVisualPlugin =
                , captureCinsts = \comp f -> case comp of
                  I_store{..} -> Ds.insert (render $ printIr comp) f
                  I_load{..} -> Ds.insert (render $ printIr comp) f
+                 I_getelementptr{..} -> Ds.insert (render $ printIr comp) f
                  _ -> f
                , visNodeOO = \te mp node -> case node of
                     (Cnode cinst _)  -> case Dm.lookup (render $ printIr cinst) mp of
-                      Nothing -> [node]
+                      Nothing -> [Comment $ render $ printIr (typeof te cinst), node]
                       Just x -> 
                         case cinst of
                           I_store{..} -> [Comment $ render $ printIr x, node]
-                          I_load{..} -> let retType = typeof te cinst
-                                        in [Comment $ render $ printIr x, node]
+                          I_load{..} -> [Comment $ render $ printIr (typeof te cinst), node]
+                          I_getelementptr{..} -> [Comment $ render $ printIr (typeof te cinst), node]
                     _ -> [node]
                }
 
@@ -120,12 +122,6 @@ scanModule visPlugin (Module l) =
      ; return $ allocateVisualIds (Dm.unions l0)
      }
 
-callLog :: [T Dtype Value] -> (Node a) O O
-callLog tvs = 
-  let aps = fmap (\(T t v) -> ActualParamData t [] Nothing v []) tvs
-      callSiteType = CallSiteFun (Tfunction (RtypeVoidU Tvoid) (TypeParamList [ucast $ ptr0 i8, ucast i32] (Just VarArgParam)) []) 0
-  in Cnode (I_call_fun TcNon Nothing [] callSiteType (FunId (GlobalIdAlphaNum "visual_log")) aps [] Nothing) []
-
 {- rewrite this with foldBlock -}
 rwBlockCC :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]) 
              -> TypeEnv -> Dm.Map String Const -> H.Block (Node a) C C -> H.Block (Node a) C C
@@ -184,31 +180,8 @@ rwModule visPlugin m@(Module l) duM =
 
 stringize :: Dm.Map String GlobalId -> ([Toplevel a], Dm.Map String Const)
 stringize mp = 
-  let mp0 = Dm.mapWithKey (\c lhs -> 
-                            let str = (fmap (\x -> case x of
-                                                '\\' -> '_'
-                                                '"' -> '_'
-                                                _ ->  x) c) ++ ['\00']
-                                strType = ucast (Tarray (fromIntegral $ length str) (ucast i8))
-                            in (TlGlobalDtype { tlg_lhs = lhs
-                                              , tlg_linkage = Just LinkagePrivate 
-                                              , tlg_visibility = Nothing
-                                              , tlg_dllstorage = Nothing
-                                              , tlg_tls = Nothing
-                                              , tlg_addrnaming = UnnamedAddr
-                                              , tlg_addrspace = Nothing
-                                              , tlg_externallyInitialized = IsNot ExternallyInitialized
-                                              , tlg_globalType = GlobalType "constant"
-                                              , tlg_dtype = strType
-                                              , tlg_const = Just $ C_str str
-                                              , tlg_section = Nothing
-                                              , tlg_comdat = Nothing
-                                              , tlg_alignment = Just (Alignment 1)
-                                              }, C_getelementptr (Is InBounds)
-                                                 (T (ucast $ Tpointer (ucast strType) 0) (C_globalAddr lhs)) 
-                                                 (i32sToTcs [0,0]))
-                          ) mp
-  in (fmap ToplevelGlobal $ Dm.elems $ Dm.map fst mp0, Dm.map snd mp0)
+  let mp0 = Dm.mapWithKey (\c lhs -> internalize (lhs,c)) mp
+  in (fmap ToplevelGlobal $ Dm.elems $ Dm.map llvmDef mp0, Dm.map llvmRef mp0)
 
 visualize :: VisualPlugin a -> Module a -> Module a
 visualize visPlugin m = 

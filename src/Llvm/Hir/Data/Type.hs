@@ -52,20 +52,20 @@ data Type sto rep where {
   TpLabel :: Type CodeLabelB X;
   Tvoid :: Type NoB U;
   Topaque :: Type OpaqueB D;
-  
+
   {- first class aggregate types -}
   Tfirst_class_array :: Word32 -> ScalarType -> Type FirstClassB D;
   Tfirst_class_struct :: Packing -> [ScalarType] -> Type FirstClassB D;
   Tfirst_class_name :: String -> Type FirstClassB D;
   Tfirst_class_quoteName :: String -> Type FirstClassB D;
   Tfirst_class_no :: Word32 -> Type FirstClassB D;
-  
+
   Tarray :: Word32 -> Dtype -> Type RecordB D;
   Tstruct :: Packing -> [Dtype] -> Type RecordB D;
-  
+
   Topaque_struct :: Packing -> [Either Dtype (Type OpaqueB D)] -> Type OpaqueB D;
   Topaque_array :: Word32 -> Type OpaqueB D -> Type OpaqueB D;
-  
+
   Tpointer :: Etype -> AddrSpace -> Type ScalarB P;
   Tfunction :: Rtype -> TypeParamList -> [FunAttr] -> Type CodeFunB X;
   {- reference types -}
@@ -105,7 +105,7 @@ data Type sto rep where {
   TnameCodeFunX :: String -> Type CodeFunB X;
   TquoteNameCodeFunX :: String -> Type CodeFunB X;
   TnoCodeFunX :: Word32 -> Type CodeFunB X;
-  
+
   {- referee is Opaque -}
   TnameOpaqueD :: String -> Type OpaqueB D;
   TquoteNameOpaqueD :: String -> Type OpaqueB D;
@@ -178,10 +178,10 @@ instance Show (Type s r) where
     TnameOpaqueD s -> "TnameOpaqueD " ++ show s
     TquoteNameOpaqueD s -> "TquoteNameOpaqueD " ++ show s
     TnoOpaqueD n -> "TnoOpaqueD " ++ show n
-    
+
     Topaque_struct pk l -> "Topaque_struct " ++ show pk ++ " " ++ show l
-    Topaque_array n e -> "Topaque_array " ++ show n ++ " " ++ show e 
-    
+    Topaque_array n e -> "Topaque_array " ++ show n ++ " " ++ show e
+
     Tfirst_class_array n e -> "Tfirst_class_array " ++ show n ++ " " ++ show e
     Tfirst_class_struct pk l -> "Tfirst_class_struct " ++ show pk ++ " " ++ show l
     Tfirst_class_name s -> "Tfirst_class_name " ++ show s
@@ -213,14 +213,14 @@ instance Eq (Type s r) where
 
     (Tarray n d, Tarray n1 d1) -> (n,d) == (n1,d1)
     (Tstruct p ds, Tstruct p1 ds1) -> (p,ds) == (p1,ds1)
-    
+
     (Tfirst_class_array n d, Tfirst_class_array n1 d1) -> (n,d) == (n1,d1)
     (Tfirst_class_struct p ds, Tfirst_class_struct p1 ds1) -> (p,ds) == (p1,ds1)
     (Tfirst_class_name s, Tfirst_class_name s1) -> s == s1
-    (Tfirst_class_quoteName s, Tfirst_class_quoteName s1) -> s == s1    
-    (Tfirst_class_no s, Tfirst_class_no s1) -> s == s1    
-    
-    
+    (Tfirst_class_quoteName s, Tfirst_class_quoteName s1) -> s == s1
+    (Tfirst_class_no s, Tfirst_class_no s1) -> s == s1
+
+
     (Tpointer e as, Tpointer e1 as1) -> (e,as) == (e1,as1)
     (Tfunction rt tp fa, Tfunction rt1 tp1 fa1) -> (rt,tp,fa) == (rt1,tp1,fa1)
 
@@ -295,16 +295,16 @@ instance Ord (Type s r) where
 
     (Tarray n d, Tarray n1 d1) -> compare (n,d) (n1,d1)
     (Tstruct p ds, Tstruct p1 ds1) -> compare (p,ds) (p1,ds1)
-    
+
     (Tfirst_class_array n d, Tfirst_class_array n1 d1) -> compare (n,d) (n1,d1)
     (Tfirst_class_struct p ds, Tfirst_class_struct p1 ds1) -> compare (p,ds) (p1,ds1)
     (Tfirst_class_name s, Tfirst_class_name s1) -> compare s s1
-    (Tfirst_class_quoteName s, Tfirst_class_quoteName s1) -> compare s s1    
+    (Tfirst_class_quoteName s, Tfirst_class_quoteName s1) -> compare s s1
     (Tfirst_class_no s, Tfirst_class_no s1) -> compare s s1
 
 
     (Tpointer e as, Tpointer e1 as1) -> compare (e,as) (e1,as1)
-    (Tfunction rt tp fa, Tfunction rt1 tp1 fa1) -> compare (rt,tp,fa) (rt1, tp1, fa1) 
+    (Tfunction rt tp fa, Tfunction rt1 tp1 fa1) -> compare (rt,tp,fa) (rt1, tp1, fa1)
 
     {- Scalar -}
     (TnameScalarI s, TnameScalarI s1) -> compare s s1
@@ -346,7 +346,7 @@ instance Ord (Type s r) where
     (TnameOpaqueD s, TnameOpaqueD s1) -> compare s s1 -- this might cause false negative: two equal types return non-equal
     (TquoteNameOpaqueD _, TquoteNameOpaqueD _) -> errorLoc FLC "comparing opaque types"
     (TnoOpaqueD n, TnoOpaqueD n1) -> compare n n1 -- this might cause false negative: two equal types returns non-equal
-    (Topaque_struct p1 sl1, Topaque_struct p2 sl2 ) -> compare (p1, sl1) (p2, sl2) 
+    (Topaque_struct p1 sl1, Topaque_struct p2 sl2 ) -> compare (p1, sl1) (p2, sl2)
     (Topaque_array n1 t1, Topaque_array n2 t2) -> compare (n1, t1) (n2, t2)
 
     (_,_) -> compare (show x1) (show x2)
@@ -390,7 +390,7 @@ data Etype = EtypeScalarI (Type ScalarB I)
             | EtypeVectorI (Type VectorB I)
             | EtypeVectorF (Type VectorB F)
             | EtypeVectorP (Type VectorB P)
-            | EtypeFirstClassD (Type FirstClassB D)              
+            | EtypeFirstClassD (Type FirstClassB D)
             | EtypeRecordD (Type RecordB D)
             | EtypeOpaqueD (Type OpaqueB D)
             | EtypeFunX (Type CodeFunB X)
@@ -435,8 +435,8 @@ data ScalarType = ScalarTypeI (Type ScalarB I)
                 | ScalarTypeF (Type ScalarB F)
                 | ScalarTypeP (Type ScalarB P)
                 deriving (Eq, Ord, Show)
-                         
-data IntOrPtrType s = IntOrPtrTypeI (Type s I)                         
+
+data IntOrPtrType s = IntOrPtrTypeI (Type s I)
                     | IntOrPtrTypeP (Type s P)
                     deriving (Eq, Ord, Show)
 

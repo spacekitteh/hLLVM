@@ -390,15 +390,18 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
         I_llvm_va_end v -> addAddrPassedToVaStart v f
         I_llvm_memcpy{..} -> let (T _ d) = dest
                                  (T _ s) = src
-                             in addAddrCaptured d
+                             in addAddrStoringValue d
+                                $ addAddrCaptured d
                                 $ addAddrCaptured s f
         I_llvm_memmove{..} -> let (T _ d) = dest
                                   (T _ s) = src
-                              in addAddrCaptured d
+                              in addAddrStoringValue d
+                                 $ addAddrCaptured d
                                  $ addAddrCaptured s f
         I_llvm_memset{..} -> let (T _ d) = dest
                                  (T _ s) = setValue
-                             in addAddrCaptured d
+                             in addAddrStoringValue d
+                                $ addAddrCaptured d
                                 $ addAddrCaptured s f               
         I_llvm_libm_una{..} -> f             
         I_llvm_libm_bin{..} -> f

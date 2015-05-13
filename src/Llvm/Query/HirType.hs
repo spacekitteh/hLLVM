@@ -12,14 +12,43 @@ import Llvm.ErrorLoc
 import Llvm.Hir.Data.Type
 import Llvm.Hir.Composer (i1)
 import qualified Data.Map as M
-import qualified Data.Bits as B
+import qualified Data.Bits as B 
 import Llvm.Hir.Data.Inst
 import Llvm.Hir.Cast
 import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Debug.Trace
-import Llvm.Query.TypeDef
 import Data.Word
+import Data.Bits(Bits(..), (.&.), (.|.), shiftR)
+
+
+data AlignType = AlignAbi | AlignPref deriving (Eq, Ord, Show)
+
+selectAlignment :: AlignType -> AbiAlign -> Maybe PrefAlign -> AlignInBit
+selectAlignment at (AbiAlign aba) pa = case at of
+  AlignAbi -> aba
+  AlignPref -> maybe aba (\(PrefAlign n) -> n) pa
+
+
+lookupOr :: Ord a => a -> a -> M.Map a r -> Maybe r
+lookupOr a1 a2 m = maybe (M.lookup a2 m) Just (M.lookup a1 m)
+
+normalizeAddrSpace :: Maybe AddrSpace -> (LayoutAddrSpace, LayoutAddrSpace)
+normalizeAddrSpace x = case x of
+  Just n | n == 0 -> (LayoutAddrSpaceUnspecified, LayoutAddrSpace n)
+  Just n -> (LayoutAddrSpace n, LayoutAddrSpace n)  
+  Nothing -> (LayoutAddrSpaceUnspecified, LayoutAddrSpace 0)
+
+ptrSizeInBit :: DataLayoutInfo -> Maybe AddrSpace -> SizeInBit
+ptrSizeInBit DataLayoutInfo{..} ma = 
+  maybe (errorLoc FLC $ show ma) (\(x,_,_) -> x)
+  (uncurry lookupOr (normalizeAddrSpace ma) pointers)
+
+ptrAlignment :: DataLayoutInfo -> Maybe AddrSpace -> AlignType -> AlignInBit
+ptrAlignment DataLayoutInfo{..} ma at = 
+  maybe (errorLoc FLC $ show ma) (\(_,a,b) -> selectAlignment at a b)
+  (uncurry lookupOr (normalizeAddrSpace ma) pointers)
+
 
 eightBits :: Word32
 eightBits = 8
@@ -38,77 +67,97 @@ fromAlignInBit :: AlignInBit -> AlignInByte
 fromAlignInBit (AlignInBit n) = AlignInByte (n `div` eightBits)
 
 
+fromAlignInByte :: AlignInByte -> AlignInBit
+fromAlignInByte (AlignInByte n) = AlignInBit (n * eightBits)
+
+
 getTypeAlignment :: TypeEnv -> Dtype -> AlignType -> AlignInByte
 getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
-  DtypeScalarI st -> fromAlignInBit $ getTpAlignment dataLayout st
-  DtypeScalarF st -> fromAlignInBit $ getTpAlignment dataLayout st  
+  DtypeScalarI st -> fromAlignInBit $ getTpAlignment st
+  DtypeScalarF st -> fromAlignInBit $ getTpAlignment st  
   DtypeRecordD st -> case st of
     Tarray i et -> getTypeAlignment te et at
     Tstruct p tys -> case (p, at) of
       (Packed, AlignAbi)  -> AlignInByte 1
-      _ -> let aa = case M.lookup (Just $ SizeInBit 0) (aggregates dataLayout) of
-                 Just (aa, pa) -> selectAlignment at aa pa
-                 Nothing -> AlignInBit 8 -- errorX FLC
+      _ -> let aa = uncurry (selectAlignment at) (aggregate dataLayout)
                sl = getStructLayout te (p,tys)
            in (max (fromAlignInBit aa) (structAlignment sl))
-  DtypeScalarP st -> case st of  
-    Tpointer t a -> case (uncurry lookupOr) (ta $ Just a) (pointers dataLayout) of
-      Just (s, aa, pa) -> (fromAlignInBit $ selectAlignment at aa pa)
-      Nothing -> errorX FLC
+  DtypeScalarP (Tpointer t a) -> fromAlignInBit $ ptrAlignment dataLayout (Just a) at
+  DtypeVectorI x -> fromAlignInBit $ getVectorAlignment x
+  DtypeVectorF x -> fromAlignInBit $ getVectorAlignment x
+  DtypeVectorP x -> fromAlignInBit $ getVectorAlignment x  
+  _ -> errorLoc FLC $ show t
   where
-    errorX :: FileLoc -> a
-    errorX flc = errorLoc flc $ "getTypeAlignment:unsupported " ++ show t ++ ", " ++ show at
-    getTpAlignment :: DataLayoutInfo -> Type ScalarB x -> AlignInBit
-    getTpAlignment dl tp = case tp of
-      TpI n -> case M.lookup (SizeInBit n) (ints dl) of
+    getVectorAlignment :: Type VectorB x -> AlignInBit
+    getVectorAlignment vt = case M.lookup (getTypeSizeInBits te (dcast FLC vt)) (vectors dataLayout) of
+      Just (aa, pa) -> selectAlignment at aa pa
+      Nothing -> case vt of
+        TvectorI n e -> bestMatchVectorAlignment n e
+        TvectorF n e -> bestMatchVectorAlignment n e
+        TvectorP n e -> bestMatchVectorAlignment n e    
+        _ -> errorLoc FLC $ show vt
+    getTpAlignment :: Type ScalarB x -> AlignInBit
+    getTpAlignment tp = case tp of
+      TpI n -> case lookupOr (SizeInBit n) (bestMatchSizeInBit n) (ints dataLayout) of
+        Just (aa, pa) -> selectAlignment at aa pa
+        Nothing -> errorLoc FLC $ show tp
+      TpF n -> case M.lookup (SizeInBit n) (floats dataLayout) of
         Just (aa, pa) -> selectAlignment at aa pa
         Nothing -> AlignInBit n
-      TpF n -> case M.lookup (SizeInBit n) (floats dl) of
-        Just (aa, pa) -> selectAlignment at aa pa
-        Nothing -> AlignInBit n
-      TpV n -> case M.lookup (SizeInBit n) (vectors dl) of
-        Just (aa, pa) -> selectAlignment at aa pa
-        Nothing ->AlignInBit n
+      TpV n -> errorLoc FLC $ show tp 
       TpHalf -> AlignInBit 16 
       TpFloat -> let b = getTypeSizeInBits te (ucast tp)
-                 in case M.lookup b (floats dl) of
+                 in case M.lookup b (floats dataLayout) of
                    Just (aa, pa) -> selectAlignment at aa pa
                    Nothing -> AlignInBit 32
       TpDouble -> let b = getTypeSizeInBits te (ucast tp)
-                  in case M.lookup b (floats dl) of
+                  in case M.lookup b (floats dataLayout) of
                     Just (aa, pa) -> selectAlignment at aa pa
                     Nothing -> AlignInBit 64
       TpFp128 -> let b = getTypeSizeInBits te (ucast tp)
-                 in case M.lookup b (floats dl) of
+                 in case M.lookup b (floats dataLayout) of
                    Just (aa, pa) -> selectAlignment at aa pa
-                   Nothing -> errorX FLC
+                   Nothing -> errorLoc FLC $ show tp
       TpX86Fp80 -> let b = getTypeSizeInBits te (ucast tp)
-                   in case M.lookup b (floats dl) of
+                   in case M.lookup b (floats dataLayout) of
                      Just (aa, pa) -> selectAlignment at aa pa
-                     Nothing -> errorX FLC
+                     Nothing -> errorLoc FLC $ show tp
       TpPpcFp128 -> let b = getTypeSizeInBits te (ucast tp)
-                    in case M.lookup b (floats dl) of
+                    in case M.lookup b (floats dataLayout) of
                       Just (aa, pa) -> selectAlignment at aa pa
-                      Nothing -> errorX FLC
-      TpX86Mmx -> errorX FLC
+                      Nothing -> errorLoc FLC $ show tp
+      TpX86Mmx -> errorLoc FLC $ show tp
+      
+    bestMatchSizeInBit :: Word32 -> SizeInBit
+    bestMatchSizeInBit n = 
+      SizeInBit $ foldl (\p s -> 
+                          if p == 0 then s {- get the first one -}
+                          else if p < n && p < s then s {- when p is still smaller than n, get a bigger one -}
+                               else if n < p && n < s && s < p 
+                                    then s {- when both p and s are bigger than n, get the smallest one that is bigger than n -}
+                                    else p
+                        ) 0 $ fmap (\(SizeInBit x) -> x) (M.keys (ints dataLayout))
+    bestMatchVectorAlignment :: Word32 -> Type ScalarB x -> AlignInBit
+    bestMatchVectorAlignment n e = 
+      let (SizeInByte s) = getTypeAllocSize te (dcast FLC e)
+          align = s * n
+      in if align .&. (align -1) == 0 
+         then fromAlignInByte $ AlignInByte align
+         else fromAlignInByte $ AlignInByte $ nextPowerOf2 align
 
-ta :: Maybe AddrSpace -> (LayoutAddrSpace, LayoutAddrSpace)
-ta x = case x of
-  Just n | n == 0 -> (LayoutAddrSpaceUnspecified, LayoutAddrSpace n)
-  Just n -> (LayoutAddrSpace n, LayoutAddrSpace n)  
-  Nothing -> (LayoutAddrSpaceUnspecified, LayoutAddrSpace 0)
 
+nextPowerOf2 :: (Num a, Bits a) => a -> a
+nextPowerOf2 a = let a0 = foldl (\p x -> p .|. (p `shiftR` x)) a [1, 2, 4, 8, 16, 32] 
+                 in a0 + 1
 
 getCallFrameTypeAlignment :: TypeEnv -> Dtype -> AlignInByte
 getCallFrameTypeAlignment te@TypeEnv{..} ty = case stackAlign dataLayout of
   StackAlign n -> fromAlignInBit n
   StackAlignUnspecified -> getTypeAlignment te ty AlignAbi
 
-lookupOr :: Ord a => a -> a -> M.Map a r -> Maybe r
-lookupOr a1 a2 m = maybe (M.lookup a2 m) Just (M.lookup a1 m)
 
 getTypeSizeInBits :: TypeEnv -> Dtype -> SizeInBit
-getTypeSizeInBits te@TypeEnv{..} dt = case dt of
+getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
   (DtypeRecordD t) -> case t of
     Tarray i et -> let SizeInBit n = getTypeAllocSizeInBits te et
                    in SizeInBit (i * n)
@@ -118,9 +167,7 @@ getTypeSizeInBits te@TypeEnv{..} dt = case dt of
       Just d -> getTypeSizeInBits te d
       Nothing -> errorLoc FLC ("undefined " ++ show n)
     _ -> errorLoc FLC (show t)
-  (DtypeScalarP (Tpointer t a)) -> case (uncurry lookupOr) (ta $ Just a) (pointers dataLayout) of
-    Just (n, _, _) -> n
-    Nothing -> error $ "getTypeSizeInBits:unsupported type " ++ show t
+  (DtypeScalarP (Tpointer t a)) -> ptrSizeInBit dataLayout (Just a)
   (DtypeScalarI t) -> case t of  
     TpI n -> SizeInBit n
     TpV n -> SizeInBit n
@@ -141,9 +188,6 @@ getTypeSizeInBits te@TypeEnv{..} dt = case dt of
 getTypeStoreSize :: TypeEnv ->  Dtype -> SizeInByte
 getTypeStoreSize te ty = let (SizeInBit tyBits) = getTypeSizeInBits te ty
                          in fromSizeInBit (SizeInBit (tyBits + 7))
-
-getTypeStoreSizeInBits :: TypeEnv -> Dtype -> SizeInBit
-getTypeStoreSizeInBits te ty = toSizeInBit (getTypeStoreSize te ty)
 
 getTypeAllocSize :: TypeEnv -> Dtype -> SizeInByte
 getTypeAllocSize te ty = roundUpAlignment (getTypeStoreSize te ty) (getTypeAlignment te ty AlignAbi)
@@ -179,42 +223,46 @@ getStructLayout te@TypeEnv{..} (pk, tys) =
                   , memberOffsets = reverse offsets
                   }
 
-getPointerSizeInBits :: DataLayoutInfo -> Maybe AddrSpace -> SizeInBit
-getPointerSizeInBits dl mas = case (uncurry lookupOr) (ta mas) (pointers dl) of
-  Just (s, aa, pa) -> s
-  Nothing -> error $ "getPointerSizeInBits:unsupported " ++ show dl
-
 getPointerSize :: DataLayoutInfo -> Maybe AddrSpace -> SizeInByte
-getPointerSize dl mas = fromSizeInBit (getPointerSizeInBits dl mas)
+getPointerSize dl mas = fromSizeInBit (ptrSizeInBit dl mas)
 
 getPointerAlignment :: DataLayoutInfo -> Maybe AddrSpace -> AlignType -> AlignInByte
-getPointerAlignment dl mas at = case (uncurry lookupOr) (ta mas) (pointers dl) of
-  Just (s, aa, pa) -> fromAlignInBit $ selectAlignment at aa pa
-  Nothing -> error $ "getPointerAlignment:unsupported " ++ show dl
+getPointerAlignment dl mas at = fromAlignInBit $ ptrAlignment dl mas at
 
 
 
-getScalarTypeSizeInBits :: DataLayoutInfo -> ScalarType -> SizeInBit
-getScalarTypeSizeInBits dl x = 
-  SizeInBit (case x of
-                ScalarTypeI e -> case e of
-                  (TpI n) -> n
-                  (TpV n) -> n
-                  TpX86Mmx -> 64
-                ScalarTypeF e -> case e of
-                  (TpF n) -> n
-                  TpHalf -> 16
-                  TpFloat -> 32
-                  TpDouble -> 64
-                  TpFp128 -> 128
-                  TpX86Fp80 -> 80
-                  TpPpcFp128 -> 128
-                ScalarTypeP _ -> 32
-            )
+getScalarTypeSizeInBits :: TypeEnv -> ScalarType -> SizeInBit
+getScalarTypeSizeInBits te x = 
+  case x of
+    ScalarTypeI e -> case e of
+      TpI n -> SizeInBit n
+      TpV n -> SizeInBit n
+      TpX86Mmx -> SizeInBit 64
+      TnameScalarI _ -> let td = getTypeDef te (ucast x)
+                        in getScalarTypeSizeInBits te (dcast FLC td)
+      TquoteNameScalarI _ -> let td = getTypeDef te (ucast x)
+                             in getScalarTypeSizeInBits te (dcast FLC td)
+      TnoScalarI _ -> let td = getTypeDef te (ucast x)
+                      in getScalarTypeSizeInBits te (dcast FLC td)
+    ScalarTypeF e -> case e of
+      TpF n -> SizeInBit n
+      TpHalf -> SizeInBit 16
+      TpFloat -> SizeInBit 32
+      TpDouble -> SizeInBit 64
+      TpFp128 -> SizeInBit 128
+      TpX86Fp80 -> SizeInBit 80
+      TpPpcFp128 -> SizeInBit 128
+      TnameScalarF _ -> let td = getTypeDef te (ucast x)
+                        in getScalarTypeSizeInBits te (dcast FLC td)
+      TquoteNameScalarF _ -> let td = getTypeDef te (ucast x)
+                             in getScalarTypeSizeInBits te (dcast FLC td)
+      TnoScalarF _ -> let td = getTypeDef te (ucast x)
+                      in getScalarTypeSizeInBits te (dcast FLC td)
+    ScalarTypeP _ -> SizeInBit 32
+
 
 
 getGetElemtPtrIndexedType :: TypeEnv -> Dtype -> [T (Type ScalarB I) Value] -> Dtype
-getGetElemtPtrIndexedType te x is | trace ("getGetElemtPtrIndexedType : type:" ++ show x ++ ", " ++ show is) False = undefined
 getGetElemtPtrIndexedType te x is = case is of 
   [] -> x
   hd:tl -> case x of
@@ -239,41 +287,68 @@ getTypeAtIndex te t idx =
     DtypeVectorI (TvectorI n et) -> ucast et
     DtypeVectorF (TvectorF n et) -> ucast et 
     DtypeVectorP (TvectorP n et) -> ucast et
-    x -> error $ "Invalid indexing of " ++ show x ++ ", idx: " ++ show idx
+    x -> errorLoc FLC $ "Invalid indexing of " ++ show x ++ ", idx: " ++ show idx
+
+getTypeAtIndices :: Show t => TypeEnv -> Dtype -> [T t Const] -> Dtype
+getTypeAtIndices te t indices = case indices of
+  [] -> t
+  h:tl -> getTypeAtIndices te (getTypeAtIndex te t h) tl
+  
+getTypeByTname :: String -> M.Map LocalId Dtype -> Maybe Dtype
+getTypeByTname tn mp = M.lookup (LocalIdAlphaNum tn) mp
+
+getTypeByTquoteName :: String -> M.Map LocalId Dtype -> Maybe Dtype
+getTypeByTquoteName tn mp = M.lookup (LocalIdDqString tn) mp
+
+getTypeByTno :: Word32 -> M.Map LocalId Dtype -> Maybe Dtype
+getTypeByTno n mp = M.lookup (LocalIdNum n) mp
+
 
 getTypeDef :: TypeEnv -> Dtype -> Dtype
 getTypeDef TypeEnv{..} t = case t of
-  DtypeRecordD (TnameRecordD n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTname n typedefs)
-  DtypeRecordD (TquoteNameRecordD n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeRecordD (TnoRecordD n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
+  DtypeRecordD (TnameRecordD n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs)
+  DtypeRecordD (TquoteNameRecordD n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeRecordD (TnoRecordD n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeRecordD _ -> t
+  DtypeScalarI (TnameScalarI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeScalarI (TquoteNameScalarI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeScalarI (TnoScalarI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeScalarI _ -> t
-  DtypeScalarP (TnameScalarP n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeScalarP (TquoteNameScalarP n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)   
-  DtypeScalarP (TnoScalarP n) -> maybe (error $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
+  DtypeScalarP (TnameScalarP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeScalarP (TquoteNameScalarP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)   
+  DtypeScalarP (TnoScalarP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeScalarP _ -> t   
+  DtypeScalarF (TnameScalarF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeScalarF (TquoteNameScalarF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeScalarF (TnoScalarF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeScalarF _ -> t
-  DtypeVectorI _ -> t
-  DtypeVectorP _ -> t
-  DtypeVectorF _ -> t
+  DtypeVectorI (TnameVectorI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeVectorI (TquoteNameVectorI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeVectorI (TnoVectorI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
+  DtypeVectorI _ -> t  
+  DtypeVectorP (TnameVectorP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeVectorP (TquoteNameVectorP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeVectorP (TnoVectorP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
+  DtypeVectorP _ -> t  
+  DtypeVectorF (TnameVectorF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
+  DtypeVectorF (TquoteNameVectorF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeVectorF (TnoVectorF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
+  DtypeVectorF _ -> t  
+  DtypeFirstClassD (Tfirst_class_name n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs)
+  DtypeFirstClassD (Tfirst_class_quoteName n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
+  DtypeFirstClassD (Tfirst_class_no n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeFirstClassD _ -> t
 
 getElementType :: TypeEnv -> Dtype -> Dtype
 getElementType te t = case getTypeDef te t of
   DtypeRecordD (Tarray _ t1) -> t1
   DtypeScalarP (Tpointer t1 _) -> dcast FLC t1
-  _ -> error $ (show t) ++ " has no element type"
+  _ -> errorLoc FLC $ (show t) ++ " has no element type"
 
-getPointsToType :: TypeEnv -> Type ScalarB P -> Dtype
-getPointsToType te t = case getTypeDef te (ucast t) of
+getPointedType :: TypeEnv -> Type ScalarB P -> Dtype
+getPointedType te t = case getTypeDef te (ucast t) of
   DtypeScalarP (Tpointer t1 _) -> dcast FLC t1
   _ -> errorLoc FLC $ show t ++ " has no element type"
-
-{-
-getScalarType :: TypeEnv -> Dtype -> Dtype
-getScalarType te (DtypeAgg (Tvector _ t)) = t
-getScalarType te x = x
--}
 
 castIsValid :: DataLayoutInfo -> Conversion ScalarB v -> Bool -- ConvertOp -> Dtype -> Dtype -> Bool
 -- castIsValid op src dest | vsize src == vsize dest = case op of
@@ -299,7 +374,7 @@ castIsValid dl op = True
 
 castable :: Show v => DataLayoutInfo -> Conversion ScalarB v -> Conversion ScalarB v
 castable dl op = if castIsValid dl op then op
-                 else error $ "Invalid cast:" ++ show op 
+                 else errorLoc FLC $ "Invalid cast:" ++ show op 
 
 
 
@@ -342,7 +417,7 @@ getGetElementPtr (T t cv) indices isB = GetElementPtr isB (T t cv) indices
 
 
 getIntStoreTypeForPointer :: DataLayoutInfo -> Dtype
-getIntStoreTypeForPointer dl =  let (SizeInBit sizeInBits) = getPointerSizeInBits dl Nothing
+getIntStoreTypeForPointer dl =  let (SizeInBit sizeInBits) = ptrSizeInBit dl Nothing
                                 in DtypeScalarI $ TpI sizeInBits
 
 class TypeOf a t | a -> t where  
@@ -361,6 +436,19 @@ addrSpaceOf te (DtypeScalarP t) = addrSpaceOf_ te t
     addrSpaceOf_ :: TypeEnv -> Type ScalarB P -> AddrSpace  
     addrSpaceOf_ te (Tpointer _ as) = as
     addrSpaceOf_ te n@(TnameScalarP _) = addrSpaceOf te (getTypeDef te (ucast n))
+
+
+instance TypeOf (T (Type ScalarB I) x) Dtype where
+  typeof te (T t _) = Just (ucast t)
+
+instance TypeOf (T (Type ScalarB F) x) Dtype where
+  typeof te (T t _) = Just (ucast t)
+
+instance TypeOf (T (Type ScalarB P) x) Dtype where
+  typeof te (T t _) = Just (ucast t)
+
+instance TypeOf (T Dtype x) Dtype where
+  typeof te (T t _) = Just t
 
 instance TypeOf Cinst Dtype where
   typeof te x = case x of
@@ -408,6 +496,12 @@ instance TypeOf Cinst Dtype where
     I_shufflevector_P{..} -> let (T vt _) = vector1P
                              in Just $ ucast vt
                                 
+    I_extractvalue{..} -> let (T t _) = record
+                          in Just $ getTypeAtIndices te (ucast t) (u32sToTcs windices)
+                             
+    I_insertvalue{..} -> let (T t _) = record
+                         in Just $ ucast t
+                             
     I_landingpad{..} -> Just resultType
     
     I_getelementptr{..} -> 
@@ -417,7 +511,7 @@ instance TypeOf Cinst Dtype where
          else let et = getGetElemtPtrIndexedType te (ucast bt) indices
               in Just (ucast $ Tpointer (ucast et) (addrSpaceOf te (ucast bt)))
                  
-    I_getelementptr_V{..} -> errorLoc FLC $ show x      
+    I_getelementptr_V{..} -> errorLoc FLC $ show x 
     
     I_icmp{..} -> Just $ ucast (TpI 1) 
     I_icmp_V{..} -> Just $ ucast (TpI 1)
@@ -520,6 +614,9 @@ instance TypeOf Cinst Dtype where
     I_llvm_gcroot{..} -> Nothing
     I_llvm_gcread{..} -> Nothing
     I_llvm_gcwrite{..} -> Nothing
+    I_llvm_memcpy{..}->Nothing
+    I_llvm_memmove{..}->Nothing
+    I_llvm_memset{..}->Nothing
     I_llvm_returnaddress{..} -> Nothing
     I_llvm_frameaddress{..} -> Nothing
     I_llvm_libm_una{..} -> case muop of
@@ -559,14 +656,16 @@ instance TypeOf CallSiteType Dtype where
     CallSiteFun t as -> case t of
       Tfunction rt _ _ -> typeof te rt
       TnameCodeFunX n -> errorLoc FLC $ "unsupported " ++ show x
-    
+
 instance TypeOf Const Dtype where    
   typeof te x = case x of
     C_getelementptr b (T bt _) indices -> let et = getGetElemtPtrIndexedType te (ucast bt) (fmap ucast indices)
                                           in Just (ucast $ Tpointer (ucast et) 0)
     _ -> errorLoc FLC $ show x
-    
-    
+
 class SizeOf a where
-  sizeOf :: a -> Maybe Word32
-    
+  sizeof :: TypeEnv -> a -> Word32
+
+instance SizeOf Dtype where
+  sizeof te dt = let (SizeInByte s) = getTypeAllocSize te dt
+                 in fromIntegral s
