@@ -2,9 +2,10 @@ module Llvm.Query.HirCxt where
 import qualified Llvm.Hir.Data.Inst as Ci
 import qualified Data.Map as M
 import Llvm.Hir.Data
+import Llvm.Hir.Data.DataLayoutInfo
 import Llvm.Hir.Print
 
-data TypeEnv = TypeEnv { dataLayout :: Ci.DataLayoutInfo
+data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
                        , targetTriple :: Ci.TargetTriple
                        , typedefs :: M.Map Ci.LocalId Ci.Dtype
                        , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)

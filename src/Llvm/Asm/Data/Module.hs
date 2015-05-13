@@ -355,6 +355,7 @@ blockLabel (Block v _ _ _) = v
 data Module = Module [Toplevel] deriving (Eq,Show)
 
 
+{-
 dataLayoutOfModule :: Module -> DataLayoutInfo
 dataLayoutOfModule (Module tl) = let [ToplevelDataLayout (TlDataLayout dl)] =
                                        filter (\x -> case x of
@@ -362,6 +363,7 @@ dataLayoutOfModule (Module tl) = let [ToplevelDataLayout (TlDataLayout dl)] =
                                                   _ -> False
                                               ) tl
                                  in getDataLayoutInfo dl
+-}
 
 typeDefOfModule :: Module -> [(LocalId, Type)]
 typeDefOfModule (Module tl) = 

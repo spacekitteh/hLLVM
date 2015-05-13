@@ -405,5 +405,3 @@ instance Print TargetTriple where
                   ([print arch] ++ mb ven ++ mb os ++ mb env))
     where mb v = maybe [] (\x -> [print x]) v
 
-instance Print DataLayoutInfo where
-  print (DataLayoutInfo e sa ptrs is fs as ni ml _) = text "datalayout"

@@ -10,6 +10,7 @@ import Llvm.ErrorLoc
 #define FLC   (FileLoc $(srcLoc))
 
 import Llvm.Hir.Data.Type
+import Llvm.Hir.Data.DataLayoutInfo
 import Llvm.Hir.Composer (i1)
 import qualified Data.Map as M
 import qualified Data.Bits as B 

@@ -1046,8 +1046,10 @@ instance IrPrint Cleanup where
 instance IrPrint TargetTriple where
   printIr = P.print
   
-instance IrPrint DataLayoutInfo where  
-  printIr = P.print
-  
 instance IrPrint VarArgParam where  
   printIr = P.print
+  
+  
+instance IrPrint DataLayoutInfo where
+  printIr (DataLayoutInfo e sa ptrs is fs as ni ml _) = text "datalayout"
+  
