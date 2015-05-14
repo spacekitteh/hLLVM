@@ -111,13 +111,18 @@ findGlobalAddr cnst = case cnst of
   C_ptrtoint (T st c) dt -> case findGlobalAddr c of
     Nothing -> Nothing
     Just (gid, f) -> Just (gid, \x -> C_ptrtoint (T st (f x)) dt)
+  C_inttoptr (T st c) dt -> case findGlobalAddr c of
+    Nothing -> Nothing
+    Just (gid, f) -> Just (gid, \x -> C_inttoptr (T st (f x)) dt)
+  C_bitcast (T st c) dt -> case findGlobalAddr c of  
+    Nothing -> Nothing
+    Just (gid, f) -> Just (gid, \x -> C_bitcast (T st (f x)) dt)
   C_str _ -> errorLoc FLC ("unsupported " ++ show cnst)
-  C_struct _ _ -> errorLoc FLC ("unsupported " ++ show cnst)  
-  C_vector _ -> errorLoc FLC ("unsupported " ++ show cnst)    
-  C_vectorN _ _-> errorLoc FLC ("unsupported " ++ show cnst)      
-  C_array _ -> errorLoc FLC ("unsupported " ++ show cnst)        
-  C_arrayN _ _ -> errorLoc FLC ("unsupported " ++ show cnst)  
---   C_localId _ -> errorLoc FLC ("unsupported " ++ show cnst)    
+  C_struct _ _ -> Nothing
+  C_vector _ -> Nothing
+  C_vectorN _ _-> Nothing
+  C_array _ -> Nothing
+  C_arrayN _ _ -> Nothing
   C_labelId _ -> errorLoc FLC ("unsupported " ++ show cnst)
   C_block _ _ -> errorLoc FLC ("unsupported " ++ show cnst)
   _ -> Nothing
@@ -127,10 +132,6 @@ baseOf :: Value -> LocalId
 baseOf nb = case nb of
   Val_ssa s -> s
   Val_const c -> LocalIdDqString $ mangle c 
-                 {- case findGlobalAddr c of
-                 Just (g,_) -> getLocalBase g
-    Nothing -> LocalIdDqString $ "cannot find global addr of " ++ show nb
--}
 
 useBase :: Value -> Cc ad a -> Cc ad a
 useBase nb cca = local (\_ -> baseOf nb) cca

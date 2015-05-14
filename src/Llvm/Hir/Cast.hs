@@ -518,6 +518,17 @@ instance Ucast Ftype Utype where
     FtypeVectorP e -> UtypeVectorP e
     FtypeFirstClassD e -> UtypeFirstClassD e    
 
+instance Ucast Ftype Dtype where
+  ucast x = case x of
+    FtypeScalarI e -> DtypeScalarI e
+    FtypeScalarF e -> DtypeScalarF e
+    FtypeScalarP e -> DtypeScalarP e
+    FtypeVectorI e -> DtypeVectorI e
+    FtypeVectorF e -> DtypeVectorF e
+    FtypeVectorP e -> DtypeVectorP e
+    FtypeFirstClassD e -> DtypeFirstClassD e    
+
+
 instance Dcast (Type s r) Ftype where
   dcast lc x = let (x1::Utype) = ucast x
                in dcast lc x1

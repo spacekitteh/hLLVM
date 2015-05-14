@@ -662,6 +662,9 @@ instance TypeOf Const Dtype where
   typeof te x = case x of
     C_getelementptr b (T bt _) indices -> let et = getGetElemtPtrIndexedType te (ucast bt) (fmap ucast indices)
                                           in Just (ucast $ Tpointer (ucast et) 0)
+    C_bitcast _ dt -> Just dt
+    C_inttoptr _ dt -> Just $ ucast dt
+    C_ptrtoint _ dt -> Just $ ucast dt
     _ -> errorLoc FLC $ show x
 
 class SizeOf a where
