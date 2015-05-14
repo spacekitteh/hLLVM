@@ -113,7 +113,6 @@ instance Substitutable Const where
           C_str _ -> cst
           C_labelId lb -> C_labelId (substitute chg lb)
           C_block g l -> C_block (substitute chg g) l
---          C_localId x -> C_localId (substitute chg x)
           C_globalAddr x -> C_globalAddr (substitute chg x)
           C_struct pk l -> C_struct pk (substitute chg l)
           C_vector l -> C_vector (substitute chg l)

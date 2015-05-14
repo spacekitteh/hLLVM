@@ -1,7 +1,16 @@
+{-# OPTIONS_GHC -cpp #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Llvm.Query.Hir where
 
 import Llvm.Hir.Data
 import qualified Data.Set as S
+import Llvm.ErrorLoc
+#define FLC (FileLoc $(srcLoc))
+
 
 -- this should be a map, globalid might have an opaque type
 globalIdOfModule :: (Module a) -> S.Set (Dtype, GlobalId) 
@@ -24,3 +33,53 @@ selectUndeclaredTlGlobals (Module l) =
   in filter (\x -> case x of
                 TlGlobalDtype{..} -> maybe 
 -}
+
+data SingleConstAddr = SingleConstAddr { globalId :: GlobalId
+                                       , reconstructor :: Const -> Const
+                                       }
+
+getSingleConstAddr :: Const -> Maybe SingleConstAddr -- (GlobalId, Const -> Const)
+getSingleConstAddr cnst = case cnst of
+  C_u8 _ -> Nothing
+  C_u16 _ -> Nothing
+  C_u32 _ -> Nothing
+  C_u64 _ -> Nothing
+  C_u96 _ -> Nothing
+  C_u128 _ -> Nothing
+  C_s8 _ -> Nothing
+  C_s16 _ -> Nothing
+  C_s32 _ -> Nothing
+  C_s64 _ -> Nothing
+  C_s96 _ -> Nothing
+  C_s128 _ -> Nothing
+  C_int _ -> Nothing
+  C_uhex_int _ -> Nothing
+  C_shex_int _ -> Nothing
+  C_float _ -> Nothing
+  C_null -> Nothing
+  C_undef -> Nothing
+  C_true -> Nothing
+  C_false -> Nothing
+  C_zeroinitializer -> Nothing
+  C_globalAddr g -> Just $ SingleConstAddr { globalId = g, reconstructor = id }
+  C_getelementptr b (T t c) idx -> case getSingleConstAddr c of
+    Nothing -> Nothing
+    Just ca -> Just $ ca { reconstructor = \x -> C_getelementptr b (T t (reconstructor ca x)) idx}
+  C_ptrtoint (T st c) dt -> case getSingleConstAddr c of
+    Nothing -> Nothing
+    Just ca -> Just $ ca { reconstructor = \x -> C_ptrtoint (T st (reconstructor ca x)) dt }
+  C_inttoptr (T st c) dt -> case getSingleConstAddr c of
+    Nothing -> Nothing
+    Just ca -> Just $ ca { reconstructor = \x -> C_inttoptr (T st (reconstructor ca x)) dt }
+  C_bitcast (T st c) dt -> case getSingleConstAddr c of  
+    Nothing -> Nothing
+    Just ca -> Just $ ca { reconstructor = \x -> C_bitcast (T st (reconstructor ca x)) dt }
+  C_str _ -> Nothing -- a constant string itself is a value initialized in memory, itself does not indicate an address
+  C_struct _ _ -> Nothing
+  C_vector _ -> Nothing
+  C_vectorN _ _-> Nothing
+  C_array _ -> Nothing
+  C_arrayN _ _ -> Nothing
+  C_labelId _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  C_block _ _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  _ -> Nothing

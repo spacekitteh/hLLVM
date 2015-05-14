@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Llvm.Pass.CodeGenMonad ( Cc, emitNodes, useBase, appendToBase, emitAll
                               , newGlobalId, newNode, theEnd,newCInst, new, newValue
-                              , getLocalBase, findGlobalAddr, newLocalId
+                              , getLocalBase, newLocalId
                               ) where
 
 
@@ -81,51 +81,6 @@ getLocalBase g = case g of
   GlobalIdAlphaNum s -> LocalIdDqString $ "@" ++ s
   GlobalIdDqString s -> LocalIdDqString $ "@" ++ s
         
-findGlobalAddr :: Const -> Maybe (GlobalId, Const -> Const)
-findGlobalAddr cnst = case cnst of
-  C_u8 _ -> Nothing
-  C_u16 _ -> Nothing
-  C_u32 _ -> Nothing
-  C_u64 _ -> Nothing
-  C_u96 _ -> Nothing
-  C_u128 _ -> Nothing
-  C_s8 _ -> Nothing
-  C_s16 _ -> Nothing
-  C_s32 _ -> Nothing
-  C_s64 _ -> Nothing
-  C_s96 _ -> Nothing
-  C_s128 _ -> Nothing
-  C_int _ -> Nothing
-  C_uhex_int _ -> Nothing
-  C_shex_int _ -> Nothing
-  C_float _ -> Nothing
-  C_null -> Nothing
-  C_undef -> Nothing
-  C_true -> Nothing
-  C_false -> Nothing
-  C_zeroinitializer -> Nothing
-  C_globalAddr g -> Just (g, id)
-  C_getelementptr b (T t c) idx -> case findGlobalAddr c of
-    Nothing -> Nothing
-    Just (gid, f) -> Just (gid, \x -> C_getelementptr b (T t (f x)) idx)
-  C_ptrtoint (T st c) dt -> case findGlobalAddr c of
-    Nothing -> Nothing
-    Just (gid, f) -> Just (gid, \x -> C_ptrtoint (T st (f x)) dt)
-  C_inttoptr (T st c) dt -> case findGlobalAddr c of
-    Nothing -> Nothing
-    Just (gid, f) -> Just (gid, \x -> C_inttoptr (T st (f x)) dt)
-  C_bitcast (T st c) dt -> case findGlobalAddr c of  
-    Nothing -> Nothing
-    Just (gid, f) -> Just (gid, \x -> C_bitcast (T st (f x)) dt)
-  C_str _ -> errorLoc FLC ("unsupported " ++ show cnst)
-  C_struct _ _ -> Nothing
-  C_vector _ -> Nothing
-  C_vectorN _ _-> Nothing
-  C_array _ -> Nothing
-  C_arrayN _ _ -> Nothing
-  C_labelId _ -> errorLoc FLC ("unsupported " ++ show cnst)
-  C_block _ _ -> errorLoc FLC ("unsupported " ++ show cnst)
-  _ -> Nothing
                         
        
 baseOf :: Value -> LocalId       
