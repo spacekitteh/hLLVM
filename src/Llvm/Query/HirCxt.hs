@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Llvm.Query.HirCxt where
 import qualified Llvm.Hir.Data.Inst as Ci
 import qualified Data.Map as M
@@ -17,6 +18,7 @@ data FunCxt = FunCxt { funName :: String
 
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
+                           , functions :: M.Map Ci.GlobalId Ci.FunctionPrototype
                            } deriving (Eq, Ord, Show)
                                 
 data IrCxt = IrCxt { globalCxt :: GlobalCxt
@@ -44,12 +46,22 @@ irCxtOfModule (Module tl) =
                           ToplevelGlobal _ -> True
                           _ -> False
                       ) tl
+      funs = fmap (\tl -> case tl of
+                      ToplevelDeclare (TlDeclare fp@FunctionPrototype{..}) -> (fp_fun_name, fp)
+                      ToplevelDefine (TlDefine fp@FunctionPrototype{..} _ _) -> (fp_fun_name, fp)
+                  )
+             $ filter (\x -> case x of
+                          ToplevelDeclare _ -> True
+                          ToplevelDefine{..} -> True
+                          _ -> False
+                      ) tl
   in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
                                                        , targetTriple = tt
                                                        , typedefs = M.fromList tdefs
                                                        , opaqueTypeDefs = M.empty
                                                        }
                                    , globals = M.fromList glbs
+                                   , functions = M.fromList funs
                                    }
            , funCxt = FunCxt { funName = ""
                              , funParameters = M.empty
@@ -64,8 +76,9 @@ instance IrPrint TypeEnv where
                                $+$ text "opaqueTypedefs:" <+> printIr otd                               
                                
 instance IrPrint GlobalCxt where
-  printIr (GlobalCxt te gl) = text "typeEnv:" <+> printIr te
-                              $+$ text "globals:" <+> printIr gl
+  printIr (GlobalCxt te gl fns) = text "typeEnv:" <+> printIr te
+                                  $+$ text "globals:" <+> printIr gl
+                                  $+$ text "functions:" <+> printIr fns
                                 
 instance IrPrint FunCxt where
   printIr (FunCxt fn p) = text "funName:" <+> text fn

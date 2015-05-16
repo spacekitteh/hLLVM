@@ -1546,7 +1546,11 @@ toplevel2Ir (A.ToplevelStandaloneMd s) = Md.liftM I.ToplevelStandaloneMd (conver
 toplevel2Ir (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
 toplevel2Ir (A.ToplevelDeclare f) = Md.liftM I.ToplevelDeclare (convert_TlDeclare f)
 toplevel2Ir (A.ToplevelDefine f) = Md.liftM I.ToplevelDefine (convert_TlDefine f)
-toplevel2Ir (A.ToplevelGlobal g) = Md.liftM I.ToplevelGlobal (convert_TlGlobal g)
+toplevel2Ir (A.ToplevelGlobal g) = do { tlg <- convert_TlGlobal g  
+                                      ; case specializeTlGlobal tlg of
+                                        Just tli -> return $ I.ToplevelIntrinsic tli
+                                        Nothing -> return $ I.ToplevelGlobal tlg
+                                      }
 toplevel2Ir (A.ToplevelTypeDef t) = Md.liftM I.ToplevelTypeDef (convert_TlTypeDef t)
 toplevel2Ir (A.ToplevelDepLibs qs) = Md.liftM I.ToplevelDepLibs (convert_TlDepLibs qs)
 toplevel2Ir (A.ToplevelUnamedType i) = Md.liftM I.ToplevelUnamedType (convert_TlUnamedType i)

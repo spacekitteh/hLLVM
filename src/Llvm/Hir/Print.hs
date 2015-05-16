@@ -88,6 +88,13 @@ instance IrPrint TlGlobal where
       hsep [printIr lhs, equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
            , printIr externali, printIr gty, printIr ty, printIr c, commaSepNonEmpty [printIr section, printIr comdat, printIr align]]      
 
+instance IrPrint TlIntrinsic where
+  printIr x = case x of
+    TlIntrinsic_llvm_used ty c s -> hsep [text "llvm.used", printIr c, printIr s]
+    TlIntrinsic_llvm_compiler_used ty c s -> hsep [text "llvm.compiler.used", printIr c, printIr s]
+    TlIntrinsic_llvm_global_ctors ty c s -> hsep [text "llvm.global_ctors", printIr c, printIr s]
+    TlIntrinsic_llvm_global_dtors ty c s -> hsep [text "llvm.global_dtors", printIr c, printIr s]
+
 instance IrPrint TlTypeDef where    
   printIr x = case x of
     (TlDatTypeDef n t) -> hsep [printIr n, equals, text "data type", printIr t]
@@ -125,30 +132,10 @@ instance IrPrint a => IrPrint (Toplevel a) where
   printIr (ToplevelModuleAsm x) = printIr x
   printIr (ToplevelAttribute x) = printIr x
   printIr (ToplevelComdat x) = printIr x
-
-{-
-instance IrPrint TypeEnv where
-  printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
-                               $+$ text "triple:" <+> printIr tt
-                               $+$ text "typedefs:" <+> printIr td
-                               $+$ text "opaqueTypedefs:" <+> printIr otd                               
-                               
-instance IrPrint GlobalCxt where
-  printIr (GlobalCxt te gl) = text "typeEnv:" <+> printIr te
-                              $+$ text "globals:" <+> printIr gl
-                                
-instance IrPrint FunCxt where
-  printIr (FunCxt fn p) = text "funName:" <+> text fn
-                          $+$ text "funParameters:" <+> printIr p
-                                
-instance IrPrint IrCxt where
-  printIr (IrCxt g l) = text "globalCxt:" <+> printIr g
-                        $+$ text "funCxt:" <+> printIr l
--}
+  printIr (ToplevelIntrinsic x) = printIr x
 
 instance IrPrint a => IrPrint (Module a) where 
   printIr (Module tops) = fcat $ fmap printIr tops
-
 
 instance IrPrint a => IrPrint (Node a e x) where
   printIr (Lnode lbl) = printIr lbl
@@ -543,7 +530,7 @@ instance IrPrint Cinst where
     I_va_arg dv t lhs -> hsep [printIr lhs, equals, text "va_arg", printIr dv, printIr t]
     I_llvm_va_start tv -> text "call" <+> text "void" <+> text "@llvm.va_start" <+> parens(printIr tv)
     I_llvm_va_end tv -> text "call" <+> text "void" <+> text "@llvm.va_end" <+> parens(printIr tv)
-  
+    I_llvm_va_copy tv1 tv2 -> text "call" <+> text "void" <+> text "@llvm.va_copy" <+> parens(commaSepList [printIr tv1, printIr tv2])     
     I_landingpad rt pt tgl b clauses lhs -> 
       hsep ([printIr lhs, equals, text "landingpad", printIr rt, text "personality", printIr pt, printIr tgl, printIr b] ++ fmap printIr clauses)
     

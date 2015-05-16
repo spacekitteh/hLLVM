@@ -772,7 +772,14 @@ instance Substitutable TlGlobal where
     tl@TlGlobalOpaque{..} -> tl { tlg_lhs = substitute chg tlg_lhs
                                 , tlg_const = substitute chg tlg_const
                                 , tlg_comdat = substitute chg tlg_comdat
-                                }                          
+                                }                       
+                             
+instance Substitutable TlIntrinsic where                             
+  substitute chg tli = case tli of
+    x@TlIntrinsic_llvm_used{..}  -> x { tli_const = substitute chg tli_const }
+    x@TlIntrinsic_llvm_compiler_used{..}  -> x { tli_const = substitute chg tli_const }
+    x@TlIntrinsic_llvm_global_ctors{..}  -> x { tli_const = substitute chg tli_const }
+    x@TlIntrinsic_llvm_global_dtors{..}  -> x { tli_const = substitute chg tli_const }
   
 instance Substitutable a => Substitutable (Toplevel a) where
   substitute chg@Changer{..} tpl = case tpl of
@@ -780,7 +787,7 @@ instance Substitutable a => Substitutable (Toplevel a) where
     ToplevelDataLayout _ -> tpl
     ToplevelAlias x -> ToplevelAlias (substitute chg x)    
     ToplevelDbgInit x -> ToplevelDbgInit (substitute chg x)
-    ToplevelStandaloneMd x -> ToplevelStandaloneMd (substitute chg x)    
+    ToplevelStandaloneMd x -> ToplevelStandaloneMd (substitute chg x)
     ToplevelNamedMd x -> ToplevelNamedMd (substitute chg x)
     ToplevelDeclare x -> ToplevelDeclare (substitute chg x)
     ToplevelDefine x -> ToplevelDefine (substitute chg x)
@@ -791,6 +798,7 @@ instance Substitutable a => Substitutable (Toplevel a) where
     ToplevelModuleAsm x -> ToplevelModuleAsm (substitute chg x)                        
     ToplevelAttribute x -> ToplevelAttribute (substitute chg x)
     ToplevelComdat x -> ToplevelComdat (substitute chg x)
+    ToplevelIntrinsic x -> ToplevelIntrinsic (substitute chg x)
     
     
 instance Substitutable TlTypeDef where    

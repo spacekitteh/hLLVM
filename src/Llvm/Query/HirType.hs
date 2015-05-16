@@ -159,7 +159,7 @@ getCallFrameTypeAlignment te@TypeEnv{..} ty = case stackAlign dataLayout of
 
 getTypeSizeInBits :: TypeEnv -> Dtype -> SizeInBit
 getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
-  (DtypeRecordD t) -> case t of
+  DtypeRecordD t -> case t of
     Tarray i et -> let SizeInBit n = getTypeAllocSizeInBits te et
                    in SizeInBit (i * n)
     Tstruct pk ts -> let sl = getStructLayout te (pk, ts)
@@ -168,11 +168,11 @@ getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
       Just d -> getTypeSizeInBits te d
       Nothing -> errorLoc FLC ("undefined " ++ show n)
     _ -> errorLoc FLC (show t)
-  (DtypeScalarP (Tpointer t a)) -> ptrSizeInBit dataLayout (Just a)
-  (DtypeScalarI t) -> case t of  
+  DtypeScalarP (Tpointer t a) -> ptrSizeInBit dataLayout (Just a)
+  DtypeScalarI t -> case t of
     TpI n -> SizeInBit n
     TpV n -> SizeInBit n
-  (DtypeScalarF t) -> case t of  
+  DtypeScalarF t -> case t of  
     TpF n -> SizeInBit n
     TpHalf -> SizeInBit 16
     TpFloat -> SizeInBit 32
@@ -180,9 +180,15 @@ getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
     TpFp128 -> SizeInBit 128
     TpX86Fp80 -> SizeInBit 80
     TpPpcFp128 -> SizeInBit 128
-  (DtypeVectorI t) -> case t of  
+  DtypeVectorI t -> case t of  
     TvectorI n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
                      in (SizeInBit (s * n))
+  DtypeVectorF t -> case t of  
+    TvectorF n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
+                     in (SizeInBit (s * n))
+  DtypeVectorP t -> case t of  
+    TvectorP n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
+                     in (SizeInBit (s * n))                        
   _ -> errorLoc FLC (show dt)
       
 

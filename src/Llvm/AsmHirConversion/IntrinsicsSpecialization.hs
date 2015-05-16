@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE CPP, TemplateHaskell #-}
-{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, RecordWildCards #-}
 module Llvm.AsmHirConversion.IntrinsicsSpecialization where
 
 import Llvm.Hir
@@ -16,6 +16,9 @@ specializeCallSite lhs csi = case csi of
     [ActualParamData t1 [] Nothing v []] [] | isNothing lhs -> Just $ I_llvm_va_start v
   CsFun Nothing [] _ (FunId (GlobalIdAlphaNum "llvm.va_end"))
     [ActualParamData t1 [] Nothing v []] [] | isNothing lhs -> Just $ I_llvm_va_end v
+  CsFun Nothing [] _ (FunId (GlobalIdAlphaNum "llvm.va_copy"))
+    [ActualParamData t1 [] Nothing v1 []
+    ,ActualParamData t2 [] Nothing v2 []] [] | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
   CsFun Nothing [] _ (FunId (GlobalIdAlphaNum nm))
     [ActualParamData t1 [] Nothing v1 [] -- dest
     ,ActualParamData t2 [] Nothing v2 [] -- src or setValue
@@ -59,6 +62,9 @@ unspecializeIntrinsics inst = case inst of
   I_llvm_va_end v -> 
     Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum "llvm.va_end"))
     [tvToAp (T (ptr0 i8) v)] [] Nothing
+  I_llvm_va_copy v1 v2 ->
+    Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum "llvm.va_copy"))
+    [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)] [] Nothing
   I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
     let nm = case memLen of
           MemLenI32 -> "llvm.memcpy.p0i8.p0i8.i32"
@@ -82,3 +88,45 @@ unspecializeIntrinsics inst = case inst of
 tvToAp :: Ucast t Dtype => T t Value -> ActualParam
 tvToAp (T t v) = ActualParamData (ucast t) [] Nothing v []
   
+                 
+                 
+specializeTlGlobal :: TlGlobal -> Maybe TlIntrinsic
+specializeTlGlobal tl = case tl of
+  TlGlobalDtype {..} -> case tlg_lhs of
+    GlobalIdAlphaNum nm | (nm == "llvm.used" || nm == "llvm.compiler.used" 
+                           || nm == "llvm.global_ctors" || nm == "llvm.global_dtors") && tlg_linkage == Just LinkageAppending -> 
+      
+      let cnf = case nm of
+            "llvm.used" -> TlIntrinsic_llvm_used
+            "llvm.compiler.used" -> TlIntrinsic_llvm_compiler_used 
+            "llvm.global_ctors" -> TlIntrinsic_llvm_global_ctors
+            "llvm.global_dtors" -> TlIntrinsic_llvm_global_dtors
+      in Just $ cnf (dcast FLC tlg_dtype) (fromJust tlg_const) tlg_section
+    _ -> Nothing
+  _ -> Nothing
+  
+  
+unspecializeTlIntrinsics :: TlIntrinsic -> TlGlobal  
+unspecializeTlIntrinsics tl = case tl of
+  TlIntrinsic_llvm_used ty cnst sec -> mkGlobal "llvm.used" ty cnst sec
+  TlIntrinsic_llvm_compiler_used ty cnst sec -> mkGlobal "llvm.compiler.used" ty cnst sec  
+  TlIntrinsic_llvm_global_ctors ty cnst sec -> mkGlobal "llvm.global_ctors" ty cnst sec  
+  TlIntrinsic_llvm_global_dtors ty cnst sec -> mkGlobal "llvm.global_dtors" ty cnst sec
+  where mkGlobal str t c s = TlGlobalDtype { tlg_lhs = GlobalIdAlphaNum str
+                                           , tlg_linkage = Just LinkageAppending
+                                           , tlg_visibility = Nothing
+                                           , tlg_dllstorage = Nothing
+                                           , tlg_tls = Nothing
+                                           , tlg_addrnaming = NamedAddr
+                                           , tlg_addrspace = Nothing
+                                           , tlg_externallyInitialized = IsNot ExternallyInitialized
+                                           , tlg_globalType = GlobalType "global"
+                                           , tlg_dtype = ucast t
+                                           , tlg_const = Just c
+                                           , tlg_section = s
+                                           , tlg_comdat = Nothing
+                                           , tlg_alignment = Nothing
+                                           }
+      
+    
+    

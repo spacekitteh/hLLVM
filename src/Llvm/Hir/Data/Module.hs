@@ -26,7 +26,25 @@ data Toplevel a = ToplevelTriple TlTriple
                 | ToplevelModuleAsm TlModuleAsm
                 | ToplevelAttribute TlAttribute
                 | ToplevelComdat TlComdat
+                | ToplevelIntrinsic TlIntrinsic
 
+data TlIntrinsic = TlIntrinsic_llvm_used { tli_type :: Type RecordB D
+                                         , tli_const :: Const 
+                                         , tli_section :: Maybe Section
+                                         }
+                 | TlIntrinsic_llvm_compiler_used { tli_type :: Type RecordB D
+                                                  , tli_const :: Const 
+                                                  , tli_section :: Maybe Section
+                                                  }
+                 | TlIntrinsic_llvm_global_ctors { tli_type :: Type RecordB D
+                                                 , tli_const :: Const 
+                                                 , tli_section :: Maybe Section
+                                                 }
+                 | TlIntrinsic_llvm_global_dtors { tli_type :: Type RecordB D
+                                                 , tli_const :: Const 
+                                                 , tli_section :: Maybe Section
+                                                 } 
+                                           
 data TlTriple = TlTriple Ci.TargetTriple deriving (Eq)
 
 data TlDataLayout = TlDataLayout Ci.DataLayout deriving (Eq)

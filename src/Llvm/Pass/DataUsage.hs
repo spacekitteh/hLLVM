@@ -416,6 +416,9 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
         I_va_arg{..} -> aTv addConst dv $ aTv (addAddrPassedToVaStart) dv f
         I_llvm_va_start v -> addConst v $ addAddrPassedToVaStart v f
         I_llvm_va_end v -> addConst v $ addAddrPassedToVaStart v f
+        I_llvm_va_copy{..} -> addConst destarglist $ addConst srcarglist 
+                              $ addAddrPassedToVaStart destarglist 
+                              $ addAddrPassedToVaStart srcarglist f  
         I_llvm_memcpy{..} -> aTv addConst dest $ aTv addConst src
                              $ aTv addAddrStoringValue dest
                              $ aTv addAddrCaptured dest

@@ -496,6 +496,11 @@ instance Dcast Dtype (Type ScalarB I) where
     DtypeScalarI e -> e
     _ -> dcastError lc "Type ScalarB I" x
 
+instance Dcast Dtype (Type RecordB D) where
+  dcast lc x = case x of
+    DtypeRecordD e -> e
+    _ -> dcastError lc "Type RecordB D" x
+
 {- Ftype's dcast, ucast, dcast -}
 instance Dcast Utype Ftype where
   dcast lc x = case x of
