@@ -297,8 +297,6 @@ instance Conversion I.Const (Rm A.Const) where
                       (Md.liftM2 (A.IbinExpr A.Or [] (tconvert () t)) (convert u1) (convert u2))
     I.C_xor t u1 u2 -> Md.liftM (A.C_binexp . A.Ie)
                        (Md.liftM2 (A.IbinExpr A.Xor [] (tconvert () t)) (convert u1) (convert u2))
-
-
     I.C_add_V nw t u1 u2 -> Md.liftM (A.C_binexp . A.Ie) 
                             (Md.liftM2 (A.IbinExpr A.Add (cnowrap nw) (tconvert () t)) (convert u1) (convert u2))
     I.C_sub_V nw t u1 u2 -> Md.liftM (A.C_binexp . A.Ie) 
@@ -325,7 +323,6 @@ instance Conversion I.Const (Rm A.Const) where
                         $ Md.liftM2 (A.IbinExpr A.Or [] (tconvert () t)) (convert u1) (convert u2)
     I.C_xor_V t u1 u2 -> Md.liftM (A.C_binexp . A.Ie) 
                          $ Md.liftM2 (A.IbinExpr A.Xor [] (tconvert () t)) (convert u1) (convert u2)
-
     I.C_fadd fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
                            $ Md.liftM2 (A.FbinExpr A.Fadd fg (tconvert () t)) (convert u1) (convert u2)
     I.C_fsub fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
@@ -334,19 +331,23 @@ instance Conversion I.Const (Rm A.Const) where
                            $ Md.liftM2 (A.FbinExpr A.Fmul fg (tconvert () t)) (convert u1) (convert u2)
     I.C_fdiv fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
                            $ Md.liftM2 (A.FbinExpr A.Fdiv fg (tconvert () t)) (convert u1) (convert u2)
-    I.C_frem fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
-                           $ Md.liftM2 (A.FbinExpr A.Frem fg (tconvert () t)) (convert u1) (convert u2)
+    I.C_frem fg t u1 u2 -> 
+      Md.liftM (A.C_binexp . A.Fe) $ Md.liftM2 (A.FbinExpr A.Frem fg (tconvert () t)) (convert u1) (convert u2)
 
-    I.C_fadd_V fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
-                             $ Md.liftM2 (A.FbinExpr A.Fadd fg (tconvert () t)) (convert u1) (convert u2)
-    I.C_fsub_V fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
-                             $ Md.liftM2 (A.FbinExpr A.Fsub fg (tconvert () t)) (convert u1) (convert u2)
-    I.C_fmul_V fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
-                             $ Md.liftM2 (A.FbinExpr A.Fmul fg (tconvert () t)) (convert u1) (convert u2)
-    I.C_fdiv_V fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
-                             $ Md.liftM2 (A.FbinExpr A.Fdiv fg (tconvert () t)) (convert u1) (convert u2)
-    I.C_frem_V fg t u1 u2 -> Md.liftM (A.C_binexp . A.Fe) 
-                             $ Md.liftM2 (A.FbinExpr A.Frem fg (tconvert () t)) (convert u1) (convert u2)
+    I.C_fadd_V fg t u1 u2 -> 
+      Md.liftM (A.C_binexp . A.Fe) $ Md.liftM2 (A.FbinExpr A.Fadd fg (tconvert () t)) (convert u1) (convert u2)
+      
+    I.C_fsub_V fg t u1 u2 -> 
+      Md.liftM (A.C_binexp . A.Fe) $ Md.liftM2 (A.FbinExpr A.Fsub fg (tconvert () t)) (convert u1) (convert u2)
+                             
+    I.C_fmul_V fg t u1 u2 -> 
+      Md.liftM (A.C_binexp . A.Fe) $ Md.liftM2 (A.FbinExpr A.Fmul fg (tconvert () t)) (convert u1) (convert u2)
+                             
+    I.C_fdiv_V fg t u1 u2 -> 
+      Md.liftM (A.C_binexp . A.Fe) $ Md.liftM2 (A.FbinExpr A.Fdiv fg (tconvert () t)) (convert u1) (convert u2)
+      
+    I.C_frem_V fg t u1 u2 -> 
+      Md.liftM (A.C_binexp . A.Fe) $ Md.liftM2 (A.FbinExpr A.Frem fg (tconvert () t)) (convert u1) (convert u2)
 
     I.C_trunc (I.T t0 u0) dt0 -> mkConversion (A.Trunc, tconvert () t0, u0, tconvert () dt0) 
     I.C_zext (I.T t0 u0) dt0 -> mkConversion (A.Zext, tconvert () t0, u0, tconvert () dt0)
@@ -592,322 +593,348 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
     I.I_add n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Add (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Add (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_sub n t v1 v2 lhs -> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Sub (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Sub (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_mul n t v1 v2 lhs -> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Mul (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Mul (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_udiv n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Udiv (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Udiv (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_sdiv n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Sdiv (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Sdiv (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_urem t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Urem [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Urem [] (tconvert () t) v1a v2a)
          }
     I.I_srem t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Srem [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Srem [] (tconvert () t) v1a v2a)
          }
     I.I_shl n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Shl (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Shl (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_lshr n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Lshr (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Lshr (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_ashr n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Ashr (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Ashr (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_and t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2 
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.And [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.And [] (tconvert () t) v1a v2a)
          }
     I.I_or t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Or [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Or [] (tconvert () t) v1a v2a)
          }
     I.I_xor t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Xor [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Xor [] (tconvert () t) v1a v2a)
          }
     I.I_add_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Add (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Add (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_sub_V n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Sub (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Sub (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_mul_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Mul (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Mul (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_udiv_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Udiv (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Udiv (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_sdiv_V n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Sdiv (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Sdiv (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_urem_V t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Urem [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Urem [] (tconvert () t) v1a v2a)
          }
     I.I_srem_V t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Srem [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Srem [] (tconvert () t) v1a v2a)
          }
     I.I_shl_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Shl (cnowrap n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Shl (cnowrap n) (tconvert () t) v1a v2a)
          }
     I.I_lshr_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Lshr (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Lshr (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_ashr_V n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Ashr (cexact n) (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Ashr (cexact n) (tconvert () t) v1a v2a)
          }
     I.I_and_V t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.And [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.And [] (tconvert () t) v1a v2a)
          }
     I.I_or_V t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Or [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Or [] (tconvert () t) v1a v2a)
          }
     I.I_xor_V t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Ie $ A.IbinExpr A.Xor [] (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Ie $ A.IbinExpr A.Xor [] (tconvert () t) v1a v2a)
          }    
     I.I_fadd n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
          }
     I.I_fsub n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fsub n (tconvert () t) v1a v2a)
          }
     I.I_fmul n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fmul n (tconvert () t) v1a v2a)
          }
     I.I_fdiv n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fdiv n (tconvert () t) v1a v2a)
          }
     I.I_frem n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Frem n (tconvert () t) v1a v2a)
          }
     I.I_fadd_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
          }
     I.I_fsub_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fsub n (tconvert () t) v1a v2a)
          }
     I.I_fmul_V n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fmul n (tconvert () t) v1a v2a)
          }
     I.I_fdiv_V n t v1 v2 lhs-> 
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Fdiv n (tconvert () t) v1a v2a)
          }
     I.I_frem_V n t v1 v2 lhs->
       do { v1a <- convert v1
          ; v2a <- convert v2
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprBinExpr 
-                                                $ A.Fe $ A.FbinExpr A.Fadd n (tconvert () t) v1a v2a)
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprBinExpr $ A.Fe $ A.FbinExpr A.Frem n (tconvert () t) v1a v2a)
          }
     I.I_trunc tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Trunc tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Trunc tva (tconvert () dt)) 
          }
     I.I_zext tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Zext tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Zext tva (tconvert () dt)) 
          }    
     I.I_sext tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Sext tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Sext tva (tconvert () dt)) 
          }    
     I.I_fptrunc tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpTrunc tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpTrunc tva (tconvert () dt)) 
          }    
     I.I_fpext tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpExt tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpExt tva (tconvert () dt)) 
          }    
     I.I_fptoui tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToUi tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToUi tva (tconvert () dt)) 
          }    
     I.I_fptosi tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToSi tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToSi tva (tconvert () dt)) 
          }    
     I.I_uitofp tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.UiToFp tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.UiToFp tva (tconvert () dt)) 
          }    
     I.I_sitofp tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.SiToFp tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.SiToFp tva (tconvert () dt)) 
          }    
     I.I_ptrtoint tv dt lhs ->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.PtrToInt tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.PtrToInt tva (tconvert () dt)) 
          }    
     I.I_inttoptr tv dt lhs -> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.IntToPtr tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.IntToPtr tva (tconvert () dt)) 
          }    
     I.I_bitcast tv dt lhs -> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Bitcast tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Bitcast tva (tconvert () dt)) 
          }    
     I.I_bitcast_D tv dt lhs -> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Bitcast tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Bitcast tva (tconvert () dt)) 
          }      
     I.I_addrspacecast tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.AddrSpaceCast tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.AddrSpaceCast tva (tconvert () dt)) 
          }    
     I.I_trunc_V tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Trunc tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Trunc tva (tconvert () dt)) 
          }
     I.I_zext_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Zext tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Zext tva (tconvert () dt)) 
          }    
     I.I_sext_V tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Sext tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.Sext tva (tconvert () dt)) 
          }    
     I.I_fptrunc_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpTrunc tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpTrunc tva (tconvert () dt)) 
          }    
     I.I_fpext_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpExt tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpExt tva (tconvert () dt)) 
          }    
     I.I_fptoui_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToUi tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToUi tva (tconvert () dt)) 
          }    
     I.I_fptosi_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToSi tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.FpToSi tva (tconvert () dt)) 
          }    
     I.I_uitofp_V tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.UiToFp tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.UiToFp tva (tconvert () dt)) 
          }    
     I.I_sitofp_V tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.SiToFp tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.SiToFp tva (tconvert () dt)) 
          }    
     I.I_ptrtoint_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.PtrToInt tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.PtrToInt tva (tconvert () dt)) 
          }    
     I.I_inttoptr_V tv dt lhs->
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.IntToPtr tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.IntToPtr tva (tconvert () dt)) 
          }    
     I.I_addrspacecast_V tv dt lhs-> 
       do { tva <- convert tv
-         ; return $ A.ComputingInst (Just lhs) (A.RhsExpr $ A.ExprConversion $ A.Conversion A.AddrSpaceCast tva (tconvert () dt)) 
+         ; return $ A.ComputingInst (Just lhs) 
+           (A.RhsExpr $ A.ExprConversion $ A.Conversion A.AddrSpaceCast tva (tconvert () dt)) 
          }    
     I.I_select_I cnd t f lhs->
       do { cnda <- convert cnd

@@ -20,7 +20,7 @@ import qualified Llvm.Pass.Substitution as Sub
 import qualified Llvm.Pass.Changer as Cg
 import qualified Llvm.Pass.Visualization as Vis
 import qualified Llvm.Pass.SizeofVerification as Tveri
-
+import System.Exit
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List (stripPrefix)
@@ -165,6 +165,18 @@ main = do { sel <- cmdArgsRun mode
                                ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
+                                 {-
+                               ; if not (ast' == ast'') then
+                                   do { ou <- openFile "correct_one.ll" WriteMode
+                                      ; writeOutLlvm ast' ou
+                                      ; hClose ou
+                                      ; putStrLn "the correctone is written to correct_one.ll"
+                                      ; putStrLn $ "the incorrect one is written to " ++ show ox
+                                      ; exitFailure
+                                      }
+                                 else
+                                   exitSuccess
+                                  -}
                                }
             SizeofVerification ix ox -> 
               do { inh <- openFile ix ReadMode

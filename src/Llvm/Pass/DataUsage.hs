@@ -198,9 +198,12 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
   where
     bwdTran :: S.Set LocalId -> Node a e x -> H.Fact x DataUsage -> DataUsage
     bwdTran fp n f = case n of 
-      Tnode _ _ -> 
-        let bs = H.successors n
-        in foldl (\p l -> p `unionDataUsage` (fromMaybe emptyDataUsage $ H.lookupFact l f)) emptyDataUsage bs
+      Tnode tinst _ -> 
+        let f0 = foldl (\p l -> p `unionDataUsage` (fromMaybe emptyDataUsage $ H.lookupFact l f)) emptyDataUsage (H.successors n)
+        in case tinst of
+          T_ret_void -> f0
+          T_return vs -> foldl (flip (aTv addConst)) f0 vs
+          _ -> f0
       Lnode _ -> f
       Pnode (Pinst{..}) _ -> foldl (\p (e, _) -> propogateUpPtrUsage flowout e p) f flowins
       Enode x -> f
