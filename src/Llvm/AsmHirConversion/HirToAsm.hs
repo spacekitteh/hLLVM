@@ -439,8 +439,8 @@ instance Conversion I.Value (Rm A.Value) where
 
 instance Conversion I.CallSiteType (Rm A.Type) where
   convert t = case t of
-    I.CallSiteRet x -> return $ tconvert () x
-    I.CallSiteFun ft as -> return $ tconvert () (I.Tpointer (ucast ft) as)
+    I.CallSiteTypeRet x -> return $ tconvert () x
+    I.CallSiteTypeFun ft as -> return $ tconvert () (I.Tpointer (ucast ft) as)
     
 instance Conversion I.FunPtr (Rm A.FunName) where
   convert x = case x of
@@ -455,16 +455,27 @@ instance Conversion I.FunPtr (Rm A.FunName) where
                                         ; return $ A.FunNameInttoptr tv1 (tconvert () dt)
                                         }
 
-instance Conversion I.CallSite (Rm A.CallSite) where
-  convert  (I.CsFun cc pa t fn aps fa) = do { fna <- convert fn
-                                            ; apsa <- mapM convert aps
-                                            ; ta <- convert t
-                                            ; return $ A.CallSiteFun cc pa ta fna apsa fa
-                                            }
-  convert  (I.CsAsm t mse mas dia s1 s2 aps fa) = 
+instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite)) where
+  convert  (fn, I.CallFunInterface tc cc pa t aps fa) = 
+    do { fna <- convert fn
+       ; apsa <- mapM convert aps
+       ; ta <- convert t
+       ; return (tc, A.CallSiteFun (Just cc) pa ta fna apsa fa)
+       }
+    
+instance Conversion (I.FunPtr, I.InvokeFunInterface) (Rm A.CallSite) where
+  convert  (fn, I.InvokeFunInterface cc pa t aps fa) = 
+    do { fna <- convert fn
+       ; apsa <- mapM convert aps
+       ; ta <- convert t
+       ; return (A.CallSiteFun (Just cc) pa ta fna apsa fa)
+       }
+
+instance Conversion (I.AsmCode, I.CallAsmInterface) (Rm A.InlineAsmExp) where
+  convert (I.AsmCode dia s1 s2, I.CallAsmInterface t mse mas aps fa) = 
     do { apsa <- mapM convert aps
        ; ta <- convert t
-       ; return $ A.CallSiteAsm ta mse mas dia s1 s2 apsa fa
+       ; return (A.InlineAsmExp ta mse mas dia s1 s2 apsa fa)
        }
 
 instance Conversion I.Clause (Rm A.Clause) where
@@ -1019,13 +1030,13 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
          ; tva <- convert tv
          ; return $ A.ComputingInst (Just lhs) $ A.RhsInsertValue $ A.InsertValue vtva tva idx 
          }
-    I.I_call_fun tc cc pa cstype fn ap fna lhs-> 
-      do { csa <- convert (I.CsFun cc pa cstype fn ap fna)
+    I.I_call_fun fn cfi lhs-> 
+      do { (tc, csa) <- convert (fn, cfi)
          ; return $ A.ComputingInst lhs $ A.RhsCall tc csa 
          }
-    I.I_call_asm tc t dia b1 b2 qs1 qs2 as fa lhs -> 
-      do { csa <- convert (I.CsAsm t dia b1 b2 qs1 qs2 as fa) 
-         ; return $ A.ComputingInst lhs $ A.RhsCall tc csa 
+    I.I_call_asm asm cai lhs ->
+      do { csa <- convert (asm, cai)
+         ; return $ A.ComputingInst lhs $ A.RhsInlineAsm csa 
          } 
     _ -> errorLoc FLC $ show cinst
                                       
@@ -1091,11 +1102,11 @@ instance Conversion I.Tinst (Rm A.TerminatorInst) where
   convert (I.T_indirectbr cnd bs) = Md.liftM2 A.IndirectBr (convert cnd) (mapM convert_to_TargetLabel bs)
   convert (I.T_switch (cnd,d) cases) = Md.liftM3 A.Switch (convert cnd) (convert_to_TargetLabel d) 
                                        (mapM (pairM convert convert_to_TargetLabel) cases)
-  convert (I.T_invoke conv ra fty ptr aps fa  t f mg) = 
-    Md.liftM3 (A.Invoke mg) (convert (I.CsFun conv ra fty ptr aps fa))
+  convert (I.T_invoke fptr ifi t f mg) = 
+    Md.liftM3 (A.Invoke mg) (convert (fptr, ifi))
     (convert_to_TargetLabel t) (convert_to_TargetLabel f)
-  convert (I.T_invoke_asm rt se as dia dq1 dq2 aps fa t f lhs) =
-    Md.liftM3 (A.Invoke lhs) (convert (I.CsAsm rt se as dia dq1 dq2 aps fa))
+  convert (I.T_invoke_asm asm cai t f lhs) =
+    Md.liftM3 (A.InvokeInlineAsm lhs) (convert (asm, cai))
     (convert_to_TargetLabel t) (convert_to_TargetLabel f)
   convert (I.T_resume tv) = Md.liftM A.Resume (convert tv)
   convert I.T_unreachable = return A.Unreachable

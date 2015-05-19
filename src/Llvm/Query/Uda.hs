@@ -78,10 +78,25 @@ instance Uda x => Uda [x] where
   storeTo l = S.unions (fmap storeTo l)
   loadFrom l = S.unions (fmap loadFrom l)
 
+{-
 instance Uda CallSite where
   use x = case x of
     CsFun _ _ _ _ l _ -> use l
   def _ = S.empty  
+-}
+
+instance Uda CallFunInterface where
+  use CallFunInterface{..} = use cfi_actualParams
+  def _ = S.empty
+
+instance Uda InvokeFunInterface where
+  use InvokeFunInterface{..} = use ifi_actualParams
+  def _ = S.empty  
+
+instance Uda CallAsmInterface where
+  use CallAsmInterface{..} = use cai_actualParams
+  def _ = S.empty
+
 
 instance Uda Cinst where 
   use ci = case ci of
@@ -95,8 +110,8 @@ instance Uda Cinst where
     I_cmpxchg_F{..} -> S.unions [use pointer,use cmpf,use newf]
     I_cmpxchg_P{..} -> S.unions [use pointer,use cmpp,use newp]
     I_atomicrmw{..} -> S.unions [use pointer,use val]
-    I_call_fun{..} -> use call_actualParams
-    I_call_asm{..} -> use call_actualParams
+    I_call_fun{..} -> use call_fun_interface
+    I_call_asm{..} -> use call_asm_interface
     I_extractelement_I{..} -> S.unions [use vectorI, use index]
     I_extractelement_F{..} -> S.unions [use vectorF, use index]
     I_extractelement_P{..} -> S.unions [use vectorP, use index]

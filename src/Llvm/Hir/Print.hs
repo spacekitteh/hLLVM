@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, RecordWildCards #-}
 module Llvm.Hir.Print
        (module Llvm.Hir.Print
        ,module Llvm.Asm.Printer.Common
@@ -415,18 +415,48 @@ instance IrPrint FunPtr where
   printIr (FunSsa g) = printIr g
   printIr Fun_null = text "null"
   printIr Fun_undef = text "undef"
+  
+  
+instance IrPrint AsmCode where  
+  printIr AsmCode{ asm_dialect = d
+                 , asm_dqstring1 = s1
+                 , asm_dqstring2 = s2
+                 } = printIr d <+> printIr s1 <+> comma <+> printIr s2
 
 instance IrPrint CallSiteType where
-  printIr (CallSiteRet e) = printIr e
-  printIr (CallSiteFun e as) = printIr (Tpointer (ucast e) as)
+  printIr (CallSiteTypeRet e) = printIr e
+  printIr (CallSiteTypeFun e as) = printIr (Tpointer (ucast e) as)
+
+instance IrPrint CallFunInterface where
+  printIr CallFunInterface{..} = commaSepList [printIr cfi_tail, 
+                                               printIr cfi_conv,
+                                               printIr cfi_retAttrs,
+                                               printIr cfi_type,
+                                               printIr cfi_actualParams, 
+                                               printIr cfi_funAttrs]
+
+instance IrPrint InvokeFunInterface where
+  printIr InvokeFunInterface{..} = commaSepList [printIr ifi_conv,
+                                                 printIr ifi_retAttrs,
+                                                 printIr ifi_type,
+                                                 printIr ifi_actualParams, 
+                                                 printIr ifi_funAttrs]
 
 
+instance IrPrint CallAsmInterface where
+  printIr CallAsmInterface{..} = commaSepList [printIr cai_type,
+                                               printIr cai_sideeffect, 
+                                               printIr cai_alignstack,
+                                               printIr cai_actualParams, 
+                                               printIr cai_funAttrs]
+
+
+{-
 instance IrPrint CallSite where
-  printIr (CsFun cc ra rt ident params fa) =
-    hsep [printIr cc, hsep $ fmap printIr ra, printIr rt, printIr ident, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
-  printIr (CsAsm t se as dia s1 s2 params fa) =
-    hsep [printIr t, text "asm", printIr se, printIr as, printIr dia, printIr s1 <> comma
-         , printIr s2, parens (commaSepList $ fmap printIr params), hsep $ fmap printIr fa]
+  printIr (CallSiteFun fptr cfi) = hsep [printIr fptr, printIr cfi]
+  printIr (CallSiteAsm cai) = hsep [text "asm", printIr cai]
+-}
+  
 
 instance IrPrint Clause where
   printIr (Catch tv) = text "catch" <+> printIr tv
@@ -503,15 +533,11 @@ instance IrPrint Cinst where
            , printIr c <> comma, printIr n, printIr st, printIr sord, printIr ford]
 
     (I_atomicrmw v op p vl st ord lhs) ->
-      hsep [printIr lhs, equals, text "atomicrmw", printIr v, printIr op, printIr p <> comma, printIr vl, printIr st, printIr ord]
-
-    (I_call_fun tc cc ra cstype callee actparams fna lhs) ->
-      hsep [optSepToLlvm lhs equals, printIr tc,
-            printIr cc, printIr ra, printIr cstype, printIr callee, parens (printIr actparams), printIr fna]
-    (I_call_asm tc ct se as dia dq1 dq2 actparams fna lhs) ->
-      hsep [optSepToLlvm lhs equals, printIr tc,
-            printIr ct, printIr se, printIr as, printIr dia, printIr dq1, printIr dq2, parens (printIr actparams)
-           , printIr fna]
+      hsep [printIr lhs, equals, text "atomicrmw", printIr v, printIr op, printIr p <> comma
+           , printIr vl, printIr st, printIr ord]
+      
+    (I_call_fun fna cfi lhs) -> hsep [optSepToLlvm lhs equals, printIr fna, printIr cfi]
+    (I_call_asm asm cfi lhs) -> hsep [optSepToLlvm lhs equals, printIr asm, printIr cfi]
     (I_extractelement_I tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_i", printIr tv, printIr idx]
     (I_extractelement_F tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_f", printIr tv, printIr idx]
     (I_extractelement_P tv idx lhs) -> hsep [printIr lhs, equals, text "extractelement_p", printIr tv, printIr idx]
@@ -643,13 +669,11 @@ instance IrPrint Tinst where
   printIr (T_indirectbr v l) = hsep [text "indirectbr", printIr v <> comma, brackets (commaSepList $ fmap printIr l)]
   printIr (T_switch (v,d) tbl) =
     hsep [text "switch", printIr v <> comma, printIr d, brackets (hsep $ fmap (\(p1,p2) -> printIr p1 <> comma <+> printIr p2) tbl)]
-  printIr (T_invoke conv reta ft ptr aps fa toL unwindL lhs) =
-    hsep [optSepToLlvm lhs equals, text "invoke", printIr conv, printIr reta, printIr ft, printIr ptr
-         , parens (printIr aps), printIr fa, printIr toL, text "unwind", printIr unwindL]
-  printIr (T_invoke_asm rt mse mas dia s1 s2 aps fa toL unwindL lhs) =
-    hsep [optSepToLlvm lhs equals, text "invoke", text "asm", printIr rt, printIr mse
-         , printIr mas, printIr dia, printIr s1, printIr s2, parens (printIr aps)
-         , printIr fa, printIr toL, text "unwind", printIr unwindL]
+  printIr (T_invoke fptr itf toL unwindL lhs) =
+    hsep [optSepToLlvm lhs equals, text "invoke", printIr fptr, printIr itf, printIr toL, text "unwind", printIr unwindL]
+  printIr (T_invoke_asm asmcode itf toL unwindL lhs) =
+    hsep [optSepToLlvm lhs equals, text "invoke", text "asm", printIr asmcode, printIr itf,
+          printIr toL, text "unwind", printIr unwindL]
   printIr T_unreachable = text "unreachable"
   printIr (T_resume a) = text "resume" <+> printIr a
   printIr T_unwind = text "unwind"

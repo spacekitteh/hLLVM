@@ -60,6 +60,7 @@ pInstruction = do { lhs <- opt (do { x <- pLocalId
                                    ; return x
                                    })
                   ; choice [ try $ liftM Term $ pInvoke lhs
+                           , liftM Term $ pInvokeAsm lhs
                            , liftM Comp $ pComputingInst lhs
                            , liftM Term pTerminatorInst
                            , liftM Phi $ pPhiInst lhs
@@ -95,6 +96,16 @@ pInvoke lhs = do { reserved "invoke"
                  ; unwindLbl <- pTargetLabel
                  ; return $ Invoke lhs callSite toLbl unwindLbl
                  }
+
+pInvokeAsm :: Maybe LocalId -> P TerminatorInst
+pInvokeAsm lhs = do { reserved "invoke"
+                    ; callSite <- pAsm -- CallSite
+                    ; reserved "to"
+                    ; toLbl <- pTargetLabel
+                    ; reserved "unwind"
+                    ; unwindLbl <- pTargetLabel
+                    ; return $ InvokeInlineAsm lhs callSite toLbl unwindLbl
+                    }
 
 
 pPhiInst :: Maybe LocalId -> P PhiInst

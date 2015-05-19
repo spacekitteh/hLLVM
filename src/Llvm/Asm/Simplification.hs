@@ -107,7 +107,8 @@ rnDefFunctionPrototype fpt@(FunctionPrototype v0 v1 v2 v3 v4 v5 v6 fhParams v8 v
   do { fp' <- rnDefFormalParamList fhParams
      ; prefix' <- rnPrefix fhPrefix
      ; prologue' <- rnPrologue fhPrologue 
-     ; return $ FunctionPrototype v0 v1 v2 v3 v4 v5 v6 fp' v8 v9 v10 v11 v12 v13  prefix' prologue'
+     ; return $ FunctionPrototype v0 v1 v2 (maybe (Just Ccc) Just v3) 
+       v4 v5 v6 fp' v8 v9 v10 v11 v12 v13  prefix' prologue'
      }
   
   
@@ -266,6 +267,7 @@ rnRhs lhs = case lhs of
               RhsMemOp x -> S.liftM (\(b,x) -> (b, RhsMemOp x)) (rnMemOp x)
               RhsExpr x -> S.liftM (\x -> (True, RhsExpr x)) (rnExpr x)
               RhsCall b cs -> S.liftM (\(bb, x) -> (bb, RhsCall b x)) (rnCallSite cs)
+              RhsInlineAsm cs -> S.liftM (\(bb, x) -> (bb, RhsInlineAsm x)) (rnInlineAsmExp cs)
               RhsExtractElement e -> S.liftM (\x -> (True, RhsExtractElement x)) (rnExtractElem rnTypedValue e)
               RhsInsertElement e -> S.liftM (\x -> (True, RhsInsertElement x)) (rnInsertElem rnTypedValue e)
               RhsShuffleVector e -> S.liftM (\x -> (True, RhsShuffleVector x)) (rnShuffleVector rnTypedValue e)
@@ -349,10 +351,11 @@ rnCallSite (CallSiteFun c pa t fn aps fas) =
      ; let (rt, _) = splitCallReturnType t
      ; return (not (rt == Tvoid), CallSiteFun c pa t fna x fas)
      }
-rnCallSite (CallSiteAsm t dia b1 b2 qs1 qs2 aps fas) = 
+  
+rnInlineAsmExp (InlineAsmExp t dia b1 b2 qs1 qs2 aps fas) = 
   do { apsa <- mapM rnActualParam aps
      ; let (rt, _) = splitCallReturnType t
-     ; return (not (rt == Tvoid),  CallSiteAsm t dia b1 b2 qs1 qs2 apsa fas)
+     ; return (not (rt == Tvoid),  InlineAsmExp t dia b1 b2 qs1 qs2 apsa fas)
      }
 
 rnActualParam :: ActualParam -> MS ActualParam
@@ -540,6 +543,7 @@ rnRhs2 lhs = case lhs of
   RhsMemOp x -> S.liftM RhsMemOp (rnMemOp2 x)
   RhsExpr x -> S.liftM RhsExpr (rnExpr2 x)
   RhsCall b cs -> S.liftM (RhsCall b) (rnCallSite2 cs)
+  RhsInlineAsm cs -> S.liftM RhsInlineAsm (rnInlineAsm2 cs)  
   RhsExtractElement e -> S.liftM RhsExtractElement (rnExtractElem2 rnTypedValue2 e)
   RhsInsertElement e -> S.liftM RhsInsertElement (rnInsertElem2 rnTypedValue2 e)
   RhsShuffleVector e -> S.liftM RhsShuffleVector (rnShuffleVector2 rnTypedValue2 e)
@@ -575,9 +579,11 @@ rnCallSite2 (CallSiteFun c pa t fn aps fas) =
   do { x <- mapM rnActualParam2 aps
      ; return (CallSiteFun c pa t fn x fas)
      }
-rnCallSite2 (CallSiteAsm t dia b1 b2 qs1 qs2 aps fas) = 
+  
+rnInlineAsm2 :: InlineAsmExp -> RD InlineAsmExp
+rnInlineAsm2 (InlineAsmExp t dia b1 b2 qs1 qs2 aps fas) = 
   do { apsa <- mapM rnActualParam2 aps
-     ; return (CallSiteAsm t dia b1 b2 qs1 qs2 apsa fas)
+     ; return (InlineAsmExp t dia b1 b2 qs1 qs2 apsa fas)
      }
   
 rnActualParam2 :: ActualParam -> RD ActualParam

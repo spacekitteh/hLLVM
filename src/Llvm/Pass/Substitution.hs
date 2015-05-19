@@ -303,10 +303,10 @@ instance Substitutable Cinst where
                                , result = substitute chg result
                                }
         i@I_call_fun{..} -> i { call_ptr = substitute chg call_ptr
-                              , call_actualParams = substitute chg call_actualParams
+                              , call_fun_interface = substitute chg call_fun_interface
                               , call_return = substitute chg call_return
                               }
-        i@I_call_asm{..} -> i { call_actualParams = substitute chg call_actualParams
+        i@I_call_asm{..} -> i { call_asm_interface = substitute chg call_asm_interface
                               , call_return = substitute chg call_return
                               }
         i@I_extractelement_I{..} -> i { vectorI = substitute chg vectorI
@@ -731,15 +731,24 @@ instance Substitutable Tinst where
     T_indirectbr tv ls -> T_indirectbr (substitute chg tv) ls
     T_switch d o -> T_switch (substitute chg d) (substitute chg o)
     t@T_invoke{..} -> t { invoke_ptr = substitute chg invoke_ptr
-                        , invoke_actualParams = substitute chg invoke_actualParams
+                        , invoke_fun_interface = substitute chg invoke_fun_interface
                         , invoke_return = substitute chg invoke_return
                         }
-    t@T_invoke_asm{..} -> t { invoke_actualParams = substitute chg invoke_actualParams 
+    t@T_invoke_asm{..} -> t { invoke_asm_interface = substitute chg invoke_asm_interface
                             , invoke_return = substitute chg invoke_return
                             }
     T_resume (T dt v) -> T_resume (T dt (substitute chg v))
     T_unwind -> T_unwind
                     
+instance Substitutable CallFunInterface where
+  substitute chg x@CallFunInterface{..} = x { cfi_actualParams = substitute chg cfi_actualParams}
+    
+instance Substitutable InvokeFunInterface where
+  substitute chg x@InvokeFunInterface{..} = x { ifi_actualParams = substitute chg ifi_actualParams}
+
+instance Substitutable CallAsmInterface where
+  substitute chg x@CallAsmInterface{..} = x { cai_actualParams = substitute chg cai_actualParams}
+
 instance Substitutable ActualParam where
   substitute chg c = case c of
     ActualParamData dt pa ma v pa2 -> ActualParamData dt pa ma (substitute chg v) pa2

@@ -223,15 +223,47 @@ data FunPtr = FunId GlobalId
             | Fun_null
             | Fun_undef
             deriving (Eq, Ord, Show)
+                     
+data AsmCode = AsmCode { asm_dialect :: AsmDialect
+                       , asm_dqstring1 :: DqString
+                       , asm_dqstring2 :: DqString
+                       } deriving (Eq, Ord, Show)
 
-data CallSiteType = CallSiteRet Rtype
-                  | CallSiteFun (Type CodeFunB X) AddrSpace
+data CallSiteType = CallSiteTypeRet Rtype
+                  | CallSiteTypeFun (Type CodeFunB X) AddrSpace
                   deriving (Eq, Ord, Show)
 
-data CallSite = CsFun (Maybe CallConv) [ParamAttr] CallSiteType FunPtr [ActualParam] [FunAttr]
-              | CsAsm CallSiteType (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
-              deriving (Eq,Ord,Show)
+{-
+data CallFun = CallFun FunPtr CallFunInterface
+             deriving (Eq,Ord,Show)
+                       
+data CallAsm = CallAsm AsmCode CallAsmInterface
+             deriving (Eq, Ord, Show)
+-}
 
+data CallFunInterface = CallFunInterface { cfi_tail :: TailCall
+                                         , cfi_conv :: CallConv
+                                         , cfi_retAttrs :: [ParamAttr]
+                                         , cfi_type :: CallSiteType
+                                         , cfi_actualParams :: [ActualParam]
+                                         , cfi_funAttrs :: [FunAttr]
+                                         } deriving (Eq, Ord, Show)
+
+data InvokeFunInterface = InvokeFunInterface { ifi_conv :: CallConv
+                                             , ifi_retAttrs :: [ParamAttr]
+                                             , ifi_type :: CallSiteType
+                                             , ifi_actualParams :: [ActualParam]
+                                             , ifi_funAttrs :: [FunAttr]
+                                             } deriving (Eq, Ord, Show)
+
+data CallAsmInterface = CallAsmInterface { cai_type :: CallSiteType
+                                         , cai_sideeffect :: Maybe SideEffect
+                                         , cai_alignstack :: Maybe AlignStack
+                                         , cai_actualParams :: [ActualParam]
+                                         , cai_funAttrs :: [FunAttr]
+                                         } deriving (Eq, Ord, Show)
+
+                                          
 data Clause = Catch (T Dtype Value)
             | Filter TypedConstOrNull
             | CcoS (Conversion ScalarB Value)
@@ -356,25 +388,13 @@ data Cinst where {
                  , result :: LocalId
                  } -> Cinst;
 
-  I_call_fun :: { call_tail :: TailCall
-                , call_conv :: Maybe CallConv
-                , call_retAttrs :: [ParamAttr]
-                , call_type :: CallSiteType
-                , call_ptr :: FunPtr
-                , call_actualParams :: [ActualParam]
-                , call_funAttrs :: [FunAttr]
+  I_call_fun :: { call_ptr :: FunPtr
+                , call_fun_interface :: CallFunInterface
                 , call_return :: Maybe LocalId
                 } -> Cinst;
 
-  I_call_asm :: { call_tail :: TailCall
-                , call_type :: CallSiteType
-                , sideeffect :: Maybe SideEffect
-                , alignstack :: Maybe AlignStack
-                , dialect :: AsmDialect
-                , dqstring1 :: DqString
-                , dqstring2 :: DqString
-                , call_actualParams :: [ActualParam]
-                , call_funAttr :: [FunAttr]
+  I_call_asm :: { call_asmcode :: AsmCode
+                , call_asm_interface :: CallAsmInterface
                 , call_return :: Maybe LocalId
                 } -> Cinst;
 
@@ -1043,24 +1063,14 @@ data Tinst = T_unreachable
            | T_switch { defaultcase :: (T (Type ScalarB I) Value, Label)
                       , othercases :: [(T (Type ScalarB I) Value, Label)]
                       }
-           | T_invoke { invoke_conv :: Maybe CallConv
-                      , invoke_retAttrs :: [ParamAttr]
-                      , invoke_type :: CallSiteType
-                      , invoke_ptr :: FunPtr
-                      , invoke_actualParams :: [ActualParam]
-                      , invoke_funAttrs :: [FunAttr]
+           | T_invoke { invoke_ptr :: FunPtr
+                      , invoke_fun_interface :: InvokeFunInterface
                       , invoke_normal_label :: Label
                       , invoke_exception_label :: Label
                       , invoke_return :: Maybe LocalId
                       }
-           | T_invoke_asm { invoke_type :: CallSiteType
-                          , invoke_sideeffect :: Maybe SideEffect
-                          , invoke_alignstack :: Maybe AlignStack
-                          , invoke_dialect :: AsmDialect
-                          , invoke_dqstring1 :: DqString
-                          , invoke_dqstring2 :: DqString
-                          , invoke_actualParams :: [ActualParam]
-                          , invoke_funAttr :: [FunAttr]
+           | T_invoke_asm { invoke_asmcode :: AsmCode
+                          , invoke_asm_interface :: CallAsmInterface
                           , invoke_normal_label :: Label
                           , invoke_exception_label :: Label
                           , invoke_return :: Maybe LocalId

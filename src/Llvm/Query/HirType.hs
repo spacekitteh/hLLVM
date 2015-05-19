@@ -480,9 +480,9 @@ instance TypeOf Cinst Dtype where
     I_atomicrmw{..} -> let (T t _) = val
                        in Just $ ucast t
 
-    I_call_fun{..} -> typeof te call_type
+    I_call_fun{..} -> typeof te (cfi_type call_fun_interface)
     
-    I_call_asm{..} -> typeof te call_type
+    I_call_asm{..} -> typeof te (cai_type call_asm_interface)
     
     I_extractelement_I{..} -> let (T vt _) = vectorI
                               in Just $ ucast $ elementTypeOfVector te vt
@@ -659,8 +659,8 @@ instance TypeOf Rtype Dtype where
     
 instance TypeOf CallSiteType Dtype where
   typeof te x = case x of
-    CallSiteRet rt -> typeof te rt
-    CallSiteFun t as -> case t of
+    CallSiteTypeRet rt -> typeof te rt
+    CallSiteTypeFun t as -> case t of
       Tfunction rt _ _ -> typeof te rt
       TnameCodeFunX n -> errorLoc FLC $ "unsupported " ++ show x
 

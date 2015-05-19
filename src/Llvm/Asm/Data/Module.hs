@@ -15,17 +15,17 @@ import qualified Data.Map as M
 import Data.Word (Word32)
 
 {-
-  This AST is designed to make parsing and pretty print easy. 
-  It's not meant to be friendly to pattern matching and manual 
-  construction. 
+  This AST is designed to make parsing and pretty print easy.
+  It's not meant to be friendly to pattern matching and manual
+  construction.
 -}
 
 -- | quotation does not change a label value
 -- | it's still unclear when a quoted verion is used
 -- | we keep the original format to make llvm-as happy
-data LabelId = LabelString String 
+data LabelId = LabelString String
              | LabelDqString String -- a string enclosed by double quotes
-             | LabelNumber Word32 
+             | LabelNumber Word32
              | LabelDqNumber Word32 -- a number enclosed by double quotes
              deriving (Eq,Ord,Show)
 
@@ -152,7 +152,7 @@ data Expr = ExprGetElementPtr (GetElementPtr Value)
 
 -- | Memory Access and Addressing Operations <http://llvm.org/releases/3.5.0/docs/LangRef.html#memory-access-and-addressing-operations>
 data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe Alignment)
-           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal) 
+           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal)
              (Maybe InvariantLoad) (Maybe Nonnull)
            | LoadAtomic Atomicity (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment)
            | Store (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal)
@@ -170,16 +170,19 @@ instance Functor Pointer where
 
 data FunName = FunNameGlobal GlobalOrLocalId
              | FunNameBitcast (Typed Const) Type
-             | FunNameInttoptr (Typed Const) Type               
+             | FunNameInttoptr (Typed Const) Type
                -- well, it's a little weird, but LLVM allows this
-             | FunName_null 
+             | FunName_null
              | FunName_undef
-             | FunName_zero 
+             | FunName_zero
              deriving (Eq,Ord,Show)
 
 data CallSite = CallSiteFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-              | CallSiteAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
+                -- | CallSiteAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
+
+data InlineAsmExp = InlineAsmExp Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
+                       deriving (Eq, Ord, Show)
 
 data Clause = ClauseCatch (Typed Value)
             | ClauseFilter TypedConstOrNull
@@ -193,6 +196,7 @@ data TypedConstOrNull = TypedConst (Typed Const)
 data Rhs = RhsMemOp MemOp
          | RhsExpr Expr
          | RhsCall TailCall CallSite
+         | RhsInlineAsm InlineAsmExp
          | RhsExtractElement (ExtractElement Value)
          | RhsInsertElement (InsertElement Value)
          | RhsShuffleVector (ShuffleVector Value)
@@ -216,7 +220,7 @@ data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg]
 
 data ComputingInst = ComputingInst (Maybe LocalId) Rhs
                      deriving (Eq,Show)
-                              
+
 data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
                           | ComputingInstWithComment String
                             deriving (Eq,Show)
@@ -236,6 +240,7 @@ data TerminatorInst =
     | IndirectBr (Typed Value) [TargetLabel]
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_invoke>
     | Invoke (Maybe LocalId) CallSite TargetLabel TargetLabel
+    | InvokeInlineAsm (Maybe LocalId) InlineAsmExp TargetLabel TargetLabel
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_unwind>
     | Unwind
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_resume>
@@ -255,7 +260,7 @@ data ActualParam = ActualParamData Type [ParamAttr] (Maybe Alignment) Value [Par
 data Value = Val_local LocalId
            | Val_const Const
            deriving (Eq,Ord,Show)
-                    
+
 data Typed v = Typed Type v deriving (Eq, Ord, Show)
 
 data Aliasee = AliaseeTv (Typed Value)
@@ -346,7 +351,7 @@ data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Show)
 
 data TlComdat = TlComdat DollarId SelectionKind deriving (Eq, Show)
 
-data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg 
+data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg
            deriving (Eq,Show)
 
 blockLabel :: Block -> BlockLabel
@@ -354,19 +359,8 @@ blockLabel (Block v _ _ _) = v
 
 data Module = Module [Toplevel] deriving (Eq,Show)
 
-
-{-
-dataLayoutOfModule :: Module -> DataLayoutInfo
-dataLayoutOfModule (Module tl) = let [ToplevelDataLayout (TlDataLayout dl)] =
-                                       filter (\x -> case x of
-                                                  ToplevelDataLayout _ -> True
-                                                  _ -> False
-                                              ) tl
-                                 in getDataLayoutInfo dl
--}
-
 typeDefOfModule :: Module -> [(LocalId, Type)]
-typeDefOfModule (Module tl) = 
+typeDefOfModule (Module tl) =
   let tl0 = filter (\x -> case x of
                        ToplevelTypeDef _ -> True
                        _ -> False

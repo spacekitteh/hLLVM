@@ -256,7 +256,7 @@ pCallFun = do { cc <- opt pCallConv
               ; return (CallSiteFun cc atts0 t i params atts1)
               }
 
-pAsm ::  P CallSite
+pAsm ::  P InlineAsmExp
 pAsm = do { t <- pType
           ; reserved "asm"
           ; se <- opt (reserved "sideeffect" >> return SideEffect)
@@ -265,19 +265,25 @@ pAsm = do { t <- pType
           ; (s1, s2) <- pTuple pQuoteStr
           ; params <- parens (sepBy pActualParam comma)
           ; atts1 <- pFunAttrCollection
-          ; return (CallSiteAsm t se as dialect (DqString s1) (DqString s2) params atts1)
+          ; return (InlineAsmExp t se as dialect (DqString s1) (DqString s2) params atts1)
           }
 
 
 
 pCallSite :: P CallSite
-pCallSite = choice [try pCallFun, pAsm]
+pCallSite = choice [try pCallFun] -- , pAsm]
          
 pCall :: P Rhs
 pCall = do { tl <- option TcNon pTailCall 
            ; reserved "call"
            ; (liftM (RhsCall tl) pCallSite)
            }
+        
+pRhsInlineAsm :: P Rhs        
+pRhsInlineAsm = do { tl <- option TcNon pTailCall
+                   ; reserved "call"
+                   ; liftM RhsInlineAsm pAsm
+                   }
 
 pActualParam :: P ActualParam
 pActualParam = choice [do { t <- pType
@@ -307,7 +313,8 @@ pRhs = choice [ liftM RhsExpr pExpr
               , liftM RhsExtractValue pExtractValue
               , liftM RhsInsertValue pInsertValue
               , pVaArg
-              , pCall
+              , try pCall
+              , pRhsInlineAsm
               , pLandingPad
               ]
 

@@ -33,7 +33,7 @@ funName = ask >>= return . funname
 
 withFunName :: A.GlobalId -> MM a -> MM a
 withFunName g f = withReaderT (\(ReaderData x _) -> ReaderData x g) f
-  
+
 {- Ast to Ir conversion -}
 -- the real differences between Ast and Ir
 -- 1. Ir uses Unique values as labels while Ast can use any strings as labels
@@ -216,13 +216,13 @@ convert_to_Conversion cvt  (A.Conversion op (A.Typed t u) dt) =
                           in I.Trunc (I.T t2 u1) dt2
                A.Zext -> let (t2::I.Type I.ScalarB I.I) = dcast FLC t1
                              (dt2::I.Type I.ScalarB I.I) = dcast FLC dt1
-                         in I.Zext (I.T t2 u1) dt2 
+                         in I.Zext (I.T t2 u1) dt2
                A.Sext -> let (t2::I.Type I.ScalarB I.I) = dcast FLC t1
                              (dt2::I.Type I.ScalarB I.I) = dcast FLC dt1
-                         in I.Sext (I.T t2 u1) dt2 
+                         in I.Sext (I.T t2 u1) dt2
                A.FpTrunc -> let (t2::I.Type I.ScalarB I.F) = dcast FLC t1
                                 (dt2::I.Type I.ScalarB I.F) = dcast FLC dt1
-                            in I.FpTrunc (I.T t2 u1) dt2 
+                            in I.FpTrunc (I.T t2 u1) dt2
                A.FpExt -> let (t2::I.Type I.ScalarB I.F) = dcast FLC t1
                               (dt2::I.Type I.ScalarB I.F) = dcast FLC dt1
                           in I.FpExt (I.T t2 u1) dt2 
@@ -855,53 +855,50 @@ convert_to_Minst lhs x = case x of
        }
   _ -> return Nothing 
 
-convert_to_CallSite :: Maybe A.LocalId -> A.CallSite -> MM (Bool, I.CallSite)
-convert_to_CallSite lhs x = case x of
-  (A.CallSiteFun cc pa t fn aps fa) ->
-    do { mp <- typeDefs
-       ; let ert = A.splitCallReturnType t
-             erta = eitherRet mp ert
-       ; fna <- convert_FunPtr fn
-       ; apsa <- mapM convert_ActualParam aps
-       ; return (fst ert == A.Tvoid, I.CsFun cc pa erta fna apsa fa)
-       }
+convert_to_CallFunInterface :: A.TailCall -> A.CallSite -> MM (Bool, I.FunPtr, I.CallFunInterface)
+convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) = 
+  do { mp <- typeDefs
+     ; let ert = A.splitCallReturnType t
+           erta = eitherRet mp ert
+     ; fna <- convert_FunPtr fn
+     ; apsa <- mapM convert_ActualParam aps
+     ; return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) pa erta apsa fa)
+     }
 
-  (A.CallSiteAsm t dia b1 b2 qs1 qs2 as fa) ->
-    do { mp <- typeDefs
-       ; let ert = A.splitCallReturnType t
-             erta = eitherRet mp ert
-       ; asa <- mapM convert_ActualParam as
-       ; let rt::I.Utype = tconvert mp (fst ert)
-       ; return (fst ert == A.Tvoid, I.CsAsm erta dia b1 b2 qs1 qs2 asa fa)
-       }
-    {-    
-  (A.CsConversion pa t cv as fa) -> errorLoc FLC $ show x
-    do { mp <- typeDefs
-       ; let ert = A.splitCallReturnType t
-             erta = eitherRet mp ert
-       ; asa <- mapM convert_ActualParam as
-       ; if isTvector mp t then errorLoc FLC $ show x
-         else
-           do { cva <- convert_to_Conversion convert_Const cv
-              ; case cva of
-                I.Bitcast (I.T t (I.C_globalAddr c)) dt -> 
-                  return (fst ert == A.Tvoid, I.CsFun Nothing pa erta (I.FunIdCast (I.T t c) dt) asa fa)
-                _ -> errorLoc FLC $ show x
-              }
-       } -}
+convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr, I.InvokeFunInterface)
+convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) = 
+  do { mp <- typeDefs
+     ; let ert = A.splitCallReturnType t
+           erta = eitherRet mp ert
+     ; fna <- convert_FunPtr fn
+     ; apsa <- mapM convert_ActualParam aps
+     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) pa erta apsa fa)
+     }
+
+
+convert_to_CallAsmInterface :: A.InlineAsmExp -> MM (Bool, I.AsmCode, I.CallAsmInterface)
+convert_to_CallAsmInterface  (A.InlineAsmExp t dia b1 b2 qs1 qs2 as fa) =
+  do { mp <- typeDefs
+     ; let ert = A.splitCallReturnType t
+           erta = eitherRet mp ert
+     ; asa <- mapM convert_ActualParam as
+     ; let rt::I.Utype = tconvert mp (fst ert)
+     ; return (fst ert == A.Tvoid, I.AsmCode b2 qs1 qs2, I.CallAsmInterface erta dia b1 asa fa)
+     }
+
     
 eitherRet :: MP -> (A.Type, Maybe (A.Type, A.AddrSpace)) -> I.CallSiteType
 eitherRet mp (rt, ft) = case ft of
-  Just (fta,as) -> I.CallSiteFun (dcast FLC ((tconvert mp fta)::I.Utype)) (tconvert mp as)
-  Nothing -> I.CallSiteRet $ dcast FLC ((tconvert mp rt)::I.Utype)
+  Just (fta,as) -> I.CallSiteTypeFun (dcast FLC ((tconvert mp fta)::I.Utype)) (tconvert mp as)
+  Nothing -> I.CallSiteTypeRet $ dcast FLC ((tconvert mp rt)::I.Utype)
 
 convert_Clause :: A.Clause -> MM I.Clause
 convert_Clause x = case x of 
   (A.ClauseCatch (A.Typed t v)) -> do { mp <- typeDefs
-                                ; let (ti::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
-                                ; vi <- convert_Value v
-                                ; return $ I.Catch (I.T ti vi)
-                                }
+                                      ; let (ti::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
+                                      ; vi <- convert_Value v
+                                      ; return $ I.Catch (I.T ti vi)
+                                      }
   (A.ClauseFilter tc) -> Md.liftM I.Filter (convert_TypedConstOrNUll tc)
   (A.ClauseConversion tc) ->  
     do { mp <- typeDefs
@@ -1188,12 +1185,14 @@ convert_Rhs (lhs, A.RhsCall b cs) =
        Just mi -> return $ I.Mnode mi []
        Nothing -> 
          Md.liftM (\x -> I.Cnode x []) $ 
-         do { (isvoid, csi) <- convert_to_CallSite lhs cs
-            ; return $ maybe (case csi of 
-                                 I.CsFun cc pa cstype fn ap fa -> I.I_call_fun b cc pa cstype fn ap fa lhs
-                                 I.CsAsm rt mse mas dia s1 s2 aps fa -> I.I_call_asm b rt mse mas dia s1 s2 aps fa lhs
-                             ) id (specializeCallSite lhs csi)
+         do { (isvoid, fnptr, csi) <- convert_to_CallFunInterface b cs
+            ; return $ maybe (I.I_call_fun fnptr csi lhs) id (specializeCallSite lhs fnptr csi)
             }
+     }
+convert_Rhs (lhs, A.RhsInlineAsm cs) = 
+  Md.liftM (\x -> I.Cnode x []) $ 
+  do { (isvoid, asm, csi) <- convert_to_CallAsmInterface cs
+     ; return $ I.I_call_asm asm csi lhs
      }
 convert_Rhs (Just lhs, A.RhsVaArg (A.VaArg tv t)) = 
   do { tvi <- convert_to_DtypedValue tv
@@ -1355,8 +1354,9 @@ convert_TerminatorInst :: A.TerminatorInst -> MM I.Tinst
 convert_TerminatorInst (A.RetVoid) = return I.T_ret_void
 convert_TerminatorInst (A.Return tvs) = Md.liftM I.T_return (mapM convert_to_DtypedValue tvs)
 convert_TerminatorInst (A.Br t) = Md.liftM I.T_br (convert_TargetLabel t)
-convert_TerminatorInst (A.Cbr cnd t f) = Md.liftM3 I.T_cbr (convert_Value cnd) (convert_TargetLabel t) 
-                                         (convert_TargetLabel f)
+convert_TerminatorInst (A.Cbr cnd t f) = 
+  Md.liftM3 I.T_cbr (convert_Value cnd) (convert_TargetLabel t) 
+  (convert_TargetLabel f)
 convert_TerminatorInst (A.IndirectBr cnd bs) = 
   Md.liftM2 I.T_indirectbr (convert_to_TypedAddrValue FLC cnd) (mapM convert_TargetLabel bs)
 convert_TerminatorInst (A.Switch cnd d cases) = 
@@ -1366,15 +1366,17 @@ convert_TerminatorInst (A.Switch cnd d cases) =
      ; return $ I.T_switch (dc, dl) other
      }
 convert_TerminatorInst (A.Invoke mg cs t f) = 
-  do { (_, csa) <- convert_to_CallSite Nothing cs
+  do { (_, fptr, csa) <- convert_to_InvokeFunInterface cs
      ; ta <- convert_TargetLabel t
      ; fa <- convert_TargetLabel f
-     ; case csa of
-       I.CsFun mcnv ra cst fptr ap cfa -> 
-         return $ I.T_invoke mcnv ra cst fptr ap cfa ta fa mg
-       I.CsAsm rt mse mas dia s1 s2 aps cfa -> 
-         return $ I.T_invoke_asm rt mse mas dia s1 s2 aps cfa ta fa mg
+     ; return $ I.T_invoke fptr csa ta fa mg
      }
+convert_TerminatorInst (A.InvokeInlineAsm mg cs t f) = 
+  do { (_, asm, csa) <- convert_to_CallAsmInterface cs
+     ; ta <- convert_TargetLabel t
+     ; fa <- convert_TargetLabel f
+     ; return $ I.T_invoke_asm asm csa ta fa mg
+     }  
 convert_TerminatorInst (A.Resume tv) = Md.liftM I.T_resume (convert_to_DtypedValue tv)
 convert_TerminatorInst A.Unreachable = return I.T_unreachable
 convert_TerminatorInst A.Unwind = return I.T_unwind

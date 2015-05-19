@@ -10,22 +10,23 @@ import Data.Maybe
 
 #define FLC  (FileLoc $(srcLoc))
 
-specializeCallSite :: Maybe LocalId -> CallSite -> Maybe Cinst
-specializeCallSite lhs csi = case csi of
-  CsFun Nothing [] _ (FunId (GlobalIdAlphaNum "llvm.va_start"))
-    [ActualParamData t1 [] Nothing v []] [] | isNothing lhs -> Just $ I_llvm_va_start v
-  CsFun Nothing [] _ (FunId (GlobalIdAlphaNum "llvm.va_end"))
-    [ActualParamData t1 [] Nothing v []] [] | isNothing lhs -> Just $ I_llvm_va_end v
-  CsFun Nothing [] _ (FunId (GlobalIdAlphaNum "llvm.va_copy"))
-    [ActualParamData t1 [] Nothing v1 []
-    ,ActualParamData t2 [] Nothing v2 []] [] | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
-  CsFun Nothing [] _ (FunId (GlobalIdAlphaNum nm))
-    [ActualParamData t1 [] Nothing v1 [] -- dest
-    ,ActualParamData t2 [] Nothing v2 [] -- src or setValue
-    ,ActualParamData t3 [] Nothing v3 [] -- len
-    ,ActualParamData t4 [] Nothing v4 [] -- align
-    ,ActualParamData t5 [] Nothing v5 [] -- volatile
-    ] [] | isNothing lhs && (nm == "llvm.memcpy.p0i8.p0i8.i32" 
+specializeCallSite :: Maybe LocalId -> FunPtr -> CallFunInterface -> Maybe Cinst
+specializeCallSite lhs fptr csi = case (fptr, csi) of
+  (FunId (GlobalIdAlphaNum "llvm.va_start"),
+   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v []] []) | isNothing lhs -> Just $ I_llvm_va_start v
+  (FunId (GlobalIdAlphaNum "llvm.va_end"),
+   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v []] []) | isNothing lhs -> Just $ I_llvm_va_end v
+  (FunId (GlobalIdAlphaNum "llvm.va_copy"),
+   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v1 []
+                                   ,ActualParamData t2 [] Nothing v2 []] []) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
+  (FunId (GlobalIdAlphaNum nm), 
+   CallFunInterface TcNon Ccc [] _ 
+   [ActualParamData t1 [] Nothing v1 [] -- dest
+   ,ActualParamData t2 [] Nothing v2 [] -- src or setValue
+   ,ActualParamData t3 [] Nothing v3 [] -- len
+   ,ActualParamData t4 [] Nothing v4 [] -- align
+   ,ActualParamData t5 [] Nothing v5 [] -- volatile
+   ] []) | isNothing lhs && (nm == "llvm.memcpy.p0i8.p0i8.i32" 
                              || nm == "llvm.memcpy.p0i8.p0i8.i64"
                              || nm == "llvm.memmove.p0i8.p0i8.i32"
                              || nm == "llvm.memmove.p0i8.p0i8.i64"
@@ -57,32 +58,36 @@ specializeCallSite lhs csi = case csi of
 unspecializeIntrinsics :: Cinst -> Maybe Cinst
 unspecializeIntrinsics inst = case inst of
   I_llvm_va_start v -> 
-    Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum "llvm.va_start"))
-    [tvToAp (T (ptr0 i8) v)] [] Nothing
+    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_start")) 
+    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) [tvToAp (T (ptr0 i8) v)] []) Nothing
   I_llvm_va_end v -> 
-    Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum "llvm.va_end"))
-    [tvToAp (T (ptr0 i8) v)] [] Nothing
+    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_end"))
+    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) [tvToAp (T (ptr0 i8) v)] []) Nothing
   I_llvm_va_copy v1 v2 ->
-    Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum "llvm.va_copy"))
-    [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)] [] Nothing
+    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_copy"))
+    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
+     [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)] []) Nothing
   I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
     let nm = case memLen of
           MemLenI32 -> "llvm.memcpy.p0i8.p0i8.i32"
           MemLenI64 -> "llvm.memcpy.p0i8.p0i8.i64"
-    in Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum nm))
-       ([tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) [] Nothing
+    in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
+       (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
+        ([tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
   I_llvm_memmove memLen tv1 tv2 tv3 tv4 tv5 -> 
     let nm = case memLen of
           MemLenI32 -> "llvm.memmove.p0i8.p0i8.i32"
           MemLenI64 -> "llvm.memmove.p0i8.p0i8.i64"
-    in Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum nm))
-       ([tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) [] Nothing
+    in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
+       (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
+        ([tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
   I_llvm_memset memLen tv1 tv2 tv3 tv4 tv5 -> 
     let nm = case memLen of
           MemLenI32 -> "llvm.memset.p0i8.i32"
           MemLenI64 -> "llvm.memset.p0i8.i64"
-    in Just $ I_call_fun TcNon Nothing [] (CallSiteRet (RtypeVoidU Tvoid)) (FunId (GlobalIdAlphaNum nm))
-       ([tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) [] Nothing
+    in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
+       (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
+        ([tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
   _ -> Nothing
     
 tvToAp :: Ucast t Dtype => T t Value -> ActualParam
@@ -93,8 +98,10 @@ tvToAp (T t v) = ActualParamData (ucast t) [] Nothing v []
 specializeTlGlobal :: TlGlobal -> Maybe TlIntrinsic
 specializeTlGlobal tl = case tl of
   TlGlobalDtype {..} -> case tlg_lhs of
-    GlobalIdAlphaNum nm | (nm == "llvm.used" || nm == "llvm.compiler.used" 
-                           || nm == "llvm.global_ctors" || nm == "llvm.global_dtors") && tlg_linkage == Just LinkageAppending -> 
+    GlobalIdAlphaNum nm | (nm == "llvm.used" 
+                           || nm == "llvm.compiler.used" 
+                           || nm == "llvm.global_ctors" 
+                           || nm == "llvm.global_dtors") && tlg_linkage == Just LinkageAppending -> 
       
       let cnf = case nm of
             "llvm.used" -> TlIntrinsic_llvm_used

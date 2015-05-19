@@ -221,7 +221,9 @@ instance AsmPrint CallSite where
   toLlvm (CallSiteFun cc ra rt ident params fa) = 
     hsep [toLlvm cc, hsep $ fmap toLlvm ra, toLlvm rt, toLlvm ident, 
           parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
-  toLlvm (CallSiteAsm t se as dia s1 s2 params fa) = 
+    
+instance AsmPrint InlineAsmExp where
+  toLlvm (InlineAsmExp t se as dia s1 s2 params fa) = 
     hsep [toLlvm t, text "asm", toLlvm se, toLlvm as, toLlvm dia, 
           toLlvm s1 <> comma, toLlvm s2, parens (commaSepList $ fmap toLlvm params), hsep $ fmap toLlvm fa]
    
@@ -258,10 +260,11 @@ instance AsmPrint Rhs where
   toLlvm (RhsMemOp a) = toLlvm a
   toLlvm (RhsExpr a) = toLlvm a
   toLlvm (RhsCall tailc callSite) = hsep [toLlvm tailc, text "call", toLlvm callSite]
+  toLlvm (RhsInlineAsm callSite) = hsep [text "call", toLlvm callSite]  
   toLlvm (RhsExtractElement a) = toLlvm a
   toLlvm (RhsInsertElement a) = toLlvm a
   toLlvm (RhsShuffleVector a) = toLlvm a
-  toLlvm (RhsExtractValue a) = toLlvm a
+  toLlvm (RhsExtractValue a) = toLlvm a 
   toLlvm (RhsInsertValue a) = toLlvm a
   toLlvm (RhsVaArg (VaArg tv t)) = hsep [text "va_arg", toLlvm tv <> comma, toLlvm t]
   toLlvm (RhsLandingPad (LandingPad rt pt tgl b clause)) = 
@@ -299,6 +302,9 @@ instance AsmPrint TerminatorInst where
   toLlvm (Invoke lhs callSite toL unwindL) = 
     hsep [maybe empty ((<+> equals) . toLlvm) lhs, text "invoke", toLlvm callSite, text "to"
          , toLlvm toL, text "unwind", toLlvm unwindL]
+  toLlvm (InvokeInlineAsm lhs callSite toL unwindL) = 
+    hsep [maybe empty ((<+> equals) . toLlvm) lhs, text "invoke", toLlvm callSite, text "to"
+         , toLlvm toL, text "unwind", toLlvm unwindL]    
   toLlvm Unreachable = text "unreachable"
   toLlvm (Resume a) = text "resume" <+> toLlvm a
              
