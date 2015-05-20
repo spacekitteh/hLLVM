@@ -11,32 +11,31 @@ class Mangle a where
   
 replaceDq :: String -> String
 replaceDq s = fmap (\x -> if x == '"' then '_' else x) s
-  
 
-instance Mangle a => Mangle ([a]) where  
-  mangle l = foldl (\p e -> p ++ (mangle e)) "" l
+instance Mangle a => Mangle [a] where  
+  mangle l = concat $ fmap mangle l
   
 instance Mangle a => Mangle (Maybe a) where  
   mangle x = case x of
     Nothing -> ""
     Just e -> mangle e
-  
+
 instance (Mangle l, Mangle r) => Mangle (Either l r) where  
   mangle e = case e of
     Left l -> mangle l
     Right r -> mangle r
-  
+
 instance Mangle Const where
   mangle c = replaceDq $ show c
 
 instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
-    
+
 instance Mangle Rtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
-    
+
 instance Mangle Etype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
@@ -57,7 +56,7 @@ instance Mangle Utype where
                    UtypeLabelX e -> mangle e
              in replaceDq s
 
-instance Mangle ScalarType where                
+instance Mangle ScalarType where
   mangle t = case t of
     ScalarTypeI x -> mangle x
     ScalarTypeF x -> mangle x
@@ -66,23 +65,26 @@ instance Mangle ScalarType where
 instance Mangle Word32 where
   mangle x = show x
   
-instance Mangle TailCall where  
+instance Mangle TailCall where
   mangle x = render $ printIr x
   
-instance Mangle CallConv where  
+instance Mangle CallConv where
   mangle x = render $ printIr x
   
-instance Mangle CallSiteType where  
+instance Mangle Alignment where
+  mangle x = show x
+  
+instance Mangle CallSiteType where
   mangle x = case x of
     CallSiteTypeRet t -> render $ printIr t
     CallSiteTypeFun t as -> render $ printIr t
   
-instance Mangle Packing where  
+instance Mangle Packing where
   mangle x = case x of
     Packed -> "PK"
     Unpacked -> "UNPK"
-      
-instance Mangle VarArgParam where      
+  
+instance Mangle VarArgParam where
   mangle _ = "3dot"
   
 instance Mangle TypeParamList where
@@ -91,17 +93,12 @@ instance Mangle TypeParamList where
 instance Mangle FunAttr where
   mangle x = render $ printIr x
   
-instance Mangle ParamAttr where  
+instance Mangle ParamAttr where
   mangle x = render $ printIr x
   
-instance Mangle ActualParam where  
+instance Mangle ActualParam where
   mangle x = render $ printIr x
   
-{-
-instance Mangle FunPtr where  
--}
-  
-
 instance Mangle (Type s r) where
   mangle x = case x of
     TpI n -> "i" ++ mangle n
