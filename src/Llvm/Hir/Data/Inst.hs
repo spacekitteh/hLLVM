@@ -223,7 +223,7 @@ data FunPtr = FunId GlobalId
             | Fun_null
             | Fun_undef
             deriving (Eq, Ord, Show)
-                     
+
 data AsmCode = AsmCode { asm_dialect :: AsmDialect
                        , asm_dqstring1 :: DqString
                        , asm_dqstring2 :: DqString
@@ -236,7 +236,7 @@ data CallSiteType = CallSiteTypeRet Rtype
 {-
 data CallFun = CallFun FunPtr CallFunInterface
              deriving (Eq,Ord,Show)
-                       
+
 data CallAsm = CallAsm AsmCode CallAsmInterface
              deriving (Eq, Ord, Show)
 -}
@@ -263,7 +263,7 @@ data CallAsmInterface = CallAsmInterface { cai_type :: CallSiteType
                                          , cai_funAttrs :: [FunAttr]
                                          } deriving (Eq, Ord, Show)
 
-                                          
+
 data Clause = Catch (T Dtype Value)
             | Filter TypedConstOrNull
             | CcoS (Conversion ScalarB Value)
@@ -460,12 +460,12 @@ data Cinst where {
                    , result :: LocalId
                    } ->  Cinst;
 
-  I_landingpad :: { resultType :: Dtype 
-                  , persFnType :: Dtype 
-                  , persFn :: FunPtr -- PersFn 
-                  , cleanup :: Maybe Cleanup 
-                  , clauses :: [Clause] 
-                  , result :: LocalId 
+  I_landingpad :: { resultType :: Dtype
+                  , persFnType :: Dtype
+                  , persFn :: FunPtr -- PersFn
+                  , cleanup :: Maybe Cleanup
+                  , clauses :: [Clause]
+                  , result :: LocalId
                   } -> Cinst;
 
   I_getelementptr :: { inBounds :: IsOrIsNot InBounds
@@ -946,12 +946,12 @@ data Cinst where {
                    } -> Cinst;
 
   I_llvm_gcread :: { reference :: Value
-                   , readFrom :: Value 
+                   , readFrom :: Value
                    } -> Cinst;
-  
+
   I_llvm_gcwrite :: { p1 :: Value
-                    , obj :: Value 
-                    , p2 :: Value 
+                    , obj :: Value
+                    , p2 :: Value
                     } -> Cinst;
 
   I_llvm_returnaddress :: { level :: Value {- i32 -} } -> Cinst;
@@ -997,18 +997,18 @@ data Cinst where {
                    , align :: T (Type ScalarB I) Value
                    , isvolatile :: T (Type ScalarB I) Value
                    } -> Cinst;
-  
+
   I_llvm_libm_una :: { muop :: LibmUnaryExp
-                     , result :: LocalId 
+                     , result :: LocalId
                      } -> Cinst;
-  
+
   I_llvm_libm_bin :: { mbop :: LibmBinaryExp
-                     , result :: LocalId 
+                     , result :: LocalId
                      } -> Cinst;
-  
+
   I_llvm_powi :: { realOperand :: T (Type ScalarB F) Value
                  , intOperand :: T (Type ScalarB I) Value
-                 , result :: LocalId 
+                 , result :: LocalId
                  } -> Cinst;
 
   I_llvm_bitset_test :: Value -> Value -> LocalId -> Cinst;
@@ -1016,27 +1016,27 @@ data Cinst where {
   } deriving (Eq, Ord, Show)
 
 
-data LibmUnaryExp = Sqrt (Type ScalarB F) Value 
+data LibmUnaryExp = Sqrt (Type ScalarB F) Value
                   | Sin (Type ScalarB F)  Value
-                  | Cos (Type ScalarB F) Value 
+                  | Cos (Type ScalarB F) Value
                   | Exp (Type ScalarB F) Value
-                  | Exp2 (Type ScalarB F) Value 
-                  | Log (Type ScalarB F) Value 
-                  | Log10 (Type ScalarB F) Value 
-                  | Log2 (Type ScalarB F) Value 
-                  | Fabs (Type ScalarB F) Value 
-                  | Floor (Type ScalarB F) Value 
-                  | Ceil (Type ScalarB F) Value 
-                  | Ftrunc (Type ScalarB F) Value 
+                  | Exp2 (Type ScalarB F) Value
+                  | Log (Type ScalarB F) Value
+                  | Log10 (Type ScalarB F) Value
+                  | Log2 (Type ScalarB F) Value
+                  | Fabs (Type ScalarB F) Value
+                  | Floor (Type ScalarB F) Value
+                  | Ceil (Type ScalarB F) Value
+                  | Ftrunc (Type ScalarB F) Value
                   | Rint (Type ScalarB F) Value
-                  | NearByInt (Type ScalarB F) Value 
-                  | Round (Type ScalarB F) Value 
+                  | NearByInt (Type ScalarB F) Value
+                  | Round (Type ScalarB F) Value
                   deriving (Eq, Ord, Show)
 
-data LibmBinaryExp = Pow (Type ScalarB F) Value Value 
-                   | Minnum (Type ScalarB F) Value Value 
+data LibmBinaryExp = Pow (Type ScalarB F) Value Value
+                   | Minnum (Type ScalarB F) Value Value
                    | Maxnum (Type ScalarB F) Value Value
-                   | CopySign (Type ScalarB F) Value Value 
+                   | CopySign (Type ScalarB F) Value Value
                    deriving (Eq, Ord, Show)
 
 data MemLen = MemLenI32
@@ -1081,7 +1081,6 @@ data Tinst = T_unreachable
 
 data ActualParam = ActualParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
                  | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label [ParamAttr]
-                 -- | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 
 data Value = Val_ssa LocalId
