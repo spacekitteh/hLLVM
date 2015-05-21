@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, GADTs, RecordWildCards, TemplateHaskell #-}
 
-module Llvm.Pass.DataUsage (scanModule,DataUsage(..)) where
+module Llvm.Pass.DataUsage where
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Map as Dm
@@ -61,6 +61,12 @@ data DataUsage = DataUsage { -- | The addresses that store pointer parameters
                            , callAsmInfoSet :: S.Set CallAsmInterface
                            } deriving (Eq, Ord, Show)
 
+
+class DataUsageUpdator a where
+  update :: a -> DataUsage -> DataUsage
+  
+instance DataUsageUpdator () where  
+  update _ = id
 
 addAddrStoringPtrParam :: Value -> DataUsage -> DataUsage
 addAddrStoringPtrParam v du@DataUsage{..} =
@@ -197,7 +203,7 @@ unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16
     (s13 `S.union` t13) (s14 `Dm.union` t14) (s15 `Dm.union` t15)
     (s16 `S.union` t16)    
 
-bwdScan :: forall a.forall m. (Show a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node a) DataUsage
+bwdScan :: forall a.forall m. (Show a, DataUsageUpdator a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node a) DataUsage
 bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                  , H.bp_transfer = H.mkBTransfer (bwdTran formalParams)
                                  , H.bp_rewrite = H.noBwdRewrite
@@ -224,7 +230,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
           _ -> f0
       Lnode _ -> f
       Pnode (Pinst{..}) _ -> foldl (\p (e, _) -> propogateUpPtrUsage flowout e p) f flowins
-      Enode x -> f
+      Enode x -> update x f
       Comment _ -> f
       Cnode comp _ -> case comp of
         I_alloca{..} ->
@@ -467,13 +473,13 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                        _ -> p
                                    ) S.empty ls
 
-scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a) => S.Set LocalId -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
+scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => S.Set LocalId -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
 scanGraph fm entry graph =
   do { (_, a, _) <- H.analyzeAndRewriteBwd (bwdScan fm) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyDataUsage (H.lookupFact entry a))
      }
 
-scanDefine :: (CheckpointMonad m, FuelMonad m, Show a) => IrCxt -> TlDefine a -> m DataUsage
+scanDefine :: (CheckpointMonad m, FuelMonad m, Show a, DataUsageUpdator a) => IrCxt -> TlDefine a -> m DataUsage
 scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
   where formalParamIds :: S.Set LocalId
         formalParamIds = let (FormalParamList l _ _) = fp_param_list fn
@@ -482,7 +488,7 @@ scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
                                       _ -> p
                                   ) S.empty l
 
-scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show a) => Module a -> IrCxt -> m (Dm.Map FunctionPrototype DataUsage)
+scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => Module a -> IrCxt -> m (Dm.Map FunctionPrototype DataUsage)
 scanModule (Module l) ic =
   do { l0 <- mapM (\x -> case x of
                       ToplevelDefine def@(TlDefine fn _ _) ->

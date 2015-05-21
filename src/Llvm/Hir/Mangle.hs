@@ -10,7 +10,10 @@ class Mangle a where
   mangle :: a -> String
   
 replaceDq :: String -> String
-replaceDq s = fmap (\x -> if x == '"' then '_' else x) s
+replaceDq s = fmap (\x -> case x of 
+                       '"' -> '_' 
+                       ' ' -> '_'
+                       _ -> x) s
 
 instance Mangle a => Mangle [a] where  
   mangle l = concat $ fmap mangle l
@@ -26,7 +29,7 @@ instance (Mangle l, Mangle r) => Mangle (Either l r) where
     Right r -> mangle r
 
 instance Mangle Const where
-  mangle c = replaceDq $ show c
+  mangle c = replaceDq $ render $ printIr c
 
 instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 

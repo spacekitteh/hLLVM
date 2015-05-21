@@ -1228,9 +1228,10 @@ convertNode (I.Lnode a) p = do { (bl, bs, Nothing) <- p
                                }
 convertNode (I.Pnode a dbgs) p = do { (bl, bs, pblk) <- p
                                     ; case pblk of
-                                      Just (pb, phis, l) | all isComment l -> do { a' <- convert (PhiInstWithDbg a dbgs)
-                                                                                 ; return (bl, bs, Just (pb, a':phis, l))
-                                                                                 }
+                                      Just (pb, phis, l) | all isComment l -> 
+                                        do { a' <- convert (PhiInstWithDbg a dbgs)
+                                           ; return (bl, bs, Just (pb, a':phis, l))
+                                           }
                                       _ -> errorLoc FLC $ "irrefutable:unexpected case " ++ show pblk
                                     }
 convertNode (I.Cnode a dbgs) p = do { (bl, bs, Just (pb, phis, cs)) <- p
@@ -1242,7 +1243,8 @@ convertNode (I.Mnode a dbgs) p = do { (bl, bs, Just (pb, phis, cs)) <- p
                                     ; return (bl, bs, Just (pb, phis, a':cs))
                                     }
 convertNode (I.Comment a) p = do { (bl, bs, Just (pb, phis, cs)) <- p
-                                 ; return (bl, bs, Just (pb, phis, (A.ComputingInstWithComment a):cs))
+                                 ; let comments = reverse $ fmap A.ComputingInstWithComment (I.commentize a)
+                                 ; return (bl, bs, Just (pb, phis, comments ++ cs))
                                  }
 convertNode (I.Tnode a dbgs) p = do { (bl, bs, pb) <- p
                                     ; a' <- convert (TerminatorInstWithDbg a dbgs)

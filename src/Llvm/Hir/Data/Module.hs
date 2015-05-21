@@ -2,10 +2,12 @@
 module Llvm.Hir.Data.Module
     (module Llvm.Hir.Data.Module
     , module Llvm.Hir.Data.Inst
+    , module Llvm.Hir.Data.Commentor
     , module Data.Word
     )
     where
 import Llvm.Hir.Data.Inst
+import Llvm.Hir.Data.Commentor
 import qualified Llvm.Hir.Data.Inst as Ci
 import qualified Compiler.Hoopl as H
 import Data.Word (Word32)
@@ -117,6 +119,8 @@ data TlComdat = TlComdat Ci.DollarId Ci.SelectionKind deriving (Eq, Ord, Show)
 
 data Module a = Module [Toplevel a] 
 
+  
+  
 data Node a e x where
   -- | Lnode represents the name of a basic block
   Lnode :: H.Label -> Node a H.C H.O
@@ -129,7 +133,7 @@ data Node a e x where
   -- | It's handy if we can communicate some decisions or changes made by
   -- | dataflow analyses/transformations back as comments, so I create this
   -- | Comment node, it is NOOP and will display as a comment in LLVM assembly codes
-  Comment :: String -> Node a H.O H.O
+  Comment :: Commentor s => s -> Node a H.O H.O
   -- | Extension node, it could be NOOP or any customization node used by
   -- | backends to facilitate dataflow analysis and transformations.
   -- | The clients of this library should never handle this node. If 
@@ -144,7 +148,7 @@ instance Show a => Show (Node a e x) where
     Pnode v dbgs -> "Pnode : Node O O:" ++ show v ++ show dbgs
     Cnode v dbgs -> "Cnode : Node O O:" ++ show v ++ show dbgs
     Mnode v dbgs -> "Mnode : Node O O:" ++ show v ++ show dbgs    
-    Comment s -> "Comment : Node O O:" ++ s
+    Comment s -> "Comment : Node O O:" ++ show (commentize s)
     Enode a -> "Enode : Node O O:" ++ show a
     Tnode v dbgs -> "Tnode : Node O C:" ++ show v ++ show dbgs    
 
@@ -154,7 +158,7 @@ instance Eq a => Eq (Node a e x) where
     (Pnode v1 d1, Pnode v2 d2) -> v1 == v2 && d1 == d2
     (Cnode v1 d1, Cnode v2 d2) -> v1 == v2 && d1 == d2
     (Mnode v1 d1, Mnode v2 d2) -> v1 == v2 && d1 == d2    
-    (Comment v1, Comment v2) -> v1 == v2
+    (Comment v1, Comment v2) -> commentize v1 == commentize v2
     (Enode a1, Enode a2) -> a1 == a2
     (Tnode v1 d1, Tnode v2 d2) -> v1 == v2 && d1 == d2    
     (_, _) -> False
@@ -165,7 +169,7 @@ instance (Show a, Ord a) => Ord (Node a e x) where
     (Pnode v1 d1, Pnode v2 d2) -> compare (v1,d1) (v2,d2)
     (Cnode v1 d1, Cnode v2 d2) -> compare (v1,d1) (v2,d2)
     (Mnode v1 d1, Mnode v2 d2) -> compare (v1,d1) (v2,d2)    
-    (Comment v1, Comment v2) -> compare v1 v2
+    (Comment v1, Comment v2) -> compare (commentize v1) (commentize v2)
     (Enode v1, Enode v2) -> compare v1 v2
     (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2)
     (_, _) -> compare (show x1) (show x2)

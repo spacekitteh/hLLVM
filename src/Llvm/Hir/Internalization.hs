@@ -42,3 +42,5 @@ instance Internalization (GlobalId, String) TlGlobal Const where
                              (T (ucast $ Tpointer (ucast strType) 0) (C_globalAddr lhs)) 
                              (i32sToTcs [0,0])
                  }
+       
+       

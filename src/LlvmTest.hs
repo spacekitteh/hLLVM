@@ -127,12 +127,12 @@ main = do { sel <- cmdArgsRun mode
             Parser ix ox sh -> do { inh <- openFile ix ReadMode
                                   ; m <- testParser ix inh
                                   ; if sh then
-                                      do { swth <- openFileOrStdout (fmap (\x -> x ++ ".show") ox)                                    
+                                      do { swth <- openFileOrStdout (fmap (\x -> x ++ ".show") ox)
                                          ; writeOutShow m swth
                                          ; closeFileOrStdout ox swth
                                          }
                                       else 
-                                      do { outh <- openFileOrStdout ox              
+                                      do { outh <- openFileOrStdout ox
                                          ; writeOutLlvm m outh
                                          ; closeFileOrStdout ox outh
                                          }

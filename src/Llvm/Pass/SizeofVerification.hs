@@ -127,11 +127,11 @@ getDataLayoutAndTriple (Module l) = filter (\x -> case x of
 
 
 mkCheck :: TypeEnv -> Dm.Map Dtype Const -> Dtype -> [Node a O O]
-mkCheck te mp dt = [ Comment $ render $ printIr dt
-                   , Comment $ show dt
-                   , Comment $ "SizeInBits:" ++ show (getTypeSizeInBits te dt)
-                   , Comment $ "TypeStoreSize:" ++ show (getTypeStoreSize te dt)
-                   , Comment $ "Alignment:" ++ show (getTypeAlignment te dt AlignAbi) 
+mkCheck te mp dt = [ Comment $ Cstring $ render $ printIr dt
+                   , Comment $ Cstring $ show dt
+                   , Comment $ Cstring $ "SizeInBits:" ++ show (getTypeSizeInBits te dt)
+                   , Comment $ Cstring $ "TypeStoreSize:" ++ show (getTypeStoreSize te dt)
+                   , Comment $ Cstring $ "Alignment:" ++ show (getTypeAlignment te dt AlignAbi) 
                    , callLog [T (ucast $ ptr0 i8) (ucast $ fromJust $ Dm.lookup dt mp),
                               ucast (T i32 (llvm_sizeof dt i32)), ucast $ toTC (sizeof te dt)]
                    ]

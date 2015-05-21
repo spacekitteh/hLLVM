@@ -53,12 +53,12 @@ sampleVisualPlugin =
                  _ -> f
                , visNodeOO = \te mp node -> case node of
                     (Cnode cinst _)  -> case Dm.lookup (render $ printIr cinst) mp of
-                      Nothing -> [Comment $ render $ printIr (typeof te cinst), node]
+                      Nothing -> [Comment $ Cstring $ render $ printIr (typeof te cinst), node]
                       Just x -> 
                         case cinst of
-                          I_store{..} -> [Comment $ render $ printIr x, node]
-                          I_load{..} -> [Comment $ render $ printIr (typeof te cinst), node]
-                          I_getelementptr{..} -> [Comment $ render $ printIr (typeof te cinst), node]
+                          I_store{..} -> [Comment $ Cstring $ render $ printIr x, node]
+                          I_load{..} -> [Comment $ Cstring $ render $ printIr (typeof te cinst), node]
+                          I_getelementptr{..} -> [Comment $ Cstring $ render $ printIr (typeof te cinst), node]
                     _ -> [node]
                }
 

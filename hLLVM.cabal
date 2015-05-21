@@ -78,6 +78,7 @@ library
                      Llvm.Hir.Data.Module,
                      Llvm.Hir.Data.Type,
                      Llvm.Hir.Data.DataLayoutInfo,
+                     Llvm.Hir.Data.Commentor,
                      Llvm.Hir.Data,
                      Llvm.Hir.Composer,
                      Llvm.Hir.Cast,

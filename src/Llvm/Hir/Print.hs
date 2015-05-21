@@ -143,7 +143,7 @@ instance IrPrint a => IrPrint (Node a e x) where
   printIr (Cnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)
   printIr (Mnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)
   printIr (Tnode t dbgs) = commaSepList $ (printIr t):(fmap printIr dbgs)
-  printIr (Comment s) = text s
+  printIr (Comment s) = vcat $ fmap (\x -> text ";" <> text x) (commentize s)
   printIr (Enode a) = printIr a
 
 instance IrPrint a => IrPrint (H.Graph (Node a) H.C H.C) where
