@@ -56,8 +56,8 @@ data DataUsage = DataUsage { -- | The addresses that store pointer parameters
                              -- | The constants used in a function
                            , constants :: S.Set Const
                              -- | The call function info set
-                           , callFunInfoMap :: Dm.Map FunPtr CallFunInterface
-                           , invokeFunInfoMap :: Dm.Map FunPtr InvokeFunInterface
+                           , callFunInfoSet :: S.Set (FunPtr, CallFunInterface)
+                           , invokeFunInfoSet :: S.Set (FunPtr, InvokeFunInterface)
                            , callAsmInfoSet :: S.Set CallAsmInterface
                            } deriving (Eq, Ord, Show)
 
@@ -154,11 +154,10 @@ propogateUpPtrUsage dest src du =
 
 emptyDataUsage :: DataUsage
 emptyDataUsage =
-  DataUsage
+  DataUsage 
   S.empty S.empty S.empty S.empty S.empty
   S.empty S.empty S.empty S.empty S.empty
-  S.empty S.empty S.empty Dm.empty Dm.empty
-  S.empty
+  S.empty S.empty S.empty S.empty S.empty S.empty
 
 instance (IrPrint t1, IrPrint t2, IrPrint t3) => IrPrint (t1, t2, t3) where
   printIr (t1, t2, t3) = parens (printIr t1 <+> printIr t2 <+> printIr t3)
@@ -178,7 +177,7 @@ instance IrPrint DataUsage where
     $+$ text "addrs_involving_pointer_arithmatic:" <+> printIr addrs_involving_pointer_arithmatic
     $+$ text "stack_addrs_involving_pointer_arithmatic:" <+> printIr stack_addrs_involving_pointer_arithmatic
     $+$ text "constants:" <+> printIr constants
-    $+$ text "callInfoMap:" <+> printIr callFunInfoMap
+    $+$ text "callInfoSet:" <+> printIr callFunInfoSet
     $+$ text "callAsmSet:" <+> printIr callAsmInfoSet
 
 usageLattice :: H.DataflowLattice DataUsage
@@ -200,7 +199,7 @@ unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16
     (s4 `S.union` t4)   (s5 `S.union` t5)   (s6 `S.union` t6)
     (s7 `S.union` t7)   (s8 `S.union` t8)   (s9 `S.union` t9)
     (s10 `S.union` t10) (s11 `S.union` t11) (s12 `S.union` t12)
-    (s13 `S.union` t13) (s14 `Dm.union` t14) (s15 `Dm.union` t15)
+    (s13 `S.union` t13) (s14 `S.union` t14) (s15 `S.union` t15)
     (s16 `S.union` t16)    
 
 bwdScan :: forall a.forall m. (Show a, DataUsageUpdator a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node a) DataUsage
@@ -220,7 +219,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
             let vals = getValuesFromParams (ifi_actualParams invoke_fun_interface)
             in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                               $ addAddrStoringValue e p
-                     ) (f0 { invokeFunInfoMap = Dm.insert invoke_ptr invoke_fun_interface (invokeFunInfoMap f0) }) 
+                     ) (f0 { invokeFunInfoSet = S.insert (invoke_ptr, invoke_fun_interface) (invokeFunInfoSet f0) }) 
                (S.toList vals)
           T_invoke_asm{..} ->
             let vals = getValuesFromParams (cai_actualParams invoke_asm_interface)
@@ -433,7 +432,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
           let vals = getValuesFromParams (cfi_actualParams call_fun_interface)
           in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                             $ addAddrStoringValue e p
-                   ) (f { callFunInfoMap = Dm.insert call_ptr call_fun_interface (callFunInfoMap f) }) 
+                   ) (f { callFunInfoSet = S.insert (call_ptr, call_fun_interface) (callFunInfoSet f) })
              (S.toList vals)
         I_call_asm{..} ->
           let vals = getValuesFromParams (cai_actualParams call_asm_interface)
