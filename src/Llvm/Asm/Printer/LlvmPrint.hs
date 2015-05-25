@@ -459,7 +459,7 @@ instance AsmPrint DllStorageClass where
 instance AsmPrint ThreadLocalStorage where  
   toLlvm = P.print
 
-instance AsmPrint CallRetAttr where
+instance AsmPrint RetAttr where
   toLlvm = P.print
 
 instance AsmPrint CallFunAttr where

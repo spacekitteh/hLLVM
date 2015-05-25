@@ -233,28 +233,35 @@ data CallSiteType = CallSiteTypeRet Rtype
                   | CallSiteTypeFun (Type CodeFunB X) AddrSpace
                   deriving (Eq, Ord, Show)
 
-{-
-data CallFun = CallFun FunPtr CallFunInterface
-             deriving (Eq,Ord,Show)
-
-data CallAsm = CallAsm AsmCode CallAsmInterface
-             deriving (Eq, Ord, Show)
--}
-
 data CallFunInterface = CallFunInterface { cfi_tail :: TailCall
                                          , cfi_conv :: CallConv
-                                         , cfi_retAttrs :: [ParamAttr]
+                                         , cfi_retAttrs :: [RetAttr]
                                          , cfi_type :: CallSiteType
                                          , cfi_actualParams :: [ActualParam]
                                          , cfi_funAttrs :: [FunAttr]
-                                         } deriving (Eq, Ord, Show)
+                                         } 
+                      | CallFunInterface2 { cfi_tail :: TailCall
+                                          , cfi_conv :: CallConv
+                                          , cfi_retAttrs :: [RetAttr]
+                                          , cfi_type :: CallSiteType
+                                          , cfi_firstParamAsRet :: FirstParamAsRet
+                                          , cfi_actualParams :: [ActualParam]
+                                          , cfi_funAttrs :: [FunAttr]
+                                          } deriving (Eq, Ord, Show)
 
 data InvokeFunInterface = InvokeFunInterface { ifi_conv :: CallConv
-                                             , ifi_retAttrs :: [ParamAttr]
+                                             , ifi_retAttrs :: [RetAttr]
                                              , ifi_type :: CallSiteType
                                              , ifi_actualParams :: [ActualParam]
                                              , ifi_funAttrs :: [FunAttr]
-                                             } deriving (Eq, Ord, Show)
+                                             }
+                        | InvokeFunInterface2 { ifi_conv :: CallConv
+                                              , ifi_retAttrs :: [RetAttr]
+                                              , ifi_type :: CallSiteType
+                                              , ifi_firstParamAsRet :: FirstParamAsRet
+                                              , ifi_actualParams :: [ActualParam]
+                                              , ifi_funAttrs :: [FunAttr]
+                                              } deriving (Eq, Ord, Show)
 
 data CallAsmInterface = CallAsmInterface { cai_type :: CallSiteType
                                          , cai_sideeffect :: Maybe SideEffect
@@ -1079,9 +1086,13 @@ data Tinst = T_unreachable
            | T_unwind
            deriving (Eq, Ord, Show)
 
-data ActualParam = ActualParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
-                 | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label [ParamAttr]
+data ActualParam = ActualParamData Dtype [ParamAttr] (Maybe Alignment) Value
+                 | ActualParamByVal Dtype [ParamAttr] (Maybe Alignment) Value
+                 | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label
                  deriving (Eq,Ord,Show)
+
+data FirstParamAsRet = FirstParamAsRet Dtype [ParamAttr] (Maybe Alignment) Value
+                     deriving (Eq,Ord,Show)
 
 data Value = Val_ssa LocalId
            | Val_const Const

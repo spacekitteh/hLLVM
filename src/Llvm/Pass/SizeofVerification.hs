@@ -139,7 +139,7 @@ mkCheck te mp dt = [ Comment $ Cstring $ render $ printIr dt
 
 callLog :: [T Dtype Value] -> (Node a) O O
 callLog tvs = 
-  let aps = fmap (\(T t v) -> ActualParamData t [] Nothing v []) tvs
+  let aps = fmap (\(T t v) -> ActualParamData t [] Nothing v) tvs
       callSiteType = CallSiteTypeFun (Tfunction (RtypeVoidU Tvoid) (TypeParamList [ucast $ ptr0 i8, ucast i32, ucast i32] Nothing) []) 0
   in Cnode (I_call_fun (FunId (GlobalIdAlphaNum "check_int2")) (CallFunInterface TcNon Ccc [] callSiteType  aps []) Nothing) []
 
@@ -151,9 +151,9 @@ visFunctions = [FunctionPrototype { fp_linkage = Nothing
                                   , fp_param_attrs = []
                                   , fp_ret_type = RtypeVoidU Tvoid
                                   , fp_fun_name = GlobalIdAlphaNum "check_int2"
-                                  , fp_param_list = (FormalParamList [FormalParamData (ucast $ ptr0 i8) [] Nothing FimplicitParam []
-                                                                     ,FormalParamData (ucast i32) [] Nothing FimplicitParam []
-                                                                     ,FormalParamData (ucast i32) [] Nothing FimplicitParam []
+                                  , fp_param_list = (FormalParamList [FormalParamData (ucast $ ptr0 i8) [] Nothing FimplicitParam
+                                                                     ,FormalParamData (ucast i32) [] Nothing FimplicitParam
+                                                                     ,FormalParamData (ucast i32) [] Nothing FimplicitParam
                                                                      ] 
                                                      Nothing [])
                                   , fp_addr_naming = Nothing

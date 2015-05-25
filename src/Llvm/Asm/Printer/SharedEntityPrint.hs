@@ -144,10 +144,13 @@ instance Print ThreadLocalStorage where
              in if isEmpty d then text "thread_local"
                 else text "thread_local" <+> parens d 
 
-instance Print CallRetAttr where
-  print CraZeroExt = text "zeroext"
-  print CraSignExt = text "signext"
-  print CraInReg = text "inreg"
+instance Print RetAttr where
+  print RetAttrZeroExt = text "zeroext"
+  print RetAttrSignExt = text "signext"
+  print RetAttrInReg = text "inreg"
+  print (RetAttrDereferenceable n) = (text "dereferenceable") <> (parens $ integral n)
+  print RetAttrNoAlias = text "noalias"
+
 
 instance Print CallFunAttr where
   print CfaNoreturn = text "noreturn"

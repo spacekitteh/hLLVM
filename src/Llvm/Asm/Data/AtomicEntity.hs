@@ -102,16 +102,20 @@ data ParamAttr = PaZeroExt
                | PaNest
                | PaReturned
                | PaNonNull
-               | PaDereferenceable Word32 -- Integer
+               | PaDereferenceable Word32
                | PaReadOnly
                | PaReadNone
-               | PaAlign Word32 -- Integer
-                 deriving (Eq,Ord,Show)
+               | PaAlign Word32
+               deriving (Eq,Ord,Show)
 
-data CallRetAttr = CraZeroExt
-                 | CraSignExt
-                 | CraInReg
-                 deriving (Eq, Ord, Show)
+data RetAttr = RetAttrZeroExt
+             | RetAttrSignExt
+             | RetAttrInReg
+             | RetAttrNoAlias
+             | RetAttrDereferenceable Word32
+             deriving (Eq, Ord, Show)
+                      
+data ParamAsRetAttr = ParamAsRetAttr deriving (Eq, Ord, Show)                      
 
 data CallFunAttr = CfaNoreturn
                  | CfaNounwind
@@ -151,8 +155,8 @@ data FunAttr = FaAlignStack Word32 -- Integer
              | FaSspStrong
              | FaUwTable
              | FaPair DqString (Maybe DqString)
-             | FaAlign Word32 -- Integer
-             | FaGroup Word32 -- Integer
+             | FaAlign Word32
+             | FaGroup Word32
              deriving (Eq,Ord,Show)
 
 
@@ -164,7 +168,8 @@ data SelectionKind = Any
                    deriving (Eq, Ord, Show)
 
 selectionKindMap :: M.Map  SelectionKind String
-selectionKindMap = M.fromList [(Any, "any"), (ExactMatch, "exactmatch"), (Largest, "largest"), (NoDuplicates, "noduplicates"), (SameSize, "samesize")]
+selectionKindMap = M.fromList [(Any, "any"), (ExactMatch, "exactmatch"), (Largest, "largest")
+                              ,(NoDuplicates, "noduplicates"), (SameSize, "samesize")]
 
 data Section = Section DqString deriving (Eq,Ord,Show)
 
@@ -221,7 +226,8 @@ atomicOpMap :: M.Map AtomicOp String
 atomicOpMap = M.fromList [(AoXchg, "xchg"), (AoAdd, "add"), (AoSub, "sub")
                          ,(AoAnd, "and"), (AoNand, "nand")
                          ,(AoOr, "or"), (AoXor, "xor")
-                         ,(AoMax, "max"), (AoMin, "min"), (AoUmax, "umax"), (AoUmin, "umin")]
+                         ,(AoMax, "max"), (AoMin, "min")
+                         ,(AoUmax, "umax"), (AoUmin, "umin")]
 
 
 {- syntatical representation: c"...." -}

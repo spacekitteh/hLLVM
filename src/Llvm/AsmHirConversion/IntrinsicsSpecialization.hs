@@ -13,19 +13,19 @@ import Data.Maybe
 specializeCallSite :: Maybe LocalId -> FunPtr -> CallFunInterface -> Maybe Cinst
 specializeCallSite lhs fptr csi = case (fptr, csi) of
   (FunId (GlobalIdAlphaNum "llvm.va_start"),
-   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v []] []) | isNothing lhs -> Just $ I_llvm_va_start v
+   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v] []) | isNothing lhs -> Just $ I_llvm_va_start v
   (FunId (GlobalIdAlphaNum "llvm.va_end"),
-   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v []] []) | isNothing lhs -> Just $ I_llvm_va_end v
+   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v] []) | isNothing lhs -> Just $ I_llvm_va_end v
   (FunId (GlobalIdAlphaNum "llvm.va_copy"),
-   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v1 []
-                                   ,ActualParamData t2 [] Nothing v2 []] []) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
+   CallFunInterface TcNon Ccc [] _ [ActualParamData t1 [] Nothing v1
+                                   ,ActualParamData t2 [] Nothing v2] []) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
   (FunId (GlobalIdAlphaNum nm), 
    CallFunInterface TcNon Ccc [] _ 
-   [ActualParamData t1 [] Nothing v1 [] -- dest
-   ,ActualParamData t2 [] Nothing v2 [] -- src or setValue
-   ,ActualParamData t3 [] Nothing v3 [] -- len
-   ,ActualParamData t4 [] Nothing v4 [] -- align
-   ,ActualParamData t5 [] Nothing v5 [] -- volatile
+   [ActualParamData t1 [] Nothing v1 -- dest
+   ,ActualParamData t2 [] Nothing v2 -- src or setValue
+   ,ActualParamData t3 [] Nothing v3 -- len
+   ,ActualParamData t4 [] Nothing v4 -- align
+   ,ActualParamData t5 [] Nothing v5 -- volatile
    ] []) | isNothing lhs && (nm == "llvm.memcpy.p0i8.p0i8.i32" 
                              || nm == "llvm.memcpy.p0i8.p0i8.i64"
                              || nm == "llvm.memmove.p0i8.p0i8.i32"
@@ -91,7 +91,7 @@ unspecializeIntrinsics inst = case inst of
   _ -> Nothing
     
 tvToAp :: Ucast t Dtype => T t Value -> ActualParam
-tvToAp (T t v) = ActualParamData (ucast t) [] Nothing v []
+tvToAp (T t v) = ActualParamData (ucast t) [] Nothing v
   
                  
                  
@@ -135,5 +135,6 @@ unspecializeTlIntrinsics tl = case tl of
                                            , tlg_alignment = Nothing
                                            }
       
+    
     
     

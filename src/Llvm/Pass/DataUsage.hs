@@ -146,7 +146,7 @@ propogateUpPtrUsage dest src du =
   bubbleUp2 (Val_ssa dest) addrs_storing_ptr_params src addAddrStoringPtrParam
   $ bubbleUp2 (Val_ssa dest) addrs_captured src addAddrCaptured
   $ bubbleUp2 (Val_ssa dest) addrs_storing_ptrs src addAddrStoringPtr
---  $ bubbleUp2 (Val_ssa dest) addrs_passed_to_va_start src addAddrPassedToVaStart
+  $ bubbleUp2 (Val_ssa dest) addrs_passed_to_va_start src addAddrPassedToVaStart
   $ bubbleUp2 (Val_ssa dest) addrs_storing_ptrs src addAddrStoringPtr
   $ bubbleUp2 (Val_ssa dest) addrs_storing_values src addAddrStoringValue
   $ bubbleUp2 (Val_ssa dest) addrs_involving_pointer_arithmatic src addAddrInvolvingPtrArithm
@@ -468,7 +468,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
 #endif
     getValuesFromParams :: [ActualParam] -> S.Set Value
     getValuesFromParams ls = foldl (\p e -> case e of
-                                       ActualParamData _ _ _ v _ -> S.insert v p
+                                       ActualParamData _ _ _ v -> S.insert v p
                                        _ -> p
                                    ) S.empty ls
 
@@ -483,7 +483,7 @@ scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
   where formalParamIds :: S.Set LocalId
         formalParamIds = let (FormalParamList l _ _) = fp_param_list fn
                          in foldl (\p x -> case x of
-                                      FormalParamData (DtypeScalarP _)  _ _ (FexplicitParam v) _ -> S.insert v p
+                                      FormalParamData (DtypeScalarP _)  _ _ (FexplicitParam v) -> S.insert v p
                                       _ -> p
                                   ) S.empty l
 

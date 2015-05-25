@@ -99,6 +99,9 @@ instance Mangle FunAttr where
 instance Mangle ParamAttr where
   mangle x = render $ printIr x
   
+instance Mangle RetAttr where
+  mangle x = render $ printIr x
+
 instance Mangle ActualParam where
   mangle x = render $ printIr x
   

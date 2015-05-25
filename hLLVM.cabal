@@ -72,6 +72,7 @@ library
                      Llvm.AsmHirConversion.AsmToHir,
                      Llvm.AsmHirConversion.HirToAsm,
                      Llvm.AsmHirConversion.IntrinsicsSpecialization,
+                     Llvm.AsmHirConversion.CallSpecialization,
                      Llvm.AsmHirConversion.TypeConversion,
                      Llvm.AsmHirConversion.LabelMapM,
                      Llvm.Hir.Data.Inst,

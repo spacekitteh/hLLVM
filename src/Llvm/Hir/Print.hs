@@ -428,19 +428,35 @@ instance IrPrint CallSiteType where
   printIr (CallSiteTypeFun e as) = printIr (Tpointer (ucast e) as)
 
 instance IrPrint CallFunInterface where
-  printIr CallFunInterface{..} = commaSepList [printIr cfi_tail, 
-                                               printIr cfi_conv,
-                                               printIr cfi_retAttrs,
-                                               printIr cfi_type,
-                                               printIr cfi_actualParams, 
-                                               printIr cfi_funAttrs]
+  printIr x = case x of
+    CallFunInterface{..} -> commaSepList [printIr cfi_tail, 
+                                         printIr cfi_conv,
+                                         printIr cfi_retAttrs,
+                                         printIr cfi_type,
+                                         printIr cfi_actualParams, 
+                                         printIr cfi_funAttrs]
+    CallFunInterface2{..} -> commaSepList [printIr cfi_tail, 
+                                           printIr cfi_conv,
+                                           printIr cfi_retAttrs,
+                                           printIr cfi_type,
+                                           printIr cfi_firstParamAsRet,
+                                           printIr cfi_actualParams, 
+                                           printIr cfi_funAttrs]                           
 
 instance IrPrint InvokeFunInterface where
-  printIr InvokeFunInterface{..} = commaSepList [printIr ifi_conv,
-                                                 printIr ifi_retAttrs,
-                                                 printIr ifi_type,
-                                                 printIr ifi_actualParams, 
-                                                 printIr ifi_funAttrs]
+  printIr x = case x of
+    InvokeFunInterface{..} -> commaSepList [printIr ifi_conv,
+                                            printIr ifi_retAttrs,
+                                            printIr ifi_type,
+                                            printIr ifi_actualParams, 
+                                            printIr ifi_funAttrs]
+    InvokeFunInterface2{..} -> commaSepList [printIr ifi_conv,
+                                             printIr ifi_retAttrs,
+                                             printIr ifi_type,
+                                             printIr ifi_firstParamAsRet,
+                                             printIr ifi_actualParams, 
+                                             printIr ifi_funAttrs]
+                             
 
 
 instance IrPrint CallAsmInterface where
@@ -449,13 +465,6 @@ instance IrPrint CallAsmInterface where
                                                printIr cai_alignstack,
                                                printIr cai_actualParams, 
                                                printIr cai_funAttrs]
-
-
-{-
-instance IrPrint CallSite where
-  printIr (CallSiteFun fptr cfi) = hsep [printIr fptr, printIr cfi]
-  printIr (CallSiteAsm cai) = hsep [text "asm", printIr cai]
--}
   
 
 instance IrPrint Clause where
@@ -483,14 +492,21 @@ instance IrPrint (ExtractValue Value) where
     hsep [text "extractvalue", printIr tv <> comma, (commaSepList $ fmap integral idxs)]
 
 instance IrPrint (InsertValue Value) where
-  printIr (InsertValue vect tv idx) = text "insertvalue" <+> hsep (punctuate comma ((printIr vect):(printIr tv):(fmap integral idx)))
+  printIr (InsertValue vect tv idx) = text "insertvalue" <+> 
+                                      hsep (punctuate comma ((printIr vect):(printIr tv):(fmap integral idx)))
 
 instance IrPrint ActualParam where
   printIr x = case x of
-    (ActualParamData t att1 align v att2) ->
-      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]
-    (ActualParamLabel t att1 align v att2) ->
-      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]
+    (ActualParamData t att1 align v) ->
+      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+    (ActualParamLabel t att1 align v) ->
+      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+
+instance IrPrint FirstParamAsRet where
+  printIr (FirstParamAsRet t att1 align v) =
+    hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+
+
 
 instance IrPrint MetaParam where
   printIr x = case x of
@@ -782,9 +798,9 @@ instance IrPrint (Type s x) where
 
 instance IrPrint FormalParam where
   printIr x = case x of
-    (FormalParamData t att1 align id att2) ->
+    (FormalParamData t att1 align id) ->
       (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align)
-      <+> (printIr id) <+> (hsep $ fmap printIr att2)
+      <+> (printIr id) 
     (FormalParamMeta e lv) -> printIr e <+> printIr lv
 
 instance IrPrint FormalParamList where
@@ -903,7 +919,7 @@ instance IrPrint DllStorageClass where
 instance IrPrint ThreadLocalStorage where
   printIr = P.print
 
-instance IrPrint CallRetAttr where
+instance IrPrint RetAttr where
   printIr = P.print
 
 instance IrPrint CallFunAttr where

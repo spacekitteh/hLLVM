@@ -211,6 +211,13 @@ data StructLayout = StructLayout { structSize :: SizeInByte
 roundUpAlignment :: SizeInByte -> AlignInByte -> SizeInByte
 roundUpAlignment (SizeInByte val) (AlignInByte align) = SizeInByte $ (val + (align -1)) B..&. (B.complement (align - 1))
 
+nextDataFieldOffset :: SizeInByte -> AlignInByte -> SizeInByte
+nextDataFieldOffset curSize@(SizeInByte curSizeByte) tyAlign@(AlignInByte tyAlignByte) = 
+  if curSizeByte B..&. (tyAlignByte -1) /= 0 then
+    roundUpAlignment curSize tyAlign
+  else 
+    curSize
+
 getStructLayout :: TypeEnv -> (Packing, [Dtype]) -> StructLayout
 getStructLayout te@TypeEnv{..} (pk, tys) = 
   let (totalSize@(SizeInByte totalSizeByte), offsets, alignment@(AlignInByte alignmentByte)) =
@@ -218,13 +225,16 @@ getStructLayout te@TypeEnv{..} (pk, tys) =
                 let tyAlign@(AlignInByte tyAlignByte) = case pk of
                       Packed -> AlignInByte 1
                       Unpacked -> getTypeAlignment te ty AlignAbi
-                    (SizeInByte nextOffsetByte) = if curSizeByte B..&. (tyAlignByte - 1) /= 0 then roundUpAlignment curSize tyAlign
-                                                  else curSize
+                    (SizeInByte nextOffsetByte) = nextDataFieldOffset curSize tyAlign
+                    {-
+                                                  if curSizeByte B..&. (tyAlignByte - 1) /= 0 then roundUpAlignment curSize tyAlign
+                                                  else curSize -}
                     (SizeInByte tySize) = getTypeAllocSize te ty
                 in (SizeInByte $ nextOffsetByte + tySize, (OffsetInByte nextOffsetByte):offsets, AlignInByte $ max tyAlignByte structAlignment0)
               ) (SizeInByte 0, [], AlignInByte 1) tys
-  in StructLayout { structSize = if (totalSizeByte B..&. (alignmentByte - 1)) /= 0 then roundUpAlignment totalSize alignment
-                                 else totalSize
+  in StructLayout { structSize = nextDataFieldOffset totalSize alignment 
+                                 {- if (totalSizeByte B..&. (alignmentByte - 1)) /= 0 then roundUpAlignment totalSize alignment
+                                 else totalSize -}
                   , structAlignment = alignment
                   , numElements = toInteger $ length tys
                   , memberOffsets = reverse offsets

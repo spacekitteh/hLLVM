@@ -751,8 +751,8 @@ instance Substitutable CallAsmInterface where
 
 instance Substitutable ActualParam where
   substitute chg c = case c of
-    ActualParamData dt pa ma v pa2 -> ActualParamData dt pa ma (substitute chg v) pa2
-    ActualParamLabel t pa ma v pa2 -> ActualParamLabel t pa ma (substitute chg v) pa2
+    ActualParamData dt pa ma v -> ActualParamData dt pa ma (substitute chg v)
+    ActualParamLabel t pa ma v -> ActualParamLabel t pa ma (substitute chg v)
 
 instance Substitutable FormalParamList where
   substitute chg (FormalParamList fps mvp fa) =
@@ -760,7 +760,7 @@ instance Substitutable FormalParamList where
   
 instance Substitutable FormalParam where  
   substitute chg fp = case fp of
-    FormalParamData dt pa1 ma x pa2 -> FormalParamData dt pa1 ma (substitute chg x) pa2
+    FormalParamData dt pa1 ma x -> FormalParamData dt pa1 ma (substitute chg x)
     FormalParamMeta mk x -> FormalParamMeta mk (substitute chg x)
     
 instance Substitutable Fparam where    

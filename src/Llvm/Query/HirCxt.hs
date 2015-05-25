@@ -19,6 +19,7 @@ data FunCxt = FunCxt { funName :: String
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
                            , functions :: M.Map Ci.GlobalId Ci.FunctionPrototype
+                           , attributes :: M.Map Word32 [FunAttr]
                            } deriving (Eq, Ord, Show)
                                 
 data IrCxt = IrCxt { globalCxt :: GlobalCxt
@@ -55,6 +56,11 @@ irCxtOfModule (Module tl) =
                           ToplevelDefine{..} -> True
                           _ -> False
                       ) tl
+      attrs = fmap (\(ToplevelAttribute (TlAttribute n l)) -> (n, l))
+              $ filter (\x -> case x of
+                           ToplevelAttribute _ -> True
+                           _ -> False
+                       ) tl             
   in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
                                                        , targetTriple = tt
                                                        , typedefs = M.fromList tdefs
@@ -62,29 +68,29 @@ irCxtOfModule (Module tl) =
                                                        }
                                    , globals = M.fromList glbs
                                    , functions = M.fromList funs
+                                   , attributes = M.fromList attrs
                                    }
            , funCxt = FunCxt { funName = ""
                              , funParameters = M.empty
                              }
            }
-     
-     
+
 instance IrPrint TypeEnv where
   printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
                                $+$ text "triple:" <+> printIr tt
                                $+$ text "typedefs:" <+> printIr td
                                $+$ text "opaqueTypedefs:" <+> printIr otd                               
-                               
+
 instance IrPrint GlobalCxt where
-  printIr (GlobalCxt te gl fns) = text "typeEnv:" <+> printIr te
-                                  $+$ text "globals:" <+> printIr gl
-                                  $+$ text "functions:" <+> printIr fns
-                                
+  printIr (GlobalCxt te gl fns atts) = text "typeEnv:" <+> printIr te
+                                       $+$ text "globals:" <+> printIr gl
+                                       $+$ text "functions:" <+> printIr fns
+                                       $+$ text "attributes:" <+> printIr atts
+
 instance IrPrint FunCxt where
   printIr (FunCxt fn p) = text "funName:" <+> text fn
                           $+$ text "funParameters:" <+> printIr p
-                                
+
 instance IrPrint IrCxt where
   printIr (IrCxt g l) = text "globalCxt:" <+> printIr g
                         $+$ text "funCxt:" <+> printIr l
-     

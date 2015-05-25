@@ -9,6 +9,7 @@ import Llvm.ErrorLoc
 import qualified Compiler.Hoopl as H
 import qualified Control.Monad as Md
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Llvm.Asm.Data as A
 import qualified Llvm.Hir.Data as I
 import Llvm.Hir.Cast
@@ -18,6 +19,7 @@ import Llvm.AsmHirConversion.TypeConversion
 import Data.Maybe (fromJust)
 import Control.Monad.Reader
 import Llvm.AsmHirConversion.IntrinsicsSpecialization
+import Llvm.AsmHirConversion.CallSpecialization
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: A.GlobalId
@@ -861,8 +863,23 @@ convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) =
      ; let ert = A.splitCallReturnType t
            erta = eitherRet mp ert
      ; fna <- convert_FunPtr fn
-     ; apsa <- mapM convert_ActualParam aps
-     ; return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) pa erta apsa fa)
+     ; case aps of
+       hd:tl -> do { mfp <- specializeFirstParamAsRet hd
+                   ; case mfp of
+                     Just fp -> 
+                       do { tla <- mapM convert_ActualParam tl
+                          ; return (fst ert == A.Tvoid, fna, I.CallFunInterface2 tc (maybe I.Ccc id cc) 
+                                                             (fmap specializeRetAttr pa) erta fp tla fa)
+                          }
+                     Nothing -> 
+                       do { apsa <- mapM convert_ActualParam aps
+                          ; return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
+                                                             (fmap specializeRetAttr pa) erta apsa fa)
+                          }
+                   }
+       _ -> do { return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
+                                                  (fmap specializeRetAttr pa) erta [] fa)
+               }
      }
 
 convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr, I.InvokeFunInterface)
@@ -871,8 +888,27 @@ convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) =
      ; let ert = A.splitCallReturnType t
            erta = eitherRet mp ert
      ; fna <- convert_FunPtr fn
+     ; case aps of
+       hd:tl -> do { mfp <- specializeFirstParamAsRet hd
+                   ; case mfp of
+                     Just fp -> 
+                       do { tla <- mapM convert_ActualParam tl
+                          ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface2 (maybe I.Ccc id cc) 
+                                                             (fmap specializeRetAttr pa) erta fp tla fa)
+                          }
+                     Nothing -> 
+                       do { apsa <- mapM convert_ActualParam aps
+                          ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) 
+                                                             (fmap specializeRetAttr pa) erta apsa fa)
+                          }
+                   }
+       _ -> do { return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc)
+                                                  (fmap specializeRetAttr pa) erta [] fa)
+               }
+            {-
      ; apsa <- mapM convert_ActualParam aps
-     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) pa erta apsa fa)
+     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) 
+                                        (fmap specializeRetAttr pa) erta apsa fa) -}
      }
 
 
@@ -1256,6 +1292,27 @@ convert_Rhs (Just lhs, A.RhsInsertValue a) =
 convert_Rhs (lhs,rhs) =  errorLoc FLC $ "AstIrConversion:irrefutable error lhs:" ++ show lhs ++ " rhs:" ++ show rhs
 
 
+
+specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe I.FirstParamAsRet)
+specializeFirstParamAsRet x = case x of
+  (A.ActualParamData t pa1 ma v pa2) ->
+    do { mp <- typeDefs
+       ; let (ta::I.Utype) = tconvert mp t
+       ; va <- convert_Value v
+       ; if S.member A.PaSRet $ S.fromList (pa1++pa2) then 
+           return $ Just $ I.FirstParamAsRet (dcast FLC ta) (filter (/= A.PaSRet) $ pa1++pa2) ma va
+         else 
+           return Nothing
+       }
+  (A.ActualParamLabel t pa1 ma v pa2) ->
+    do { mp <- typeDefs
+       ; let (ta::I.Utype) = tconvert mp t
+       ; va <- convert_PercentLabel v
+       ; case ta of
+         I.UtypeLabelX lbl -> return Nothing
+       }    
+  A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
+
   
 convert_ActualParam :: A.ActualParam -> MM I.ActualParam
 convert_ActualParam x = case x of
@@ -1263,14 +1320,17 @@ convert_ActualParam x = case x of
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
-       ; return $ I.ActualParamData (dcast FLC ta) pa1 ma va pa2
+       ; if S.member A.PaByVal (S.fromList (pa1++pa2)) then
+           return $ I.ActualParamByVal (dcast FLC ta) (filter (/= A.PaByVal) $ pa1++pa2) ma va
+         else 
+           return $ I.ActualParamData (dcast FLC ta) (pa1++pa2) ma va
        }
   (A.ActualParamLabel t pa1 ma v pa2) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_PercentLabel v
        ; case ta of
-         I.UtypeLabelX lbl -> return $ I.ActualParamLabel lbl pa1 ma va pa2
+         I.UtypeLabelX lbl -> return $ I.ActualParamLabel lbl (pa1++pa2) ma va
        }    
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 

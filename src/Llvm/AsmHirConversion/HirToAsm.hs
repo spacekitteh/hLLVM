@@ -20,6 +20,7 @@ import Llvm.Util.Monadic (maybeM, pairM)
 import Llvm.AsmHirConversion.TypeConversion
 import Control.Monad.Reader
 import Llvm.AsmHirConversion.IntrinsicsSpecialization
+import Llvm.AsmHirConversion.CallSpecialization
 import Llvm.ErrorLoc
 
 
@@ -456,20 +457,36 @@ instance Conversion I.FunPtr (Rm A.FunName) where
                                         }
 
 instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite)) where
-  convert  (fn, I.CallFunInterface tc cc pa t aps fa) = 
-    do { fna <- convert fn
-       ; apsa <- mapM convert aps
-       ; ta <- convert t
-       ; return (tc, A.CallSiteFun (Just cc) pa ta fna apsa fa)
-       }
+  convert  (fn, cfi) = case cfi of
+    I.CallFunInterface tc cc pa t aps fa -> 
+      do { fna <- convert fn
+         ; apsa <- mapM convert aps
+         ; ta <- convert t
+         ; return (tc, A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna apsa fa)
+         }
+    I.CallFunInterface2 tc cc pa t fpsr aps fa -> 
+      do { fna <- convert fn
+         ; fpsra <- convert fpsr
+         ; apsa <- mapM convert aps
+         ; ta <- convert t
+         ; return (tc, A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (fpsra:apsa) fa)
+         }      
     
 instance Conversion (I.FunPtr, I.InvokeFunInterface) (Rm A.CallSite) where
-  convert  (fn, I.InvokeFunInterface cc pa t aps fa) = 
-    do { fna <- convert fn
-       ; apsa <- mapM convert aps
-       ; ta <- convert t
-       ; return (A.CallSiteFun (Just cc) pa ta fna apsa fa)
-       }
+  convert  (fn, ifi) = case ifi of
+    I.InvokeFunInterface cc pa t aps fa ->
+      do { fna <- convert fn
+         ; apsa <- mapM convert aps
+         ; ta <- convert t
+         ; return (A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna apsa fa)
+         }
+    I.InvokeFunInterface2 cc pa t fpsr aps fa ->
+      do { fna <- convert fn
+         ; fpsra <- convert fpsr
+         ; apsa <- mapM convert aps
+         ; ta <- convert t
+         ; return (A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (fpsra:apsa) fa)
+         }
 
 instance Conversion (I.AsmCode, I.CallAsmInterface) (Rm A.InlineAsmExp) where
   convert (I.AsmCode dia s1 s2, I.CallAsmInterface t mse mas aps fa) = 
@@ -1040,25 +1057,29 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
          } 
     _ -> errorLoc FLC $ show cinst
                                       
+instance Conversion I.FirstParamAsRet (Rm A.ActualParam) where
+  convert (I.FirstParamAsRet t pa1 ma v) = 
+    do { va <- convert v
+       ; return $ A.ActualParamData (tconvert () t) (A.PaSRet:pa1) ma va []
+       }
+    
 instance Conversion I.ActualParam (Rm A.ActualParam) where
   convert x = case x of
-    (I.ActualParamData t pa1 ma v pa2) -> do { va <- convert v 
-                                             ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
-                                             }
-    (I.ActualParamLabel t pa1 ma v pa2) -> do { va <- convert_to_PercentLabel v 
-                                              ; return $ A.ActualParamLabel (tconvert () t) pa1 ma va pa2
-                                              }
---    (I.ActualParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
+    (I.ActualParamData t pa ma v) -> do { va <- convert v 
+                                        ; return $ A.ActualParamData (tconvert () t) pa ma va []
+                                        }
+    (I.ActualParamByVal t pa ma v) -> do { va <- convert v 
+                                         ; return $ A.ActualParamData (tconvert () t) (A.PaByVal:pa) ma va []
+                                         }                                      
+    (I.ActualParamLabel t pa ma v) -> do { va <- convert_to_PercentLabel v 
+                                         ; return $ A.ActualParamLabel (tconvert () t) pa ma va []
+                                         }
 
 instance Conversion I.MetaParam (Rm A.ActualParam) where
   convert x = case x of
     (I.MetaParamData t pa1 ma v pa2) -> do { va <- convert v 
                                              ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
                                              }
-                                        {-
-    (I.ActualParamLabel t pa1 ma v pa2) -> do { va <- convert v 
-                                              ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
-                                              } -}
     (I.MetaParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
 
 

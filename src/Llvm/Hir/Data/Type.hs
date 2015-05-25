@@ -351,7 +351,8 @@ instance Ord (Type s r) where
 
     (_,_) -> compare (show x1) (show x2)
 
-data FormalParam = FormalParamData Dtype [ParamAttr] (Maybe Alignment) Fparam [ParamAttr]
+data FormalParam = FormalParamData Dtype [ParamAttr] (Maybe Alignment) Fparam
+                 | FormalParamByVal Dtype [ParamAttr] (Maybe Alignment) Fparam
                  | FormalParamMeta MetaKind Fparam
                  deriving (Eq,Ord,Show)
 

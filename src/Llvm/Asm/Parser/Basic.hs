@@ -257,12 +257,6 @@ pBlockLabel :: P BlockLabel
 pBlockLabel = choice [ try pExplicitBlockLabel
                      , pImplicitBlockLabel ]
 
-pCallRetAttr :: P CallRetAttr
-pCallRetAttr = choice [ reserved "zeroext" >> return CraZeroExt
-                      , reserved "signext" >> return CraSignExt
-                      , reserved "inreg" >> return CraInReg
-                      ]
-                      
 pParamAttr :: P ParamAttr
 pParamAttr = choice [ reserved "zeroext" >> return PaZeroExt
                     , reserved "signext" >> return PaSignExt

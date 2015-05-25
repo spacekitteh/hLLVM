@@ -10,6 +10,7 @@ import qualified Llvm.Asm.Data.Type as A
 import qualified Llvm.Hir.Data.Type as I
 import Llvm.Hir.Cast 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Either 
 import Llvm.ErrorLoc
 
@@ -54,7 +55,8 @@ instance TypeConversion () (Either I.Rtype (I.Type I.CodeFunB I.X)) A.Type where
   tconvert _ (Right e) = tconvert () (I.Tpointer (ucast e) 0)
 
 instance TypeConversion () I.FormalParam A.FormalParam where
-  tconvert _ (I.FormalParamData dt pa1 ma fp pa2) = A.FormalParamData (tconvert () dt) pa1 ma fp pa2
+  tconvert _ (I.FormalParamData dt pa ma fp) = A.FormalParamData (tconvert () dt) pa ma fp []
+  tconvert _ (I.FormalParamByVal dt pa ma fp) = A.FormalParamData (tconvert () dt) (A.PaByVal:pa) ma fp []
   tconvert _ (I.FormalParamMeta mk fp) = A.FormalParamMeta (tconvert () mk) fp
 
 instance TypeConversion () I.FormalParamList A.FormalParamList where
@@ -62,7 +64,10 @@ instance TypeConversion () I.FormalParamList A.FormalParamList where
 
 instance TypeConversion MP A.FormalParam I.FormalParam where
   tconvert mp (A.FormalParamData dt pa1 ma fp pa2) = 
-    I.FormalParamData (dcast FLC ((tconvert mp dt)::I.Utype)) pa1 ma fp pa2
+    if S.member A.PaByVal (S.fromList (pa1++pa2)) then 
+      I.FormalParamByVal (dcast FLC ((tconvert mp dt)::I.Utype)) (filter (/= A.PaByVal) $ pa1++pa2) ma fp
+    else
+      I.FormalParamData (dcast FLC ((tconvert mp dt)::I.Utype)) (pa1++pa2) ma fp
   tconvert mp (A.FormalParamMeta mk fp) = I.FormalParamMeta (tconvert mp mk) fp
 
 instance TypeConversion MP A.FormalParamList I.FormalParamList where

@@ -178,11 +178,10 @@ data FunName = FunNameGlobal GlobalOrLocalId
              deriving (Eq,Ord,Show)
 
 data CallSite = CallSiteFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
-                -- | CallSiteAsm Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
-
+                       
 data InlineAsmExp = InlineAsmExp Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
-                       deriving (Eq, Ord, Show)
+                  deriving (Eq, Ord, Show)
 
 data Clause = ClauseCatch (Typed Value)
             | ClauseFilter TypedConstOrNull
@@ -212,18 +211,15 @@ data LandingPad = LandingPad Type Type FunName (Maybe Cleanup) [Clause] deriving
 
 data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
 
-data PhiInst = PhiInst (Maybe LocalId) Type
-               [(Value, PercentLabel)] deriving (Eq,Show)
+data PhiInst = PhiInst (Maybe LocalId) Type [(Value, PercentLabel)] deriving (Eq,Show)
 
-data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg]
-                      deriving (Eq, Show)
+data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg] deriving (Eq, Show)
 
-data ComputingInst = ComputingInst (Maybe LocalId) Rhs
-                     deriving (Eq,Show)
-
+data ComputingInst = ComputingInst (Maybe LocalId) Rhs deriving (Eq,Show)
+                                                                
 data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
                           | ComputingInstWithComment String
-                            deriving (Eq,Show)
+                          deriving (Eq,Show)
 
 -- | Terminator Instructions <http://llvm.org/releases/3.0/docs/LangRef.html#terminators>
 data TerminatorInst =
