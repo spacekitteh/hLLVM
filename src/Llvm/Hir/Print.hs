@@ -499,6 +499,8 @@ instance IrPrint ActualParam where
   printIr x = case x of
     (ActualParamData t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+    (ActualParamByVal t att1 align v) ->
+      hsep [printIr t, hsep $ fmap printIr (PaByVal:att1), printIr align, printIr v]      
     (ActualParamLabel t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
 
@@ -801,6 +803,9 @@ instance IrPrint FormalParam where
     (FormalParamData t att1 align id) ->
       (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align)
       <+> (printIr id) 
+    (FormalParamByVal t att1 align id) ->
+      (printIr t) <+> (hsep $ fmap printIr (PaByVal:att1)) <> (maybe empty ((comma <+>) . printIr) align)
+      <+> (printIr id)       
     (FormalParamMeta e lv) -> printIr e <+> printIr lv
 
 instance IrPrint FormalParamList where
