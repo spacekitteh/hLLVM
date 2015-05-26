@@ -237,31 +237,18 @@ data CallFunInterface = CallFunInterface { cfi_tail :: TailCall
                                          , cfi_conv :: CallConv
                                          , cfi_retAttrs :: [RetAttr]
                                          , cfi_type :: CallSiteType
+                                         , cfi_firstParamAsRet :: Maybe FirstParamAsRet
                                          , cfi_actualParams :: [ActualParam]
                                          , cfi_funAttrs :: [FunAttr]
-                                         } 
-                      | CallFunInterface2 { cfi_tail :: TailCall
-                                          , cfi_conv :: CallConv
-                                          , cfi_retAttrs :: [RetAttr]
-                                          , cfi_type :: CallSiteType
-                                          , cfi_firstParamAsRet :: FirstParamAsRet
-                                          , cfi_actualParams :: [ActualParam]
-                                          , cfi_funAttrs :: [FunAttr]
-                                          } deriving (Eq, Ord, Show)
+                                         } deriving (Eq, Ord, Show)
 
 data InvokeFunInterface = InvokeFunInterface { ifi_conv :: CallConv
                                              , ifi_retAttrs :: [RetAttr]
                                              , ifi_type :: CallSiteType
+                                             , ifi_firstParamAsRet :: Maybe FirstParamAsRet                                               
                                              , ifi_actualParams :: [ActualParam]
                                              , ifi_funAttrs :: [FunAttr]
-                                             }
-                        | InvokeFunInterface2 { ifi_conv :: CallConv
-                                              , ifi_retAttrs :: [RetAttr]
-                                              , ifi_type :: CallSiteType
-                                              , ifi_firstParamAsRet :: FirstParamAsRet
-                                              , ifi_actualParams :: [ActualParam]
-                                              , ifi_funAttrs :: [FunAttr]
-                                              } deriving (Eq, Ord, Show)
+                                             } deriving (Eq, Ord, Show)
 
 data CallAsmInterface = CallAsmInterface { cai_type :: CallSiteType
                                          , cai_sideeffect :: Maybe SideEffect
@@ -397,7 +384,7 @@ data Cinst where {
 
   I_call_fun :: { call_ptr :: FunPtr
                 , call_fun_interface :: CallFunInterface
-                , call_return :: Maybe LocalId
+                , call_return :: Maybe LocalId 
                 } -> Cinst;
 
   I_call_asm :: { call_asmcode :: AsmCode

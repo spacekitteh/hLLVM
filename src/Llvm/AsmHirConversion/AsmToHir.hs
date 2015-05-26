@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE CPP, TemplateHaskell #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, TupleSections #-}
 module Llvm.AsmHirConversion.AsmToHir(asmToHir) where
 
 import Llvm.ErrorLoc
@@ -864,22 +864,17 @@ convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) =
            erta = eitherRet mp ert
      ; fna <- convert_FunPtr fn
      ; case aps of
-       hd:tl -> do { mfp <- specializeFirstParamAsRet hd
-                   ; case mfp of
-                     Just fp -> 
-                       do { tla <- mapM convert_ActualParam tl
-                          ; return (fst ert == A.Tvoid, fna, I.CallFunInterface2 tc (maybe I.Ccc id cc) 
-                                                             (fmap specializeRetAttr pa) erta fp tla fa)
-                          }
-                     Nothing -> 
-                       do { apsa <- mapM convert_ActualParam aps
-                          ; return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
-                                                             (fmap specializeRetAttr pa) erta apsa fa)
-                          }
-                   }
-       _ -> do { return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
-                                                  (fmap specializeRetAttr pa) erta [] fa)
-               }
+         hd:tl ->      
+           do { mfp <- specializeFirstParamAsRet hd
+              ; (mfp0, apsa) <- case mfp of
+                Just _ -> liftM (mfp,) (mapM convert_ActualParam  tl) 
+                Nothing -> liftM (mfp,) (mapM convert_ActualParam aps)
+              ; return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
+                                                 (fmap specializeRetAttr pa) erta mfp0 apsa fa)
+              }
+         _ -> do { return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
+                                                    (fmap specializeRetAttr pa) erta Nothing [] fa)
+                 }
      }
 
 convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr, I.InvokeFunInterface)
@@ -890,25 +885,15 @@ convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) =
      ; fna <- convert_FunPtr fn
      ; case aps of
        hd:tl -> do { mfp <- specializeFirstParamAsRet hd
-                   ; case mfp of
-                     Just fp -> 
-                       do { tla <- mapM convert_ActualParam tl
-                          ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface2 (maybe I.Ccc id cc) 
-                                                             (fmap specializeRetAttr pa) erta fp tla fa)
-                          }
-                     Nothing -> 
-                       do { apsa <- mapM convert_ActualParam aps
-                          ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) 
-                                                             (fmap specializeRetAttr pa) erta apsa fa)
-                          }
+                   ; apsa <- case mfp of
+                     Just fp -> mapM convert_ActualParam tl 
+                     Nothing -> mapM convert_ActualParam aps
+                   ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) 
+                                                      (fmap specializeRetAttr pa) erta mfp apsa fa)
                    }
        _ -> do { return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc)
-                                                  (fmap specializeRetAttr pa) erta [] fa)
+                                                  (fmap specializeRetAttr pa) erta Nothing [] fa)
                }
-            {-
-     ; apsa <- mapM convert_ActualParam aps
-     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) 
-                                        (fmap specializeRetAttr pa) erta apsa fa) -}
      }
 
 

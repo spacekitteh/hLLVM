@@ -433,31 +433,18 @@ instance IrPrint CallFunInterface where
                                          printIr cfi_conv,
                                          printIr cfi_retAttrs,
                                          printIr cfi_type,
+                                         printIr cfi_firstParamAsRet,                                         
                                          printIr cfi_actualParams, 
                                          printIr cfi_funAttrs]
-    CallFunInterface2{..} -> commaSepList [printIr cfi_tail, 
-                                           printIr cfi_conv,
-                                           printIr cfi_retAttrs,
-                                           printIr cfi_type,
-                                           printIr cfi_firstParamAsRet,
-                                           printIr cfi_actualParams, 
-                                           printIr cfi_funAttrs]                           
 
 instance IrPrint InvokeFunInterface where
   printIr x = case x of
     InvokeFunInterface{..} -> commaSepList [printIr ifi_conv,
                                             printIr ifi_retAttrs,
                                             printIr ifi_type,
+                                            printIr ifi_firstParamAsRet,                                            
                                             printIr ifi_actualParams, 
                                             printIr ifi_funAttrs]
-    InvokeFunInterface2{..} -> commaSepList [printIr ifi_conv,
-                                             printIr ifi_retAttrs,
-                                             printIr ifi_type,
-                                             printIr ifi_firstParamAsRet,
-                                             printIr ifi_actualParams, 
-                                             printIr ifi_funAttrs]
-                             
-
 
 instance IrPrint CallAsmInterface where
   printIr CallAsmInterface{..} = commaSepList [printIr cai_type,

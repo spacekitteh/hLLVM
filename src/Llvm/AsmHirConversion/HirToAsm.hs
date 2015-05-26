@@ -458,34 +458,22 @@ instance Conversion I.FunPtr (Rm A.FunName) where
 
 instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite)) where
   convert  (fn, cfi) = case cfi of
-    I.CallFunInterface tc cc pa t aps fa -> 
+    I.CallFunInterface tc cc pa t fap aps fa -> 
       do { fna <- convert fn
+         ; fapa <- convert fap
          ; apsa <- mapM convert aps
          ; ta <- convert t
-         ; return (tc, A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna apsa fa)
+         ; return (tc, A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (maybe apsa (:apsa) fapa) fa)
          }
-    I.CallFunInterface2 tc cc pa t fpsr aps fa -> 
-      do { fna <- convert fn
-         ; fpsra <- convert fpsr
-         ; apsa <- mapM convert aps
-         ; ta <- convert t
-         ; return (tc, A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (fpsra:apsa) fa)
-         }      
     
 instance Conversion (I.FunPtr, I.InvokeFunInterface) (Rm A.CallSite) where
   convert  (fn, ifi) = case ifi of
-    I.InvokeFunInterface cc pa t aps fa ->
+    I.InvokeFunInterface cc pa t fap aps fa ->
       do { fna <- convert fn
+         ; fapa <- convert fap
          ; apsa <- mapM convert aps
          ; ta <- convert t
-         ; return (A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna apsa fa)
-         }
-    I.InvokeFunInterface2 cc pa t fpsr aps fa ->
-      do { fna <- convert fn
-         ; fpsra <- convert fpsr
-         ; apsa <- mapM convert aps
-         ; ta <- convert t
-         ; return (A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (fpsra:apsa) fa)
+         ; return (A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (maybe apsa (:apsa) fapa) fa)
          }
 
 instance Conversion (I.AsmCode, I.CallAsmInterface) (Rm A.InlineAsmExp) where
