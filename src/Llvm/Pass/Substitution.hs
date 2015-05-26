@@ -20,18 +20,18 @@ import Llvm.Pass.Changer
 
 class Substitutable a where
   substitute :: Changer -> a -> a
-  
+
 instance Substitutable a => Substitutable (Maybe a) where
   substitute chg (Just a) = Just $ substitute chg a
   substitute chg Nothing = Nothing
-  
+
 instance Substitutable a => Substitutable [a] where
   substitute chg l = fmap (substitute chg) l
 
 instance (Substitutable a, Substitutable b) => Substitutable (Either a b) where
   substitute chg (Left a) = Left $ substitute chg a
   substitute chg (Right a) = Right $ substitute chg a
-  
+
 instance (Substitutable a, Substitutable b) => Substitutable (a, b) where
   substitute chg (a, b) = (substitute chg a, substitute chg b)
 
@@ -49,17 +49,17 @@ instance Substitutable Label where
   substitute _ = id
 
 instance Substitutable v => Substitutable (Select s r v) where
-  substitute chg (Select cnd t f) = 
+  substitute chg (Select cnd t f) =
     Select (substitute chg cnd) (substitute chg t) (substitute chg f)
-    
-instance Substitutable v => Substitutable (GetElementPtr s v) where    
+
+instance Substitutable v => Substitutable (GetElementPtr s v) where
   substitute chg (GetElementPtr b base indices) =
     GetElementPtr b (substitute chg base) (substitute chg indices)
-    
+
 instance Substitutable v => Substitutable (Icmp s v) where
   substitute chg (Icmp op t v1 v2) =
     Icmp op t (substitute chg v1) (substitute chg v2)
-    
+
 instance Substitutable v => Substitutable (Fcmp s v) where
   substitute chg (Fcmp op t v1 v2) =
     Fcmp op t (substitute chg v1) (substitute chg v2)
@@ -67,13 +67,13 @@ instance Substitutable v => Substitutable (Fcmp s v) where
 instance Substitutable v => Substitutable (ShuffleVector r v) where
   substitute chg (ShuffleVector v1 v2 i) =
     ShuffleVector (substitute chg v1) (substitute chg v2) (substitute chg i)
-    
-instance Substitutable v => Substitutable (ExtractElement r v) where    
+
+instance Substitutable v => Substitutable (ExtractElement r v) where
   substitute chg (ExtractElement v i) =
     ExtractElement (substitute chg v) (substitute chg i)
-    
-    
-instance Substitutable v => Substitutable (InsertElement r v) where    
+
+
+instance Substitutable v => Substitutable (InsertElement r v) where
   substitute chg (InsertElement v e i) =
     InsertElement (substitute chg v) (substitute chg e) (substitute chg i)
 
@@ -81,12 +81,12 @@ instance Substitutable v => Substitutable (ExtractValue v) where
   substitute chg (ExtractValue v ns) = ExtractValue (substitute chg v) ns
 
 instance Substitutable v => Substitutable (InsertValue v) where
-  substitute chg (InsertValue v e ns) = 
+  substitute chg (InsertValue v e ns) =
     InsertValue (substitute chg v) (substitute chg e) ns
 
 
 instance Substitutable Const where
-  substitute chg@Changer{..} cst = 
+  substitute chg@Changer{..} cst =
     let change2c cf a b = cf (substitute chg a) (substitute chg b)
         cst1 = case cst of
           C_u8 _ -> cst
@@ -122,7 +122,7 @@ instance Substitutable Const where
           C_add n t c1 c2 -> change2c (C_add n t) c1 c2
           C_sub n t c1 c2 -> change2c (C_sub n t) c1 c2
           C_mul n t c1 c2 -> change2c (C_mul n t) c1 c2
-          C_udiv n t c1 c2 -> change2c (C_udiv n t) c1 c2 
+          C_udiv n t c1 c2 -> change2c (C_udiv n t) c1 c2
           C_sdiv n t c1 c2 -> change2c (C_sdiv n t) c1 c2
           C_urem t c1 c2 -> change2c (C_urem t) c1 c2
           C_srem t c1 c2 -> change2c (C_srem t) c1 c2
@@ -130,7 +130,7 @@ instance Substitutable Const where
           C_lshr n t c1 c2 -> change2c (C_lshr n t) c1 c2
           C_ashr n t c1 c2 -> change2c (C_ashr n t) c1 c2
           C_and t c1 c2 -> change2c (C_and t) c1 c2
-          C_or t c1 c2 -> change2c (C_or t) c1 c2 
+          C_or t c1 c2 -> change2c (C_or t) c1 c2
           C_xor t c1 c2 -> change2c (C_xor t) c1 c2
 
           C_add_V n t c1 c2 -> change2c (C_add_V n t) c1 c2
@@ -153,8 +153,8 @@ instance Substitutable Const where
           C_fdiv n t c1 c2 -> change2c (C_fdiv n t) c1 c2
           C_frem n t c1 c2 -> change2c (C_frem n t) c1 c2
 
-          C_fadd_V n t c1 c2 -> change2c (C_fadd_V n t) c1 c2 
-          C_fsub_V n t c1 c2 -> change2c (C_fsub_V n t) c1 c2 
+          C_fadd_V n t c1 c2 -> change2c (C_fadd_V n t) c1 c2
+          C_fsub_V n t c1 c2 -> change2c (C_fsub_V n t) c1 c2
           C_fmul_V n t c1 c2 -> change2c (C_fmul_V n t) c1 c2
           C_fdiv_V n t c1 c2 -> change2c (C_fdiv_V n t) c1 c2
           C_frem_V n t c1 c2 -> change2c (C_frem_V n t) c1 c2
@@ -186,9 +186,9 @@ instance Substitutable Const where
           C_inttoptr_V tc tdest -> C_inttoptr_V (substitute chg tc) tdest
           C_addrspacecast_V tc tdest -> C_addrspacecast_V (substitute chg tc) tdest
 
-          C_getelementptr ib (T t c) l -> 
+          C_getelementptr ib (T t c) l ->
             C_getelementptr ib (T t (substitute chg c)) (substitute chg l)
-          C_getelementptr_V ib (T t c) l -> 
+          C_getelementptr_V ib (T t c) l ->
             C_getelementptr_V ib (T t (substitute chg c)) (substitute chg l)
 
           C_select_I x -> C_select_I (substitute chg x)
@@ -200,7 +200,7 @@ instance Substitutable Const where
           C_select_VI x -> C_select_VI (substitute chg x)
           C_select_VF x -> C_select_VF (substitute chg x)
           C_select_VP x -> C_select_VP (substitute chg x)
-          
+
           C_icmp x -> C_icmp (substitute chg x)
           C_icmp_V x -> C_icmp_V (substitute chg x)
           C_fcmp x -> C_fcmp (substitute chg x)
@@ -220,13 +220,13 @@ instance Substitutable Const where
           C_insertvalue x -> C_insertvalue (substitute chg x)
     in change_Const cst1
 
-        
+
 instance Substitutable x => Substitutable (T t x) where
   substitute chg (T t a) = T t (substitute chg a)
 
 instance Substitutable FunctionPrototype where
-  substitute chg fp@FunctionPrototype {..} = 
-    fp { fp_fun_name = substitute chg fp_fun_name 
+  substitute chg fp@FunctionPrototype {..} =
+    fp { fp_fun_name = substitute chg fp_fun_name
        , fp_param_list = substitute chg fp_param_list
        , fp_comdat = substitute chg fp_comdat
        , fp_prefix = substitute chg fp_prefix
@@ -237,12 +237,12 @@ instance Substitutable TlDeclare where
   substitute chg (TlDeclare fp) = TlDeclare (substitute chg fp)
 
 instance Substitutable a => Substitutable (TlDefine a) where
-  substitute chg (TlDefine fp e g) = 
+  substitute chg (TlDefine fp e g) =
     TlDefine (substitute chg fp) e (H.mapGraph (substitute chg) g)
 
 instance Substitutable LocalId where
   substitute chg = change_LocalId chg
-  
+
 instance Substitutable Pinst where
   substitute chg p@Pinst{..} = p { flowins = substitute chg flowins
                                  , flowout = substitute chg flowout
@@ -264,7 +264,7 @@ instance Substitutable Clause where
     Filter tcn -> Filter (substitute chg tcn)
 
 instance Substitutable Cinst where
-  substitute chg x = 
+  substitute chg x =
     let cid = change_LocalId chg
     in case x of
         i@I_alloca{..} -> i { size = substitute chg size
@@ -278,7 +278,7 @@ instance Substitutable Cinst where
                                 }
         i@I_store{..} -> i { storedvalue = substitute chg storedvalue
                            , pointer = substitute chg pointer
-                           } 
+                           }
         i@I_storeatomic{..} -> i { storedvalue = substitute chg storedvalue
                                  , pointer = substitute chg pointer
                                  }
@@ -330,12 +330,12 @@ instance Substitutable Cinst where
                                      , elementF = (substitute chg) elementF
                                      , index = (substitute chg) index
                                      , result = cid result
-                                     } 
+                                     }
         i@I_insertelement_P{..} -> i { vectorP = (substitute chg) vectorP
                                      , elementP = (substitute chg) elementP
                                      , index = (substitute chg) index
                                      , result = cid result
-                                     } 
+                                     }
         i@I_shufflevector_I{..} -> i { vector1I = (substitute chg) vector1I
                                      , vector2I = (substitute chg) vector2I
                                      , vectorIdx = (substitute chg) vectorIdx
@@ -357,7 +357,7 @@ instance Substitutable Cinst where
         i@I_insertvalue{..} -> i { record = (substitute chg) record
                                  , element = (substitute chg) element
                                  , result = cid result
-                                 } 
+                                 }
         i@I_landingpad{..} -> i { persFn = substitute chg persFn
                                 , clauses = substitute chg clauses
                                 , result = cid result
@@ -600,10 +600,10 @@ instance Substitutable Cinst where
                               , result = cid result
                               }
         i@I_ptrtoint_V{..} -> i { srcVP = (substitute chg) srcVP
-                                , result = cid result 
+                                , result = cid result
                                 }
         i@I_inttoptr_V{..} -> i { srcVI = (substitute chg) srcVI
-                                , result = cid result 
+                                , result = cid result
                                 }
         i@I_addrspacecast_V{..} -> i { srcVP = (substitute chg) srcVP
                                      , result = cid result
@@ -648,7 +648,7 @@ instance Substitutable Cinst where
                             }
         i@I_llvm_va_start{..} -> i { arglist = substitute chg arglist }
         i@I_llvm_va_end{..} -> i { arglist = substitute chg arglist }
-        i@I_llvm_va_copy{..} -> i { destarglist = substitute chg destarglist 
+        i@I_llvm_va_copy{..} -> i { destarglist = substitute chg destarglist
                                   , srcarglist = substitute chg srcarglist
                                   }
         i@I_llvm_gcroot{..} -> i { ptrloc = substitute chg ptrloc
@@ -660,7 +660,7 @@ instance Substitutable Cinst where
         i@I_llvm_frameaddress{..} -> i { level = substitute chg level }
         I_llvm_frameescape vs -> I_llvm_frameescape (substitute chg vs)
         i@I_llvm_framerecover{..} -> undefined
-        i@I_llvm_read_register{..} -> i 
+        i@I_llvm_read_register{..} -> i
         i@I_llvm_write_register{..} -> i { value = substitute chg value
                                          }
         i@I_llvm_stacksave{..} -> i { result = cid result }
@@ -708,12 +708,12 @@ instance Substitutable Cinst where
   i@I_llvm_pow_ppcf128 :: Value -> Value -> LocalId -> Cinst;
 
   i@I_llvm_bitset_test :: Value -> Value -> LocalId -> Cinst;
-  i@I_llvm_donothing :: Cinst;                              
+  i@I_llvm_donothing :: Cinst;
   -}
-                        
+
 
 instance Substitutable Minst where
-  substitute chg (Minst cs g mps mlid) = 
+  substitute chg (Minst cs g mps mlid) =
     Minst cs (substitute chg g) (substitute chg mps) (substitute chg mlid)
 
 instance Substitutable MetaParam where
@@ -739,10 +739,10 @@ instance Substitutable Tinst where
                             }
     T_resume (T dt v) -> T_resume (T dt (substitute chg v))
     T_unwind -> T_unwind
-                    
+
 instance Substitutable CallFunInterface where
   substitute chg x@CallFunInterface{..} = x { cfi_actualParams = substitute chg cfi_actualParams}
-    
+
 instance Substitutable InvokeFunInterface where
   substitute chg x@InvokeFunInterface{..} = x { ifi_actualParams = substitute chg ifi_actualParams}
 
@@ -752,18 +752,20 @@ instance Substitutable CallAsmInterface where
 instance Substitutable ActualParam where
   substitute chg c = case c of
     ActualParamData dt pa ma v -> ActualParamData dt pa ma (substitute chg v)
+    ActualParamByVal dt pa ma v -> ActualParamByVal dt pa ma (substitute chg v)    
     ActualParamLabel t pa ma v -> ActualParamLabel t pa ma (substitute chg v)
 
 instance Substitutable FormalParamList where
   substitute chg (FormalParamList fps mvp fa) =
     FormalParamList (substitute chg fps) mvp fa
-  
-instance Substitutable FormalParam where  
+
+instance Substitutable FormalParam where
   substitute chg fp = case fp of
     FormalParamData dt pa1 ma x -> FormalParamData dt pa1 ma (substitute chg x)
+    FormalParamByVal dt pa1 ma x -> FormalParamByVal dt pa1 ma (substitute chg x)  
     FormalParamMeta mk x -> FormalParamMeta mk (substitute chg x)
-    
-instance Substitutable Fparam where    
+
+instance Substitutable Fparam where
   substitute chg fp = case fp of
     FimplicitParam -> fp
     FexplicitParam x -> FexplicitParam (substitute chg x)
@@ -781,20 +783,20 @@ instance Substitutable TlGlobal where
     tl@TlGlobalOpaque{..} -> tl { tlg_lhs = substitute chg tlg_lhs
                                 , tlg_const = substitute chg tlg_const
                                 , tlg_comdat = substitute chg tlg_comdat
-                                }                       
-                             
-instance Substitutable TlIntrinsic where                             
+                                }
+
+instance Substitutable TlIntrinsic where
   substitute chg tli = case tli of
     x@TlIntrinsic_llvm_used{..}  -> x { tli_const = substitute chg tli_const }
     x@TlIntrinsic_llvm_compiler_used{..}  -> x { tli_const = substitute chg tli_const }
     x@TlIntrinsic_llvm_global_ctors{..}  -> x { tli_const = substitute chg tli_const }
     x@TlIntrinsic_llvm_global_dtors{..}  -> x { tli_const = substitute chg tli_const }
-  
+
 instance Substitutable a => Substitutable (Toplevel a) where
   substitute chg@Changer{..} tpl = case tpl of
     ToplevelTriple _ -> tpl
     ToplevelDataLayout _ -> tpl
-    ToplevelAlias x -> ToplevelAlias (substitute chg x)    
+    ToplevelAlias x -> ToplevelAlias (substitute chg x)
     ToplevelDbgInit x -> ToplevelDbgInit (substitute chg x)
     ToplevelStandaloneMd x -> ToplevelStandaloneMd (substitute chg x)
     ToplevelNamedMd x -> ToplevelNamedMd (substitute chg x)
@@ -802,29 +804,29 @@ instance Substitutable a => Substitutable (Toplevel a) where
     ToplevelDefine x -> ToplevelDefine (substitute chg x)
     ToplevelGlobal x -> ToplevelGlobal (substitute chg x)
     ToplevelTypeDef x -> ToplevelTypeDef (substitute chg x)
-    ToplevelDepLibs x -> ToplevelDepLibs (substitute chg x)  
+    ToplevelDepLibs x -> ToplevelDepLibs (substitute chg x)
     ToplevelUnamedType x -> ToplevelUnamedType (substitute chg x)
-    ToplevelModuleAsm x -> ToplevelModuleAsm (substitute chg x)                        
+    ToplevelModuleAsm x -> ToplevelModuleAsm (substitute chg x)
     ToplevelAttribute x -> ToplevelAttribute (substitute chg x)
     ToplevelComdat x -> ToplevelComdat (substitute chg x)
     ToplevelIntrinsic x -> ToplevelIntrinsic (substitute chg x)
-    
-    
-instance Substitutable TlTypeDef where    
+
+
+instance Substitutable TlTypeDef where
   substitute chg = id
-  
-instance Substitutable TlComdat where  
+
+instance Substitutable TlComdat where
   substitute chg (TlComdat lhs v) = TlComdat (substitute chg lhs) v
-  
-instance Substitutable DollarId where  
+
+instance Substitutable DollarId where
   substitute chg di = globalId2DollarId $ substitute chg $ dollarIdToGlobalId di
 
-dollarIdToGlobalId :: DollarId -> GlobalId  
+dollarIdToGlobalId :: DollarId -> GlobalId
 dollarIdToGlobalId v = case v of
   DollarIdNum x -> GlobalIdNum x
   DollarIdAlphaNum x -> GlobalIdAlphaNum x
   DollarIdDqString x -> GlobalIdDqString x
-  
+
 globalId2DollarId :: GlobalId -> DollarId
 globalId2DollarId v = case v of
   GlobalIdNum x -> DollarIdNum x
@@ -833,26 +835,26 @@ globalId2DollarId v = case v of
 
 instance Substitutable Comdat where
   substitute chg (Comdat x) = Comdat (substitute chg x)
-  
+
 instance Substitutable TlAttribute where
   substitute chg = id
-  
-instance Substitutable TlModuleAsm where 
+
+instance Substitutable TlModuleAsm where
   substitute chg = id
 
 instance Substitutable TlUnamedType where
   substitute chg = id
 
-instance Substitutable TlDepLibs where    
+instance Substitutable TlDepLibs where
   substitute chg = id
 
 instance Substitutable TlDbgInit where
   substitute chg = id
-  
+
 instance Substitutable GlobalId where
   substitute chg = change_GlobalId chg
-    
-instance Substitutable TlAlias where    
+
+instance Substitutable TlAlias where
   substitute chg tla@TlAlias{..} = tla { tla_lhs = substitute chg tla_lhs
                                        , tla_aliasee = substitute chg tla_aliasee
                                        }
@@ -872,23 +874,23 @@ instance Substitutable v => Substitutable (Conversion s v) where
     IntToPtr x t -> IntToPtr (substitute chg x) t
     Bitcast x t -> Bitcast (substitute chg x) t
     AddrSpaceCast x t -> AddrSpaceCast (substitute chg x) t
-  
+
 instance Substitutable Aliasee where
   substitute chg al = case al of
     AliaseeTv x -> AliaseeTv (substitute chg x)
     AliaseeConversion x -> AliaseeConversion (substitute chg x)
     AliaseeConversionV x -> AliaseeConversionV (substitute chg x)
     AliaseeGEP x -> AliaseeGEP (substitute chg x)
-    AliaseeGEPV x -> AliaseeGEPV (substitute chg x)    
+    AliaseeGEPV x -> AliaseeGEPV (substitute chg x)
 
 instance Substitutable TlNamedMd where
-  substitute chg (TlNamedMd mv mns) = 
+  substitute chg (TlNamedMd mv mns) =
     TlNamedMd (substitute chg mv) (substitute chg mns)
 
 instance Substitutable MdVar where
   substitute _ = id
-  
-instance Substitutable MdNode where  
+
+instance Substitutable MdNode where
   substitute _ = id
 
 instance Substitutable TlStandaloneMd where
@@ -898,8 +900,8 @@ instance Substitutable MetaKindedConst where
   substitute chg mk = case mk of
     MetaKindedConst m mc -> MetaKindedConst m (substitute chg mc)
     UnmetaKindedNull -> mk
-  
-instance Substitutable FunPtr where  
+
+instance Substitutable FunPtr where
   substitute chg@Changer{..} fp = case fp of
     FunId g -> FunId (substitute chg g)
     FunSsa l -> FunSsa (substitute chg l)
@@ -909,7 +911,7 @@ instance Substitutable FunPtr where
     Fun_undef -> fp
 
 
-instance Substitutable MetaConst where  
+instance Substitutable MetaConst where
   substitute chg mc = case mc of
     McStruct l -> McStruct (substitute chg l)
     McString s -> mc
@@ -920,17 +922,17 @@ instance Substitutable MetaConst where
 
 instance Substitutable a => Substitutable (Module a) where
   substitute chg (Module l) = Module $ substitute chg l
-  
-  
-instance Substitutable NOOP where  
+
+
+instance Substitutable NOOP where
   substitute _  = id
-  
+
 instance Ord k => Substitutable (M.Map (GlobalId, k) v) where
   substitute chg m = M.mapKeys (\(gid, k) -> (substitute chg gid, k)) m
-  
-  
+
+
 instance Substitutable Prefix where
   substitute chg (Prefix x) = Prefix $ substitute chg x
-  
+
 instance Substitutable Prologue where
   substitute chg (Prologue x) = Prologue $ substitute chg x
