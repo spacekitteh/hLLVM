@@ -54,24 +54,20 @@ instance TypeConversion () (Either I.Rtype (I.Type I.CodeFunB I.X)) A.Type where
   tconvert _ (Left e) = tconvert () e
   tconvert _ (Right e) = tconvert () (I.Tpointer (ucast e) 0)
 
-instance TypeConversion () I.FormalParam A.FormalParam where
-  tconvert _ (I.FormalParamData dt pa ma fp) = A.FormalParamData (tconvert () dt) pa ma fp []
-  tconvert _ (I.FormalParamByVal dt pa ma fp) = A.FormalParamData (tconvert () dt) (A.PaByVal:pa) ma fp []
-  tconvert _ (I.FormalParamMeta mk fp) = A.FormalParamMeta (tconvert () mk) fp
+appendAlignment :: Maybe A.Alignment -> [A.ParamAttr] -> [A.ParamAttr]
+appendAlignment Nothing l = l
+appendAlignment (Just (A.Alignment n)) l = l ++ [A.PaAlign n]
 
-instance TypeConversion () I.FormalParamList A.FormalParamList where
-  tconvert _ (I.FormalParamList l ma fas) = A.FormalParamList (fmap (tconvert ()) l) ma fas
 
-instance TypeConversion MP A.FormalParam I.FormalParam where
-  tconvert mp (A.FormalParamData dt pa1 ma fp pa2) = 
-    if S.member A.PaByVal (S.fromList (pa1++pa2)) then 
-      I.FormalParamByVal (dcast FLC ((tconvert mp dt)::I.Utype)) (filter (/= A.PaByVal) $ pa1++pa2) ma fp
-    else
-      I.FormalParamData (dcast FLC ((tconvert mp dt)::I.Utype)) (pa1++pa2) ma fp
-  tconvert mp (A.FormalParamMeta mk fp) = I.FormalParamMeta (tconvert mp mk) fp
-
-instance TypeConversion MP A.FormalParamList I.FormalParamList where
-  tconvert mp (A.FormalParamList l ma fas) = I.FormalParamList (fmap (tconvert mp) l) ma fas
+stripOffPa :: [A.ParamAttr] -> [A.ParamAttr -> Bool] -> 
+              ([A.ParamAttr], [Maybe A.ParamAttr])
+stripOffPa palist pas = 
+  foldl (\(pl, bl) pa -> let pl0 = filter (\x -> not $ pa x) pl
+                             out = filter pa pl
+                         in case out of
+                           [x] -> (pl0, bl++[Just x])
+                           [] -> (pl0, bl++[Nothing])
+        ) (palist,[]) pas
 
 instance TypeConversion () I.Rtype A.Type where  
   tconvert _ t = case t of

@@ -248,8 +248,8 @@ data TerminatorInst =
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
                              deriving (Eq,Show)
 
-data ActualParam = ActualParamData Type [ParamAttr] (Maybe Alignment) Value [ParamAttr]
-                 | ActualParamLabel Type [ParamAttr] (Maybe Alignment) PercentLabel [ParamAttr]
+data ActualParam = ActualParamData Type [ParamAttr] {-(Maybe Alignment)-} Value [ParamAttr]
+                 | ActualParamLabel Type [ParamAttr] {-(Maybe Alignment)-} PercentLabel [ParamAttr]
                  | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 

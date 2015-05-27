@@ -18,13 +18,44 @@ data FunCxt = FunCxt { funName :: String
 
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
-                           , functions :: M.Map Ci.GlobalId Ci.FunctionPrototype
+                           , functions :: M.Map Ci.GlobalId FunctionDeclareType
                            , attributes :: M.Map Word32 [FunAttr]
                            } deriving (Eq, Ord, Show)
                                 
 data IrCxt = IrCxt { globalCxt :: GlobalCxt
                    , funCxt :: FunCxt
                    } deriving (Eq, Ord, Show)
+
+
+convert_to_FunctionDeclareType  
+  (FunctionInterface {..}) = 
+    FunctionDeclareType { fd_linkage = fi_linkage
+                        , fd_visibility = fi_visibility
+                        , fd_dllstorage = fi_dllstorage
+                        , fd_call_conv = fi_call_conv
+                        , fd_param_attrs = fi_param_attrs
+                        , fd_ret_type = fi_ret_type
+                        , fd_fun_name = fi_fun_name 
+                        , fd_param_list = convert_to_FormalParamTypeList fi_param_list
+                        , fd_addr_naming = fi_addr_naming 
+                        , fd_fun_attrs = fi_fun_attrs 
+                        , fd_section = fi_section 
+                        , fd_comdat = fi_comdat 
+                        , fd_alignment = fi_alignment
+                        , fd_gc = fi_gc 
+                        , fd_prefix = fi_prefix 
+                        , fd_prologue = fi_prologue 
+                        }
+    
+convert_to_FormalParamTypeList :: FunParamList -> FunParamTypeList
+convert_to_FormalParamTypeList (FunParamList l ma fas) = 
+  FunParamTypeList (fmap convert_to_FormalParamType l) ma fas
+  
+convert_to_FormalParamType :: FunParam -> FunParamType
+convert_to_FormalParamType x = case x of
+  FunParamData dt pas ma v -> FunParamDataType dt pas ma
+  FunParamByVal dt pas ma v -> FunParamByValType dt pas ma
+  FunParamMeta mk fp -> FunParamMetaType mk fp
 
 irCxtOfModule :: Module a -> IrCxt
 irCxtOfModule (Module tl) = 
@@ -48,8 +79,8 @@ irCxtOfModule (Module tl) =
                           _ -> False
                       ) tl
       funs = fmap (\tl -> case tl of
-                      ToplevelDeclare (TlDeclare fp@FunctionPrototype{..}) -> (fp_fun_name, fp)
-                      ToplevelDefine (TlDefine fp@FunctionPrototype{..} _ _) -> (fp_fun_name, fp)
+                      ToplevelDeclare (TlDeclare fp@FunctionDeclareType{..}) -> (fd_fun_name, fp)
+                      ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> (fi_fun_name, convert_to_FunctionDeclareType fp)
                   )
              $ filter (\x -> case x of
                           ToplevelDeclare _ -> True

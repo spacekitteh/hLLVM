@@ -1094,23 +1094,31 @@ data Aliasee = AliaseeTv (T Dtype Value)
              | AliaseeGEPV (GetElementPtr VectorB Const)
              deriving (Eq, Ord, Show)
 
-data FunctionPrototype = FunctionPrototype { fp_linkage :: Maybe Linkage
-                                           , fp_visibility :: Maybe Visibility
-                                           , fp_dllstorage :: Maybe DllStorageClass
-                                           , fp_call_conv :: Maybe CallConv
-                                           , fp_param_attrs :: [ParamAttr]
-                                           , fp_ret_type :: Rtype
-                                           , fp_fun_name :: GlobalId
-                                           , fp_param_list :: FormalParamList
-                                           , fp_addr_naming :: Maybe AddrNaming
-                                           , fp_fun_attrs :: [FunAttr]
-                                           , fp_section :: Maybe Section
-                                           , fp_comdat :: Maybe Comdat
-                                           , fp_alignment :: Maybe Alignment
-                                           , fp_gc :: Maybe Gc
-                                           , fp_prefix :: Maybe Prefix
-                                           , fp_prologue :: Maybe Prologue
+data FunctionInterface = FunctionInterface { fi_linkage :: Maybe Linkage
+                                           , fi_visibility :: Maybe Visibility
+                                           , fi_dllstorage :: Maybe DllStorageClass
+                                           , fi_call_conv :: Maybe CallConv
+                                           , fi_param_attrs :: [ParamAttr]
+                                           , fi_ret_type :: Rtype
+                                           , fi_fun_name :: GlobalId
+                                           , fi_param_list :: FunParamList
+                                           , fi_addr_naming :: Maybe AddrNaming
+                                           , fi_fun_attrs :: [FunAttr]
+                                           , fi_section :: Maybe Section
+                                           , fi_comdat :: Maybe Comdat
+                                           , fi_alignment :: Maybe Alignment
+                                           , fi_gc :: Maybe Gc
+                                           , fi_prefix :: Maybe Prefix
+                                           , fi_prologue :: Maybe Prologue
                                            } deriving (Eq,Ord,Show)
+
+data FunParam = FunParamData Dtype [ParamAttr] (Maybe Alignment) LocalId 
+              | FunParamByVal Dtype [ParamAttr] (Maybe Alignment) LocalId
+              | FunParamMeta MetaKind Fparam
+              deriving (Eq,Ord,Show)
+                       
+data FunParamList = FunParamList [FunParam] (Maybe VarArgParam) [FunAttr]
+                     deriving (Eq,Ord,Show)
 
 data Prefix = Prefix TypedConstOrNull deriving (Eq, Ord, Show)
 data Prologue = Prologue TypedConstOrNull deriving (Eq, Ord, Show)

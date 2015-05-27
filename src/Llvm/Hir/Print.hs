@@ -690,8 +690,18 @@ instance IrPrint Aliasee where
   printIr (AliaseeGEP a) = printIr a
   printIr (AliaseeGEPV a) = printIr a
 
-instance IrPrint FunctionPrototype where
-  printIr (FunctionPrototype fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams
+
+
+instance IrPrint FunctionInterface where
+  printIr (FunctionInterface fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams
+           fhd fhAttr1 fhSection fhCmd fhAlign fhGc fhPrefix fhPrologue) =
+    hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhCCoonc, hsep $ fmap printIr fhAttr
+         , printIr fhRetType, printIr fhName, printIr fhParams, printIr fhd, hsep $ fmap printIr fhAttr1
+         , printIr fhSection, printIr fhCmd, printIr fhAlign, printIr fhGc, printIr fhPrefix, printIr fhPrologue]
+
+
+instance IrPrint FunctionDeclare where
+  printIr (FunctionDeclare fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams
            fhd fhAttr1 fhSection fhCmd fhAlign fhGc fhPrefix fhPrologue) =
     hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhCCoonc, hsep $ fmap printIr fhAttr
          , printIr fhRetType, printIr fhName, printIr fhParams, printIr fhd, hsep $ fmap printIr fhAttr1
@@ -785,19 +795,32 @@ instance IrPrint (Type s x) where
     TquoteNameOpaqueD s -> char '%' <> text s
     TnoOpaqueD s -> char '%' <> integral s
 
-instance IrPrint FormalParam where
+instance IrPrint FunParamType where
   printIr x = case x of
-    (FormalParamData t att1 align id) ->
+    (FunParamDataType t att1 align) ->
       (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align)
-      <+> (printIr id) 
-    (FormalParamByVal t att1 align id) ->
+    (FunParamByValType t att1 align) ->
       (printIr t) <+> (hsep $ fmap printIr (PaByVal:att1)) <> (maybe empty ((comma <+>) . printIr) align)
-      <+> (printIr id)       
-    (FormalParamMeta e lv) -> printIr e <+> printIr lv
+    (FunParamMetaType e lv) -> printIr e <+> printIr lv
 
-instance IrPrint FormalParamList where
-  printIr (FormalParamList params var atts) =
+instance IrPrint FunParamTypeList where
+  printIr (FunParamTypeList params var atts) =
     parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr var])) <+> (hsep $ fmap printIr atts)
+
+
+
+instance IrPrint FunParam where
+  printIr x = case x of
+    (FunParamData t att1 align x) ->
+      (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align) <+> printIr x
+    (FunParamByVal t att1 align x) ->
+      (printIr t) <+> (hsep $ fmap printIr (PaByVal:att1)) <> (maybe empty ((comma <+>) . printIr) align) <+> printIr x
+    (FunParamMeta e lv) -> printIr e <+> printIr lv
+
+instance IrPrint FunParamList where
+  printIr (FunParamList params var atts) =
+    parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr var])) <+> (hsep $ fmap printIr atts)
+
 
 instance IrPrint TypeParamList where
   printIr (TypeParamList params b) = parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr b]))

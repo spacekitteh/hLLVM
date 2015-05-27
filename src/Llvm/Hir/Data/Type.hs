@@ -12,7 +12,7 @@ module Llvm.Hir.Data.Type
        )
        where
 
-import Llvm.Asm.SharedEntity (Packing, FunAttr, ParamAttr, Alignment, Fparam, ParamAttr,VarArgParam)
+import Llvm.Asm.SharedEntity (Packing, FunAttr, ParamAttr, Alignment, Fparam, LocalId, ParamAttr,VarArgParam)
 import Llvm.ErrorLoc
 import Data.Word (Word32)
 
@@ -350,14 +350,6 @@ instance Ord (Type s r) where
     (Topaque_array n1 t1, Topaque_array n2 t2) -> compare (n1, t1) (n2, t2)
 
     (_,_) -> compare (show x1) (show x2)
-
-data FormalParam = FormalParamData Dtype [ParamAttr] (Maybe Alignment) Fparam
-                 | FormalParamByVal Dtype [ParamAttr] (Maybe Alignment) Fparam
-                 | FormalParamMeta MetaKind Fparam
-                 deriving (Eq,Ord,Show)
-
-data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) [FunAttr]
-                     deriving (Eq,Ord,Show)
 
 data TypeParamList = TypeParamList [Dtype] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 

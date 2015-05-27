@@ -36,7 +36,7 @@ data VisualPlugin a = VisualPlugin {
   -- the functions whose instructions should be visualized. 
   -- If the set does not exist, all functions are visualized
   , includedFunctions :: Maybe (Ds.Set GlobalId) 
-  , visFunctions :: [FunctionPrototype]
+  , visFunctions :: [FunctionDeclareType]
   , captureCinsts :: Cinst -> Ds.Set String -> Ds.Set String                                     
   , visNodeOO :: TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]
   }
@@ -115,7 +115,7 @@ scanModule visPlugin (Module l) =
   do { l0 <- mapM (\x -> case x of
                       ToplevelDefine def@(TlDefine fn _ _) ->
                         do { fct <- scanDefine visPlugin def
-                           ; return (Dm.insert (fp_fun_name fn) fct Dm.empty)
+                           ; return (Dm.insert (fi_fun_name fn) fct Dm.empty)
                            }
                       _ -> return Dm.empty 
                   ) l
@@ -172,7 +172,7 @@ rwModule visPlugin m@(Module l) duM =
      ++ (fmap (ToplevelDeclare . TlDeclare) (visFunctions visPlugin))
      ++ (fmap (\x -> case x of
                   ToplevelDefine def@(TlDefine fn _ _) -> 
-                    if (maybe True (Ds.member (fp_fun_name fn)) (includedFunctions visPlugin))
+                    if (maybe True (Ds.member (fi_fun_name fn)) (includedFunctions visPlugin))
                     then ToplevelDefine (rwDefine (visNodeOO visPlugin) (typeEnv $ globalCxt irCxt) duC def)
                     else x
                   _ -> x

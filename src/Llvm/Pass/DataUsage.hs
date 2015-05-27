@@ -481,13 +481,15 @@ scanGraph fm entry graph =
 scanDefine :: (CheckpointMonad m, FuelMonad m, Show a, DataUsageUpdator a) => IrCxt -> TlDefine a -> m DataUsage
 scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
   where formalParamIds :: S.Set LocalId
-        formalParamIds = let (FormalParamList l _ _) = fp_param_list fn
+        formalParamIds = let (FunParamList l _ _) = fi_param_list fn
                          in foldl (\p x -> case x of
-                                      FormalParamData (DtypeScalarP _)  _ _ (FexplicitParam v) -> S.insert v p
+                                      FunParamData (DtypeScalarP _)  _ _ v -> S.insert v p
+                                      FunParamByVal (DtypeScalarP _)  _ _ v -> S.insert v p                                      
                                       _ -> p
                                   ) S.empty l
 
-scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => Module a -> IrCxt -> m (Dm.Map FunctionPrototype DataUsage)
+scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => Module a -> IrCxt -> 
+              m (Dm.Map FunctionInterface DataUsage)
 scanModule (Module l) ic =
   do { l0 <- mapM (\x -> case x of
                       ToplevelDefine def@(TlDefine fn _ _) ->

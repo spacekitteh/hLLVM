@@ -34,7 +34,7 @@ chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of
                                Nothing -> I.GlobalIdAlphaNum (s ++ "_g_")
                                Just _ -> x
                              _ -> x
-                        , Cg.change_LocalId = \x -> case x of  
+                        , Cg.change_LocalId = \x -> case x of
                              I.LocalIdAlphaNum s -> case stripPrefix "llvm." s of
                                Nothing -> I.LocalIdAlphaNum (s ++ "_l_")
                                Just _ -> x
@@ -210,7 +210,7 @@ main = do { sel <- cmdArgsRun mode
                                   ; writeOutLlvm ast'' outh
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh
-                                  }                            
+                                  }
             PhiFixUp ix ox f -> do { inh <- openFile ix ReadMode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
@@ -230,7 +230,7 @@ main = do { sel <- cmdArgsRun mode
                                   ; let (m, ir::I.Module ()) = testAst2Ir ast'
                                   ; let ic = irCxtOfModule ir
                                   ; let liv = H.runSimpleUniqueMonad $ H.runWithFuel f
-                                              ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionPrototype Du.DataUsage))
+                                              ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionInterface Du.DataUsage))
                                   ; writeOutIr liv outh
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh

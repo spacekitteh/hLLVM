@@ -145,50 +145,50 @@ callLog tvs =
             (CallFunInterface TcNon Ccc [] callSiteType  Nothing aps []) Nothing) []
 
 
-visFunctions = [FunctionPrototype { fp_linkage = Nothing
-                                  , fp_visibility = Nothing
-                                  , fp_dllstorage = Nothing
-                                  , fp_call_conv = Nothing
-                                  , fp_param_attrs = []
-                                  , fp_ret_type = RtypeVoidU Tvoid
-                                  , fp_fun_name = GlobalIdAlphaNum "check_int2"
-                                  , fp_param_list = (FormalParamList [FormalParamData (ucast $ ptr0 i8) [] Nothing FimplicitParam
-                                                                     ,FormalParamData (ucast i32) [] Nothing FimplicitParam
-                                                                     ,FormalParamData (ucast i32) [] Nothing FimplicitParam
-                                                                     ] 
-                                                     Nothing [])
-                                  , fp_addr_naming = Nothing
-                                  , fp_fun_attrs = []
-                                  , fp_section = Nothing
-                                  , fp_comdat = Nothing
-                                  , fp_alignment = Nothing
-                                  , fp_gc = Nothing
-                                  , fp_prefix = Nothing
-                                  , fp_prologue = Nothing
-                                  }
+visFunctions = [FunctionDeclareType { fd_linkage = Nothing
+                                    , fd_visibility = Nothing
+                                    , fd_dllstorage = Nothing
+                                    , fd_call_conv = Nothing
+                                    , fd_param_attrs = []
+                                    , fd_ret_type = RtypeVoidU Tvoid
+                                    , fd_fun_name = GlobalIdAlphaNum "check_int2"
+                                    , fd_param_list = (FormalParamTypeList [FormalParamDataType (ucast $ ptr0 i8) [] Nothing 
+                                                                           ,FormalParamDataType (ucast i32) [] Nothing
+                                                                           ,FormalParamDataType (ucast i32) [] Nothing
+                                                                           ] 
+                                                       Nothing [])
+                                    , fd_addr_naming = Nothing
+                                    , fd_fun_attrs = []
+                                    , fd_section = Nothing
+                                    , fd_comdat = Nothing
+                                    , fd_alignment = Nothing
+                                    , fd_gc = Nothing
+                                    , fd_prefix = Nothing
+                                    , fd_prologue = Nothing
+                                    }
                ]
 
 
 defineMain :: [Node a O O] -> TlDefine a
 defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph insts (T_return [ucast $ u32ToTv 0]))
                    in TlDefine mainFp entry graph
-  where mainFp :: FunctionPrototype 
-        mainFp = FunctionPrototype { fp_linkage = Nothing
-                                   , fp_visibility = Nothing
-                                   , fp_dllstorage = Nothing
-                                   , fp_call_conv = Nothing
-                                   , fp_param_attrs = []
-                                   , fp_ret_type = RtypeScalarI (TpI 32)
-                                   , fp_fun_name = GlobalIdAlphaNum "main"
-                                   , fp_param_list = FormalParamList [] Nothing []
-                                   , fp_addr_naming = Nothing
-                                   , fp_fun_attrs = []
-                                   , fp_section = Nothing
-                                   , fp_comdat = Nothing
-                                   , fp_alignment = Nothing
-                                   , fp_gc = Nothing
-                                   , fp_prefix = Nothing
-                                   , fp_prologue = Nothing
+  where mainFp :: FunctionInterface 
+        mainFp = FunctionInterface { fi_linkage = Nothing
+                                   , fi_visibility = Nothing
+                                   , fi_dllstorage = Nothing
+                                   , fi_call_conv = Nothing
+                                   , fi_param_attrs = []
+                                   , fi_ret_type = RtypeScalarI (TpI 32)
+                                   , fi_fun_name = GlobalIdAlphaNum "main"
+                                   , fi_param_list = FunParamList [] Nothing []
+                                   , fi_addr_naming = Nothing
+                                   , fi_fun_attrs = []
+                                   , fi_section = Nothing
+                                   , fi_comdat = Nothing
+                                   , fi_alignment = Nothing
+                                   , fi_gc = Nothing
+                                   , fi_prefix = Nothing
+                                   , fi_prologue = Nothing
                                    }
         composeGraph :: H.UniqueMonad m => [Node a O O] -> Tinst -> m (H.Label, H.Graph (Node a) C C)
         composeGraph insts ret = do { lbl <- H.freshLabel

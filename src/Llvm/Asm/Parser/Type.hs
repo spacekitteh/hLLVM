@@ -129,11 +129,11 @@ pFormalParamList = do { ignore $ chartok '('
     where
         param = choice [do { at <- pType
                            ; ar1 <- many pParamAttr
-                           ; an <- opt pAlign
+                           -- ; an <- opt pAlign
                            ; lv <- opt pLocalId
                            ; let lv' = maybe FimplicitParam FexplicitParam lv 
                            ; ar2 <- many pParamAttr
-                           ; return $ FormalParamData at  ar1 an lv' ar2
+                           ; return $ FormalParamData at  ar1 {-an-} lv' ar2
                            }
                        , do { mt <- pMetaKind
                             ; lv <- opt pLocalId

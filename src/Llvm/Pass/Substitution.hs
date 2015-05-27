@@ -224,13 +224,22 @@ instance Substitutable Const where
 instance Substitutable x => Substitutable (T t x) where
   substitute chg (T t a) = T t (substitute chg a)
 
-instance Substitutable FunctionPrototype where
-  substitute chg fp@FunctionPrototype {..} =
-    fp { fp_fun_name = substitute chg fp_fun_name
-       , fp_param_list = substitute chg fp_param_list
-       , fp_comdat = substitute chg fp_comdat
-       , fp_prefix = substitute chg fp_prefix
-       , fp_prologue = substitute chg fp_prologue
+instance Substitutable FunctionInterface where
+  substitute chg fp@FunctionInterface {..} =
+    fp { fi_fun_name = substitute chg fi_fun_name
+       , fi_param_list = substitute chg fi_param_list
+       , fi_comdat = substitute chg fi_comdat
+       , fi_prefix = substitute chg fi_prefix
+       , fi_prologue = substitute chg fi_prologue
+       }
+
+instance Substitutable FunctionDeclareType where
+  substitute chg fp@FunctionDeclareType {..} =
+    fp { fd_fun_name = substitute chg fd_fun_name
+       , fd_param_list = substitute chg fd_param_list
+       , fd_comdat = substitute chg fd_comdat
+       , fd_prefix = substitute chg fd_prefix
+       , fd_prologue = substitute chg fd_prologue
        }
 
 instance Substitutable TlDeclare where
@@ -755,15 +764,24 @@ instance Substitutable ActualParam where
     ActualParamByVal dt pa ma v -> ActualParamByVal dt pa ma (substitute chg v)    
     ActualParamLabel t pa ma v -> ActualParamLabel t pa ma (substitute chg v)
 
-instance Substitutable FormalParamList where
-  substitute chg (FormalParamList fps mvp fa) =
-    FormalParamList (substitute chg fps) mvp fa
+instance Substitutable FormalParamTypeList where
+  substitute chg (FormalParamTypeList fps mvp fa) = FormalParamTypeList (substitute chg fps) mvp fa
 
-instance Substitutable FormalParam where
+instance Substitutable FormalParamType where
   substitute chg fp = case fp of
-    FormalParamData dt pa1 ma x -> FormalParamData dt pa1 ma (substitute chg x)
-    FormalParamByVal dt pa1 ma x -> FormalParamByVal dt pa1 ma (substitute chg x)  
-    FormalParamMeta mk x -> FormalParamMeta mk (substitute chg x)
+    FormalParamDataType dt pa1 ma -> FormalParamDataType dt pa1 ma 
+    FormalParamByValType dt pa1 ma -> FormalParamByValType dt pa1 ma
+    FormalParamMetaType mk x -> FormalParamMetaType mk (substitute chg x)
+
+
+instance Substitutable FunParamList where
+  substitute chg (FunParamList fps mvp fa) = FunParamList (substitute chg fps) mvp fa
+
+instance Substitutable FunParam where
+  substitute chg fp = case fp of
+    FunParamData dt pa1 ma x -> FunParamData dt pa1 ma (substitute chg x)
+    FunParamByVal dt pa1 ma x -> FunParamByVal dt pa1 ma (substitute chg x)  
+    FunParamMeta mk x -> FunParamMeta mk (substitute chg x)
 
 instance Substitutable Fparam where
   substitute chg fp = case fp of

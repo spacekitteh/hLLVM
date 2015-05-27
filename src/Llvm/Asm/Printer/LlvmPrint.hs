@@ -273,10 +273,10 @@ instance AsmPrint Rhs where
 
 instance AsmPrint ActualParam where
   toLlvm x = case x of
-    ActualParamData t att1 align v att2 ->
-      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm align, toLlvm v, hsep $ fmap toLlvm att2]
-    ActualParamLabel t att1 align v att2 ->
-      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm align, toLlvm v, hsep $ fmap toLlvm att2]      
+    ActualParamData t att1 v att2 ->
+      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm v, hsep $ fmap toLlvm att2]
+    ActualParamLabel t att1 v att2 ->
+      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm v, hsep $ fmap toLlvm att2]      
     ActualParamMeta mc -> toLlvm mc
 
 instance AsmPrint Dbg where
@@ -369,9 +369,7 @@ instance AsmPrint TlStandaloneMd where
 
 instance AsmPrint FormalParam where
   toLlvm x = case x of
-    (FormalParamData t att1 align id att2) ->
-      (toLlvm t) <+> (hsep $ fmap toLlvm att1) 
-      <> (maybe empty ((comma <+>) . toLlvm) align) <+> (toLlvm id) <+> (hsep $ fmap toLlvm att2)
+    (FormalParamData t att1 id att2) -> (toLlvm t) <+> (hsep $ fmap toLlvm att1) <+> (toLlvm id) <+> (hsep $ fmap toLlvm att2)
     (FormalParamMeta e lv) -> toLlvm e <+> toLlvm lv
 
 instance AsmPrint FormalParamList where

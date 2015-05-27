@@ -1048,26 +1048,26 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
 instance Conversion I.FirstParamAsRet (Rm A.ActualParam) where
   convert (I.FirstParamAsRet t pa1 ma v) = 
     do { va <- convert v
-       ; return $ A.ActualParamData (tconvert () t) (A.PaSRet:pa1) ma va []
+       ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaSRet:pa1)) va []
        }
     
 instance Conversion I.ActualParam (Rm A.ActualParam) where
   convert x = case x of
     (I.ActualParamData t pa ma v) -> do { va <- convert v 
-                                        ; return $ A.ActualParamData (tconvert () t) pa ma va []
+                                        ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa) va []
                                         }
     (I.ActualParamByVal t pa ma v) -> do { va <- convert v 
-                                         ; return $ A.ActualParamData (tconvert () t) (A.PaByVal:pa) ma va []
+                                         ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaByVal:pa)) va []
                                          }                                      
     (I.ActualParamLabel t pa ma v) -> do { va <- convert_to_PercentLabel v 
-                                         ; return $ A.ActualParamLabel (tconvert () t) pa ma va []
+                                         ; return $ A.ActualParamLabel (tconvert () t) (appendAlignment ma pa) va []
                                          }
 
 instance Conversion I.MetaParam (Rm A.ActualParam) where
   convert x = case x of
     (I.MetaParamData t pa1 ma v pa2) -> do { va <- convert v 
-                                             ; return $ A.ActualParamData (tconvert () t) pa1 ma va pa2
-                                             }
+                                           ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa1) va pa2
+                                           }
     (I.MetaParamMeta mc) -> Md.liftM (A.ActualParamMeta) (convert mc)
 
 
@@ -1089,12 +1089,48 @@ instance Conversion I.TypedConstOrNull (Rm A.TypedConstOrNull) where
     I.TypedConst tv -> Md.liftM A.TypedConst (convert tv)
     I.UntypedNull -> return A.UntypedNull
 
-instance Conversion I.FunctionPrototype (Rm A.FunctionPrototype) where
-    convert (I.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
-      do { f13' <- convert f13
-         ; f14' <- convert f14
+instance Conversion I.FunParamType (Rm A.FormalParam) where
+  convert x = case x of
+    I.FunParamDataType dt pa ma -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FimplicitParam) []
+    I.FunParamByValType dt pa ma -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FimplicitParam) []
+    I.FunParamMetaType mk fp -> return $  A.FormalParamMeta (tconvert () mk) fp
+
+instance Conversion I.FunParam (Rm A.FormalParam) where
+  convert x = case x of
+    I.FunParamData dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FexplicitParam fp) []
+    I.FunParamByVal dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FexplicitParam fp) []
+    I.FunParamMeta mk fp -> return $  A.FormalParamMeta (tconvert () mk) fp
+
+instance Conversion I.FunParamTypeList (Rm A.FormalParamList) where
+  convert (I.FunParamTypeList l ma fas) =
+    do { la <- mapM convert l
+       ; return $ A.FormalParamList la ma fas
+       }
+
+instance Conversion I.FunParamList (Rm A.FormalParamList) where
+  convert (I.FunParamList l ma fas) =
+    do { la <- mapM convert l
+       ; return $ A.FormalParamList la ma fas
+       }
+
+
+instance Conversion I.FunctionInterface (Rm A.FunctionPrototype) where
+  convert (I.FunctionInterface f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
+    do { f13a <- convert f13
+       ; f14a <- convert f14
+       ; f7a <- convert f7
+       ; return $ A.FunctionPrototype f0 f1 f2 f3 f4 (tconvert () f5) f6 f7a f8 f9 f10 f10a f11 f12 f13a f14a
+       }
+
+
+
+instance Conversion I.FunctionDeclare (Rm A.FunctionPrototype) where
+    convert (I.FunctionDeclare f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
+      do { f13a <- convert f13
+         ; f14a <- convert f14
+         ; f7a <- convert f7
          ; return $ A.FunctionPrototype f0 f1 f2 f3 f4 (tconvert () f5) 
-           f6 (tconvert () f7) f8 f9 f10 f10a f11 f12 f13' f14'
+           f6 f7a f8 f9 f10 f10a f11 f12 f13a f14a
          }
 
 
@@ -1163,15 +1199,15 @@ instance Conversion I.TlDeclare (Rm A.TlDeclare) where
   
 instance Conversion (I.TlDefine a) (Rm A.TlDefine) where
   convert (I.TlDefine f elbl g) = 
-    withFunName (I.fp_fun_name f) $ 
+    withFunName (I.fi_fun_name f) $ 
     do { (bl, bm) <- graphToBlocks g
-       ; f' <- convert f
+       ; fa <- convert f
        ; elbla <- convert elbl
        ; let entryblk = case M.lookup elbla bm of
                Just x -> x
                Nothing -> error $ "irrefutable: entry block " ++ show elbl ++ " does not exist."
        ; let bs'' = entryblk:(filter (\x -> x /= entryblk) bl) 
-       ; return $ A.TlDefine f' bs''
+       ; return $ A.TlDefine fa bs''
        } -- TODO: this method will NOT emit the new nodes generated by hoopl passes, it should be fixed ASAP.
 
                              

@@ -1,8 +1,9 @@
-{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleInstances, GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleInstances, GADTs, RecordWildCards #-}
 
 module Llvm.Hir.Cast where
 import Llvm.Hir.Data.Inst
 import Llvm.Hir.Data.Type
+import Llvm.Hir.Data.Module
 import Data.Int
 import Llvm.ErrorLoc
 
@@ -657,3 +658,6 @@ uc x = ucast x
 
 dc :: Dcast a b => FileLoc -> String -> a -> b
 dc lc s x = dcast lc x
+
+
+
