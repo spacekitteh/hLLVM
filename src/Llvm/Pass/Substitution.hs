@@ -233,8 +233,8 @@ instance Substitutable FunctionInterface where
        , fi_prologue = substitute chg fi_prologue
        }
 
-instance Substitutable FunctionDeclareType where
-  substitute chg fp@FunctionDeclareType {..} =
+instance Substitutable FunctionDeclare where
+  substitute chg fp@FunctionDeclare {..} =
     fp { fd_fun_name = substitute chg fd_fun_name
        , fd_param_list = substitute chg fd_param_list
        , fd_comdat = substitute chg fd_comdat
@@ -764,14 +764,14 @@ instance Substitutable ActualParam where
     ActualParamByVal dt pa ma v -> ActualParamByVal dt pa ma (substitute chg v)    
     ActualParamLabel t pa ma v -> ActualParamLabel t pa ma (substitute chg v)
 
-instance Substitutable FormalParamTypeList where
-  substitute chg (FormalParamTypeList fps mvp fa) = FormalParamTypeList (substitute chg fps) mvp fa
+instance Substitutable FunParamTypeList where
+  substitute chg (FunParamTypeList fps mvp fa) = FunParamTypeList (substitute chg fps) mvp fa
 
-instance Substitutable FormalParamType where
+instance Substitutable FunParamType where
   substitute chg fp = case fp of
-    FormalParamDataType dt pa1 ma -> FormalParamDataType dt pa1 ma 
-    FormalParamByValType dt pa1 ma -> FormalParamByValType dt pa1 ma
-    FormalParamMetaType mk x -> FormalParamMetaType mk (substitute chg x)
+    FunParamDataType dt pa1 ma -> FunParamDataType dt pa1 ma 
+    FunParamByValType dt pa1 ma -> FunParamByValType dt pa1 ma
+    FunParamMetaType mk x -> FunParamMetaType mk (substitute chg x)
 
 
 instance Substitutable FunParamList where

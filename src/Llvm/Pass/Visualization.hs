@@ -36,7 +36,7 @@ data VisualPlugin a = VisualPlugin {
   -- the functions whose instructions should be visualized. 
   -- If the set does not exist, all functions are visualized
   , includedFunctions :: Maybe (Ds.Set GlobalId) 
-  , visFunctions :: [FunctionDeclareType]
+  , visFunctions :: [FunctionDeclare]
   , captureCinsts :: Cinst -> Ds.Set String -> Ds.Set String                                     
   , visNodeOO :: TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]
   }

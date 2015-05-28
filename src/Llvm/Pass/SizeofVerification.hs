@@ -145,27 +145,27 @@ callLog tvs =
             (CallFunInterface TcNon Ccc [] callSiteType  Nothing aps []) Nothing) []
 
 
-visFunctions = [FunctionDeclareType { fd_linkage = Nothing
-                                    , fd_visibility = Nothing
-                                    , fd_dllstorage = Nothing
-                                    , fd_call_conv = Nothing
-                                    , fd_param_attrs = []
-                                    , fd_ret_type = RtypeVoidU Tvoid
-                                    , fd_fun_name = GlobalIdAlphaNum "check_int2"
-                                    , fd_param_list = (FormalParamTypeList [FormalParamDataType (ucast $ ptr0 i8) [] Nothing 
-                                                                           ,FormalParamDataType (ucast i32) [] Nothing
-                                                                           ,FormalParamDataType (ucast i32) [] Nothing
-                                                                           ] 
-                                                       Nothing [])
-                                    , fd_addr_naming = Nothing
-                                    , fd_fun_attrs = []
-                                    , fd_section = Nothing
-                                    , fd_comdat = Nothing
-                                    , fd_alignment = Nothing
-                                    , fd_gc = Nothing
-                                    , fd_prefix = Nothing
-                                    , fd_prologue = Nothing
-                                    }
+visFunctions = [FunctionDeclare { fd_linkage = Nothing
+                                , fd_visibility = Nothing
+                                , fd_dllstorage = Nothing
+                                , fd_call_conv = Nothing
+                                , fd_param_attrs = []
+                                , fd_ret_type = RtypeVoidU Tvoid
+                                , fd_fun_name = GlobalIdAlphaNum "check_int2"
+                                , fd_param_list = (FunParamTypeList [FunParamDataType (ucast $ ptr0 i8) [] Nothing 
+                                                                    ,FunParamDataType (ucast i32) [] Nothing
+                                                                    ,FunParamDataType (ucast i32) [] Nothing
+                                                                    ] 
+                                                   Nothing [])
+                                , fd_addr_naming = Nothing
+                                , fd_fun_attrs = []
+                                , fd_section = Nothing
+                                , fd_comdat = Nothing
+                                , fd_alignment = Nothing
+                                , fd_gc = Nothing
+                                , fd_prefix = Nothing
+                                , fd_prologue = Nothing
+                                }
                ]
 
 

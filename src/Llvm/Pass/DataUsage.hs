@@ -216,13 +216,13 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
           T_ret_void -> f0
           T_return vs -> foldl (flip (aTv addConst)) f0 vs
           T_invoke{..} ->
-            let vals = getValuesFromParams (ifi_actualParams invoke_fun_interface)
+            let vals = getValuesFromParams (ifi_firstParamAsRet invoke_fun_interface) (ifi_actualParams invoke_fun_interface)
             in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                               $ addAddrStoringValue e p
                      ) (f0 { invokeFunInfoSet = S.insert (invoke_ptr, invoke_fun_interface) (invokeFunInfoSet f0) }) 
                (S.toList vals)
           T_invoke_asm{..} ->
-            let vals = getValuesFromParams (cai_actualParams invoke_asm_interface)
+            let vals = getValuesFromParams Nothing (cai_actualParams invoke_asm_interface)
             in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                               $ addAddrStoringValue e p
                      ) (f0 { callAsmInfoSet = S.insert invoke_asm_interface (callAsmInfoSet f0)}) (S.toList vals)
@@ -429,13 +429,14 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                            $ aTv (propogateUpPtrUsage result) trueVP
                            $ aTv (propogateUpPtrUsage result) falseVP f
         I_call_fun{..} ->
-          let vals = getValuesFromParams (cfi_actualParams call_fun_interface)
+          let vals = getValuesFromParams (cfi_firstParamAsRet call_fun_interface) 
+                     (cfi_actualParams call_fun_interface)
           in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                             $ addAddrStoringValue e p
                    ) (f { callFunInfoSet = S.insert (call_ptr, call_fun_interface) (callFunInfoSet f) })
              (S.toList vals)
         I_call_asm{..} ->
-          let vals = getValuesFromParams (cai_actualParams call_asm_interface)
+          let vals = getValuesFromParams Nothing (cai_actualParams call_asm_interface)
           in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                             $ addAddrStoringValue e p
                    ) (f { callAsmInfoSet = S.insert call_asm_interface (callAsmInfoSet f)}) 
@@ -466,11 +467,12 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
 #ifdef DEBUG
       _ -> errorLoc FLC $ show n
 #endif
-    getValuesFromParams :: [ActualParam] -> S.Set Value
-    getValuesFromParams ls = foldl (\p e -> case e of
-                                       ActualParamData _ _ _ v -> S.insert v p
-                                       _ -> p
-                                   ) S.empty ls
+    getValuesFromParams :: Maybe FirstParamAsRet -> [ActualParam] -> S.Set Value
+    getValuesFromParams fp ls = let x = foldl (\p e -> case e of
+                                                 ActualParamData _ _ _ v -> S.insert v p
+                                                 _ -> p
+                                              ) S.empty ls
+                                in maybe x (\(FirstParamAsRet _ _ _ v) -> S.insert v x) fp
 
 scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => S.Set LocalId -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
 scanGraph fm entry graph =
