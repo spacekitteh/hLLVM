@@ -4,10 +4,11 @@ The `hLLVM` Package  [![Hackage](https://img.shields.io/hackage/v/hLLVM.svg)](ht
 ## hLLVM: A Haskell Library for analyzing and transforming LLVM codes
 
 The implemented functionalities:
-1) a parser to parse LLVM code in its text form; 
-2) an internal IR (Hir) that is designed for Hoopl and direct composition; 
-3) a set of utility functions to convert LLVM Assembly AST to and from Hir;
-4) a set of utility functions to query Hir.
+
+1. a parser to parse LLVM code in its text form; 
+2. an internal IR (Hir) that is designed for Hoopl and direct composition; 
+3. a set of utility functions to convert LLVM Assembly AST to and from Hir;
+4. a set of utility functions to query Hir.
 
 
 Build:
