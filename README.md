@@ -1,9 +1,7 @@
-hLLVM -- A Haskell Library for analyzing and transforming LLVM assembly codes
-
-
-Goal: 
+The `hLLVM` Package  [![Hackage](https://img.shields.io/hackage/v/hLLVM.svg)](https://hackage.haskell.org/package/hLLVM) [![Build Status](https://travis-ci.org/mlite/hLLVM.svg)](https://travis-ci.org/mlite/hLLVM)
 ==========================================
-- Provide functionalities for analysing and transforming LLVM codes in pure Haskell
+
+## hLLVM: A Haskell Library for analyzing and transforming LLVM codes
 
 The implemented functionalities:
 1) a parser to parse LLVM code in its text form; 
