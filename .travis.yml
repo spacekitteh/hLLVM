@@ -20,10 +20,9 @@ install:
  - travis_retry cabal update
 
 script:
- - cabal install --only-dependencies --enable-tests
- - cabal configure -v2 --enable-tests
+ - cabal install --only-dependencies 
+ - cabal configure -v2 
  - cabal build
- - cabal test
  - cabal check
  - cabal sdist
  - SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
