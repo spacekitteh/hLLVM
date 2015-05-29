@@ -68,7 +68,7 @@ pInstruction = do { lhs <- opt (do { x <- pLocalId
                   }
 
 pDbg :: P Dbg
-pDbg = do { x <- pMdVar
+pDbg = do { x <- pMdRef
           ; mc <- pMetaConst
           ; return $ Dbg x mc
           }

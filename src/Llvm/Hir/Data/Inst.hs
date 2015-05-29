@@ -202,12 +202,16 @@ data Const where {
 
 
 
-data MdVar = MdVar String deriving (Eq,Ord,Show)
-data MdNode = MdNode String deriving (Eq,Ord,Show)
+data MdName = MdName String deriving (Eq,Ord,Show)
+data MdNode = MdNode Word32 deriving (Eq,Ord,Show)
+
+data MdRef = MdRefName MdName
+           | MdRefNode MdNode
+           deriving (Eq, Ord, Show)
+                    
 data MetaConst = McStruct [MetaKindedConst]
                | McString DqString
-               | McMn MdNode
-               | McMv MdVar
+               | McMdRef MdRef
                | McRef LocalId
                | McSimple Const
                deriving (Eq,Ord,Show)
@@ -264,7 +268,7 @@ data Clause = Catch (T Dtype Value)
             | CcoV (Conversion VectorB Value)
             deriving (Eq,Ord,Show)
 
-data Dbg = Dbg MdVar MetaConst deriving (Eq, Ord, Show)
+data Dbg = Dbg MdRef MetaConst deriving (Eq, Ord, Show)
 
 -- | Phi Instrunction merge ssa values from multiple incomming dataflows.
 -- | It is a standalone type due to its unique position, always immediately following up Lnode, in a basic block

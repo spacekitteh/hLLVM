@@ -125,7 +125,7 @@ pConstBinaryOperation = choice [liftM Ie pConstIbinaryOperation, liftM Fe pConst
               
 getType :: TypedConstOrNull -> TypedConstOrNull -> Type
 getType (TypedConst (Typed t1 _)) (TypedConst (Typed t2 _)) = if t1 == t2 then t1 
-                                                                     else error "t1 != t2"
+                                                              else error "t1 != t2"
 getType UntypedNull (TypedConst (Typed t2 _)) = t2
 getType (TypedConst (Typed t1 _)) UntypedNull = t1
 getType UntypedNull UntypedNull = error "unexpected case"
@@ -154,7 +154,8 @@ extractTypedConst (TypedConst x) = x
 extractTypedConst _ = error " error rorooror"
 
 pConstExtractElement :: P (ExtractElement Const)
-pConstExtractElement = reserved "extractelement" >> parens (pTuple pTypedConst) >>= \(x,y) -> return $ ExtractElement (extractTypedConst x) (extractTypedConst y)
+pConstExtractElement = reserved "extractelement" >> parens (pTuple pTypedConst) >>= 
+                       \(x,y) -> return $ ExtractElement (extractTypedConst x) (extractTypedConst y)
                   
 pConstInsertElement :: P (InsertElement Const)
 pConstInsertElement = do { reserved "insertelement"
@@ -163,17 +164,21 @@ pConstInsertElement = do { reserved "insertelement"
                          }
 
 pConstShuffleVector :: P (ShuffleVector Const)
-pConstShuffleVector = reserved "shufflevector" >> parens (pTriple pTypedConst) >>= \(x,y,z) -> return $  ShuffleVector (extractTypedConst x) (extractTypedConst y) (extractTypedConst z)
+pConstShuffleVector = reserved "shufflevector" >> parens (pTriple pTypedConst) >>= 
+                      \(x,y,z) -> return $  ShuffleVector (extractTypedConst x) (extractTypedConst y) (extractTypedConst z)
                      
 pConstExtractValue :: P (ExtractValue Const)
-pConstExtractValue = reserved "extractvalue" >> parens (pTuple2 pTypedConst (sepBy unsignedInt comma)) >>= \(x, y) -> return $ ExtractValue (extractTypedConst x) y 
+pConstExtractValue = reserved "extractvalue" >> parens (pTuple2 pTypedConst (sepBy unsignedInt comma)) >>= 
+                     \(x, y) -> return $ ExtractValue (extractTypedConst x) y 
                         
 pConstInsertValue :: P (InsertValue Const)
-pConstInsertValue = reserved "insertvalue" >> parens (pTriple3 pTypedConst pTypedConst (sepBy unsignedInt comma)) >>= \(x,y,z) -> return $ InsertValue (extractTypedConst x) (extractTypedConst y) z
+pConstInsertValue = reserved "insertvalue" >> parens (pTriple3 pTypedConst pTypedConst (sepBy unsignedInt comma)) >>= 
+                    \(x,y,z) -> return $ InsertValue (extractTypedConst x) (extractTypedConst y) z
                         
                         
 pConstSelect :: P (Select Const)
-pConstSelect = reserved "select" >> parens (pTriple pTypedConst) >>= \(x,y,z) -> return $ Select (extractTypedConst x) (extractTypedConst y) (extractTypedConst z)
+pConstSelect = reserved "select" >> parens (pTriple pTypedConst) >>= 
+               \(x,y,z) -> return $ Select (extractTypedConst x) (extractTypedConst y) (extractTypedConst z)
                   
 pConstConversion :: P (Conversion Const)
 pConstConversion = do { op <- pConvertOp
@@ -199,19 +204,6 @@ pConstGetElemPtr = do { reserved "getelementptr"
                       ; ignore (chartok ')')
                       ; return $ GetElementPtr ib (Pointer (Typed t c)) idx
                       }
-                      
-{-
-pTypedConst1 :: P MetaConst -- (TypedConstOrNull)
-pTypedConst1 = do { t <- pType
-                  ; case t of
-                    (Tprimitive TpNull) -> return UntypedNull
-                    _ -> (choice [pConst, liftM CmL pLocalId] >>= return . (TypedConst . Typed t))
-                  }
-
-
-pMetaStruct :: P MetaConst -- [MetaConst] -- Const
-pMetaStruct = liftM McStruct (braces (sepBy pTypedConst1 comma))
--}
 
 pMetaKindedConst :: P (MetaKindedConst)
 pMetaKindedConst = choice [ reserved "null" >> return UnmetaKindedNull
@@ -222,7 +214,7 @@ pMetaKindedConst = choice [ reserved "null" >> return UnmetaKindedNull
 pMetaConst :: P MetaConst
 pMetaConst = choice[ char '!' >> choice [ liftM McStruct (braces (sepBy pMetaKindedConst comma))
                                         , liftM (McString . DqString) pQuoteStr
-                                        , liftM (McMn . MdNode) intStrToken
+                                        , liftM (McMdRef . MdRefNode . MdNode) unsignedInt
                                         ]
                     , liftM McSimple pConst
                     , liftM McRef pLocalId 

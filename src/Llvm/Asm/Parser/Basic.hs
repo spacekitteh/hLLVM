@@ -176,14 +176,25 @@ pDollarId = lexeme (char '$' >> choice [ liftM DollarIdNum unsignedInt -- decima
                                        , liftM (DollarIdDqString) pQuoteStr
                                        ])
 
+pMdName :: P MdName
+pMdName = lexeme $ do { ignore (char '!')
+                      ; n <- choice [ liftM (\x -> [x]) (satisfy isAlpha)
+                                    , char '\\' >> numericLit ]
+                      ; l <- many (satisfy idChar)
+                      ; return $ MdName (n++l)
+                      }
 
-pMdVar :: P MdVar
-pMdVar = lexeme $ do { ignore (char '!')
-                     ; n <- choice [ liftM (\x -> [x]) (satisfy isAlpha)
-                                   , char '\\' >> numericLit ]
-                     ; l <- many (satisfy idChar)
-                     ; return $ MdVar (n++l)
-                     }
+pMdNode :: P MdNode
+pMdNode = lexeme $ do { ignore (char '!')
+                      ; n <- unsignedInt
+                      ; return $ MdNode n
+                      }
+          
+pMdRef :: P MdRef          
+pMdRef = choice [ liftM MdRefName pMdName
+                , liftM MdRefNode pMdNode
+                ]
+
 
 pId :: P String
 pId = do { n <- (satisfy isAlpha)
@@ -370,12 +381,13 @@ pDllStorageClass = choice [ reserved "dllimport" >> return DscImport
                           , reserved "dllexport" >> return DscExport
                           ] 
 pThreadLocalStorageClass :: P ThreadLocalStorage                   
-pThreadLocalStorageClass = reserved "thread_local" >> option TlsNone (parens (choice [ reserved "localdynamic" >> return TlsLocalDynamic
-                                                                                     , reserved "initialexec" >> return TlsInitialExec
-                                                                                     , reserved "localexec" >> return TlsLocalExec
-                                                                                     ]
-                                                                             ))
-
+pThreadLocalStorageClass = reserved "thread_local" >> 
+                           option TlsNone (parens (choice [ reserved "localdynamic" >> return TlsLocalDynamic
+                                                          , reserved "initialexec" >> return TlsInitialExec
+                                                          , reserved "localexec" >> return TlsLocalExec
+                                                          ]
+                                                  ))
+                           
 pTailCall :: P TailCall
 pTailCall = choice [ reserved "tail" >> return TcTailCall
                    , reserved "musttail" >> return TcMustTailCall

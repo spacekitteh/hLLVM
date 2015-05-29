@@ -24,13 +24,13 @@ toplevel = choice [ try pNamedGlobal
                   , pToplevelModuleAsm
                   , pToplevelAttributeGroup
                   , pToplevelComdat
-                  , pStandaloneMd
+                  , pToplevelMd
                   ]
 
 
 pNamedGlobal :: P Toplevel
 pNamedGlobal = do { lhsOpt <- opt (pGlobalId >>= \x->chartok '=' >> return x)
-                  ; linkOpt <- opt pLinkage -- (choice [try pExternalLinkage, pLinkage])
+                  ; linkOpt <- opt pLinkage 
                   ; vis <- opt pVisibility
                   ; dllStorage <- opt pDllStorageClass
                   ; tlm <- opt pThreadLocalStorageClass
@@ -72,7 +72,6 @@ pGlobal lhs link vis dll tls na =
   where hasInit x = case x of 
           Just(LinkageExternWeak) -> False
           Just(LinkageExternal) -> False
-          -- Just(DllImport) -> False
           Just(_) -> True
           Nothing -> True
 
@@ -156,7 +155,7 @@ pToplevelDefine = do { reserved "define"
 pToplevelAttributeGroup :: P Toplevel                  
 pToplevelAttributeGroup = do { reserved "attributes" 
                              ; ignore (char '#')
-                             ; n <- unsignedInt -- decimal
+                             ; n <- unsignedInt
                              ; ignore (chartok '=')
                              ; l <- braces $ many pFunAttr
                              ; return $ ToplevelAttribute (TlAttribute n l)
@@ -182,25 +181,22 @@ pToplevelComdat = do { l <- pDollarId
                      ; return $ ToplevelComdat (TlComdat l s)
                      }
 
-pMdNode :: P MdNode
-pMdNode = (char '!' >> liftM MdNode intStrToken)
-
-pStandaloneMd :: P Toplevel
-pStandaloneMd = do { ignore (char '!')
-                   ; choice [ do { n <- intStrToken
-                                 ; ignore (chartok '=')
-                                 ; choice [ do { t <- pMetaKindedConst -- Tmetadata
-                                               ; return (ToplevelStandaloneMd (TlStandaloneMd n t))
-                                               }
-                                          ]
-                                 }
-                            , do { i <- lexeme pId
-                                 ; ignore (chartok '=')
-                                 ; ignore (lexeme (string "!{"))
-                                 ; l <- sepBy pMdNode comma 
-                                 ; ignore (chartok '}')
-                                 ; return $ ToplevelNamedMd (TlNamedMd (MdVar i) l)
-                                 }
-                            ]
-                   }
+pToplevelMd :: P Toplevel
+pToplevelMd = do { ignore (char '!')
+                 ; choice [ do { n <- unsignedInt 
+                               ; ignore (chartok '=')
+                               ; choice [ do { t <- pMetaKindedConst
+                                             ; return (ToplevelUnamedMd (TlUnamedMd n t))
+                                             }
+                                        ]
+                               }
+                          , do { i <- lexeme pId
+                               ; ignore (chartok '=')
+                               ; ignore (lexeme (string "!{"))
+                               ; l <- sepBy pMdNode comma 
+                               ; ignore (chartok '}')
+                               ; return $ ToplevelNamedMd (TlNamedMd i l)
+                               }
+                          ]
+                 }
                    

@@ -59,16 +59,20 @@ instance IrPrint TlDataLayout where
 
 instance IrPrint TlAlias where
   printIr (TlAlias lhs vis dll tlm na link aliasee) =
-    hsep [printIr lhs, equals, printIr vis, printIr dll, printIr tlm, printIr na, text "alias", printIr link, printIr aliasee]
+    hsep [printIr lhs, equals, printIr vis, printIr dll, printIr tlm
+         , printIr na, text "alias", printIr link, printIr aliasee]
 
+{-
 instance IrPrint TlDbgInit where
   printIr (TlDbgInit s i) = hsep [text "dbginit", text s, integral i]
+-}
 
-instance IrPrint TlStandaloneMd where
-  printIr (TlStandaloneMd s t) = char '!'<>(text s) <+> equals <+> printIr t
+instance IrPrint TlUnamedMd where
+  printIr (TlUnamedMd s t) = char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
 
 instance IrPrint TlNamedMd where
-  printIr (TlNamedMd mv nds) = printIr mv <+> equals <+> char '!'<>(braces (hsep $ punctuate comma $ fmap printIr nds))
+  printIr (TlNamedMd mv nds) = char '!' <> text mv <+> 
+                               equals <+> char '!'<>(braces (hsep $ punctuate comma $ fmap printIr nds))
 
 instance IrPrint TlDeclare where
   printIr (TlDeclare fproto) = text "declare" <+> printIr fproto
@@ -120,8 +124,7 @@ instance IrPrint a => IrPrint (Toplevel a) where
   printIr (ToplevelTriple x) = printIr x
   printIr (ToplevelDataLayout x) = printIr x
   printIr (ToplevelAlias x) = printIr x
-  printIr (ToplevelDbgInit x) = printIr x
-  printIr (ToplevelStandaloneMd x) = printIr x
+  printIr (ToplevelUnamedMd x) = printIr x
   printIr (ToplevelNamedMd x) = printIr x
   printIr (ToplevelDeclare x) = printIr x
   printIr (ToplevelDefine x) = printIr x
@@ -363,17 +366,21 @@ instance IrPrint Const where
     C_extractvalue a -> printIr a
     C_insertvalue a -> printIr a
 
-instance IrPrint MdVar where
-  printIr (MdVar s) = char '!' <> (text s)
+instance IrPrint MdName where
+  printIr (MdName s) = char '!' <> (text s)
 
 instance IrPrint MdNode where
-  printIr (MdNode s) = char '!' <> (text s)
+  printIr (MdNode s) = char '!' <> (integer $ fromIntegral s)
+
+instance IrPrint MdRef where
+  printIr x = case x of
+    MdRefName s -> printIr s
+    MdRefNode s -> printIr s
 
 instance IrPrint MetaConst where
   printIr (McStruct c) = char '!' <> braces (commaSepList (fmap printIr c))
   printIr (McString s) = char '!' <> (printIr s)
-  printIr (McMn n) = printIr n
-  printIr (McMv v) = printIr v
+  printIr (McMdRef n) = printIr n
   printIr (McRef s) = text $ show s
   printIr (McSimple sc) = printIr sc
 

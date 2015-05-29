@@ -789,8 +789,7 @@ instance Substitutable Fparam where
     FexplicitParam x -> FexplicitParam (substitute chg x)
 
 instance Substitutable Dbg where
-  substitute chg (Dbg mv mc) = Dbg (substitute chg mv) (substitute chg mc)
-
+  substitute chg (Dbg mv mc) = Dbg mv (substitute chg mc)
 
 instance Substitutable TlGlobal where
   substitute chg tg = case tg of
@@ -815,8 +814,7 @@ instance Substitutable a => Substitutable (Toplevel a) where
     ToplevelTriple _ -> tpl
     ToplevelDataLayout _ -> tpl
     ToplevelAlias x -> ToplevelAlias (substitute chg x)
-    ToplevelDbgInit x -> ToplevelDbgInit (substitute chg x)
-    ToplevelStandaloneMd x -> ToplevelStandaloneMd (substitute chg x)
+    ToplevelUnamedMd x -> ToplevelUnamedMd (substitute chg x)
     ToplevelNamedMd x -> ToplevelNamedMd (substitute chg x)
     ToplevelDeclare x -> ToplevelDeclare (substitute chg x)
     ToplevelDefine x -> ToplevelDefine (substitute chg x)
@@ -866,9 +864,6 @@ instance Substitutable TlUnamedType where
 instance Substitutable TlDepLibs where
   substitute chg = id
 
-instance Substitutable TlDbgInit where
-  substitute chg = id
-
 instance Substitutable GlobalId where
   substitute chg = change_GlobalId chg
 
@@ -902,17 +897,16 @@ instance Substitutable Aliasee where
     AliaseeGEPV x -> AliaseeGEPV (substitute chg x)
 
 instance Substitutable TlNamedMd where
-  substitute chg (TlNamedMd mv mns) =
-    TlNamedMd (substitute chg mv) (substitute chg mns)
+  substitute chg (TlNamedMd mv mns) = TlNamedMd mv (substitute chg mns)
 
-instance Substitutable MdVar where
+instance Substitutable MdName where
   substitute _ = id
 
 instance Substitutable MdNode where
   substitute _ = id
 
-instance Substitutable TlStandaloneMd where
-  substitute chg (TlStandaloneMd s mk) = TlStandaloneMd s (substitute chg mk)
+instance Substitutable TlUnamedMd where
+  substitute chg (TlUnamedMd s mk) = TlUnamedMd s (substitute chg mk)
 
 instance Substitutable MetaKindedConst where
   substitute chg mk = case mk of
@@ -932,9 +926,8 @@ instance Substitutable FunPtr where
 instance Substitutable MetaConst where
   substitute chg mc = case mc of
     McStruct l -> McStruct (substitute chg l)
-    McString s -> mc
-    McMn n -> McMn (substitute chg n)
-    McMv s -> McMv (substitute chg s)
+    McString _ -> mc
+    McMdRef _ -> mc 
     McRef s -> McRef (substitute chg s)
     McSimple c -> McSimple (substitute chg c)
 

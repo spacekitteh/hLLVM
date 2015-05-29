@@ -133,19 +133,22 @@ instance AsmPrint Const where
     C_insertvalue a -> toLlvm a
     C_extractelement a -> toLlvm a
     C_insertelement a -> toLlvm a
---    C_localId v -> toLlvm v
 
-instance AsmPrint MdVar where 
-  toLlvm (MdVar s) = char '!'<> (text s)
+instance AsmPrint MdName where 
+  toLlvm (MdName s) = char '!'<> (text s)
   
 instance AsmPrint MdNode where
-  toLlvm (MdNode s) = char '!' <> (text s)
+  toLlvm (MdNode s) = char '!' <> (integer $ fromIntegral s)
   
+instance AsmPrint MdRef where  
+  toLlvm x = case x of
+    MdRefName n -> toLlvm n
+    MdRefNode n -> toLlvm n
+    
 instance AsmPrint MetaConst where
   toLlvm (McStruct c) = char '!' <> braces (commaSepList (fmap toLlvm c))
   toLlvm (McString s) = char '!' <> (toLlvm s)
-  toLlvm (McMn n) = toLlvm n
-  toLlvm (McMv v) = toLlvm v
+  toLlvm (McMdRef n) = toLlvm n
   toLlvm (McRef s) = toLlvm s
   toLlvm (McSimple sc) = toLlvm sc
 
@@ -343,9 +346,10 @@ instance AsmPrint Toplevel where
   toLlvm (ToplevelDataLayout (TlDataLayout s)) = hsep [text "target", text "datalayout", equals, toLlvm s]
   toLlvm (ToplevelAlias (TlAlias lhs vis dll tlm naddr link aliasee)) = 
     hsep [toLlvm lhs, equals, toLlvm vis, toLlvm dll, toLlvm tlm, toLlvm naddr, text "alias", toLlvm link, toLlvm aliasee]
-  toLlvm (ToplevelDbgInit (TlDbgInit s i)) = error "DbgInit is not implemented"
-  toLlvm (ToplevelStandaloneMd smd) = toLlvm smd
-  toLlvm (ToplevelNamedMd (TlNamedMd mv nds)) = toLlvm mv <+> equals <+> char '!'<>(braces (commaSepList $ fmap toLlvm nds))
+--  toLlvm (ToplevelDbgInit (TlDbgInit s i)) = error "DbgInit is not implemented"
+  toLlvm (ToplevelUnamedMd smd) = toLlvm smd
+  toLlvm (ToplevelNamedMd (TlNamedMd mv nds)) = char '!' <> text mv <+> equals 
+                                                <+> char '!'<>(braces (commaSepList $ fmap toLlvm nds))
   toLlvm (ToplevelDeclare (TlDeclare fproto)) = text "declare" <+> toLlvm fproto
   toLlvm (ToplevelDefine (TlDefine fproto blocks)) = text "define" <+> toLlvm fproto <+> text "{" $$
                                           (fcat $ fmap toLlvm blocks) $$ text "}"
@@ -364,12 +368,13 @@ instance AsmPrint Toplevel where
   toLlvm (ToplevelComdat (TlComdat l c)) = 
     hsep [toLlvm l, equals, text "comdat", toLlvm c]
 
-instance AsmPrint TlStandaloneMd where
-  toLlvm (TlStandaloneMd lhs rhs) = char '!' <> (text lhs) <+> equals <+> toLlvm rhs
+instance AsmPrint TlUnamedMd where
+  toLlvm (TlUnamedMd lhs rhs) = char '!' <> (integer $ fromIntegral lhs) <+> equals <+> toLlvm rhs
 
 instance AsmPrint FormalParam where
   toLlvm x = case x of
-    (FormalParamData t att1 id att2) -> (toLlvm t) <+> (hsep $ fmap toLlvm att1) <+> (toLlvm id) <+> (hsep $ fmap toLlvm att2)
+    (FormalParamData t att1 id att2) -> (toLlvm t) <+> (hsep $ fmap toLlvm att1) 
+                                        <+> (toLlvm id) <+> (hsep $ fmap toLlvm att2)
     (FormalParamMeta e lv) -> toLlvm e <+> toLlvm lv
 
 instance AsmPrint FormalParamList where

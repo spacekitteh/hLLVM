@@ -789,17 +789,21 @@ convert_Const x =
            Tk_VectorP -> Md.liftM I.C_insertelement_P (convert_to_InsertElement_P cvt a)
          }
         
-convert_MdVar :: A.MdVar -> (MM I.MdVar)
-convert_MdVar (A.MdVar s) = return $ I.MdVar s
+convert_MdName :: A.MdName -> (MM I.MdName)
+convert_MdName (A.MdName s) = return $ I.MdName s
 
 convert_MdNode :: A.MdNode -> (MM I.MdNode)
 convert_MdNode (A.MdNode s) = return $ I.MdNode s
 
+convert_MdRef :: A.MdRef -> MM I.MdRef
+convert_MdRef x = case x of
+  A.MdRefName n -> Md.liftM I.MdRefName (convert_MdName n)
+  A.MdRefNode n -> Md.liftM I.MdRefNode (convert_MdNode n)  
+
 convert_MetaConst :: A.MetaConst -> (MM I.MetaConst)
 convert_MetaConst (A.McStruct c) = Md.liftM I.McStruct (mapM convert_MetaKindedConst c)
 convert_MetaConst (A.McString s) = return $ I.McString s
-convert_MetaConst (A.McMn n) = Md.liftM I.McMn (convert_MdNode n)
-convert_MetaConst (A.McMv n) = Md.liftM I.McMv (convert_MdVar n)
+convert_MetaConst (A.McMdRef n) = Md.liftM I.McMdRef (convert_MdRef n)
 convert_MetaConst (A.McRef i) = return $ I.McRef i
 convert_MetaConst (A.McSimple sc) = Md.liftM I.McSimple (convert_Const sc)
 
@@ -1518,7 +1522,7 @@ convert_TerminatorInst A.Unreachable = return I.T_unreachable
 convert_TerminatorInst A.Unwind = return I.T_unwind
 
 convert_Dbg :: A.Dbg -> (MM I.Dbg)
-convert_Dbg (A.Dbg mv mc) = Md.liftM2 I.Dbg (convert_MdVar mv) (convert_MetaConst mc)
+convert_Dbg (A.Dbg mv mc) = Md.liftM2 I.Dbg (convert_MdRef mv) (convert_MetaConst mc)
 
 convert_PhiInstWithDbg :: A.PhiInstWithDbg -> MM (I.Pinst, [I.Dbg])
 convert_PhiInstWithDbg (A.PhiInstWithDbg ins dbgs) = 
@@ -1611,17 +1615,18 @@ convert_TlDataLayout (A.TlDataLayout x) = return (I.TlDataLayout x)
 convert_TlAlias :: A.TlAlias -> (MM I.TlAlias)
 convert_TlAlias (A.TlAlias  g v dll tlm na l a) = convert_Aliasee a >>= return . (I.TlAlias g v dll tlm na l)
 
+{-
 convert_TlDbgInit :: A.TlDbgInit -> (MM I.TlDbgInit)
 convert_TlDbgInit (A.TlDbgInit s i) = return (I.TlDbgInit s i)
+-}
   
-convert_TlStandaloneMd :: A.TlStandaloneMd -> (MM I.TlStandaloneMd)
-convert_TlStandaloneMd (A.TlStandaloneMd s tv) = convert_MetaKindedConst tv >>= return . (I.TlStandaloneMd s)
+convert_TlUnamedMd :: A.TlUnamedMd -> (MM I.TlUnamedMd)
+convert_TlUnamedMd (A.TlUnamedMd s tv) = convert_MetaKindedConst tv >>= return . (I.TlUnamedMd s)
   
                                                  
 convert_TlNamedMd :: A.TlNamedMd -> (MM I.TlNamedMd)
-convert_TlNamedMd (A.TlNamedMd m ns) = do { ma <- convert_MdVar m
-                                          ; nsa <- mapM convert_MdNode ns
-                                          ; return $ I.TlNamedMd ma nsa
+convert_TlNamedMd (A.TlNamedMd m ns) = do { nsa <- mapM convert_MdNode ns
+                                          ; return $ I.TlNamedMd m nsa
                                           }
                                
 convert_TlDeclare :: A.TlDeclare -> (MM I.TlDeclare)
@@ -1679,8 +1684,8 @@ toplevel2Ir :: A.Toplevel -> MM (I.Toplevel a)
 toplevel2Ir (A.ToplevelTriple q) = Md.liftM I.ToplevelTriple (convert_TlTriple q)
 toplevel2Ir (A.ToplevelDataLayout q) = Md.liftM I.ToplevelDataLayout (convert_TlDataLayout q)
 toplevel2Ir (A.ToplevelAlias q) = Md.liftM I.ToplevelAlias (convert_TlAlias q)
-toplevel2Ir (A.ToplevelDbgInit s) = Md.liftM I.ToplevelDbgInit (convert_TlDbgInit s)
-toplevel2Ir (A.ToplevelStandaloneMd s) = Md.liftM I.ToplevelStandaloneMd (convert_TlStandaloneMd s)
+-- toplevel2Ir (A.ToplevelDbgInit s) = Md.liftM I.ToplevelDbgInit (convert_TlDbgInit s)
+toplevel2Ir (A.ToplevelUnamedMd s) = Md.liftM I.ToplevelUnamedMd (convert_TlUnamedMd s)
 toplevel2Ir (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
 toplevel2Ir (A.ToplevelDeclare f) = Md.liftM I.ToplevelDeclare (convert_TlDeclare f)
 toplevel2Ir (A.ToplevelDefine f) = Md.liftM I.ToplevelDefine (convert_TlDefine f)

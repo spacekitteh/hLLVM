@@ -12,7 +12,7 @@ data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
                        , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
-data FunCxt = FunCxt { funName :: String 
+data FunCxt = FunCxt { funName :: String
                      , funParameters :: M.Map Ci.LocalId Ci.Dtype
                      } deriving (Eq, Ord, Show)
 
@@ -21,36 +21,36 @@ data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , functions :: M.Map Ci.GlobalId FunctionDeclare
                            , attributes :: M.Map Word32 [FunAttr]
                            } deriving (Eq, Ord, Show)
-                                
+
 data IrCxt = IrCxt { globalCxt :: GlobalCxt
                    , funCxt :: FunCxt
                    } deriving (Eq, Ord, Show)
 
 
-convert_to_FunctionDeclareType  
-  (FunctionInterface {..}) = 
+convert_to_FunctionDeclareType
+  (FunctionInterface {..}) =
     FunctionDeclare { fd_linkage = fi_linkage
                     , fd_visibility = fi_visibility
                     , fd_dllstorage = fi_dllstorage
                     , fd_call_conv = fi_call_conv
                     , fd_param_attrs = fi_param_attrs
                     , fd_ret_type = fi_ret_type
-                    , fd_fun_name = fi_fun_name 
+                    , fd_fun_name = fi_fun_name
                     , fd_param_list = convert_to_FormalParamTypeList fi_param_list
-                    , fd_addr_naming = fi_addr_naming 
-                    , fd_fun_attrs = fi_fun_attrs 
-                    , fd_section = fi_section 
-                    , fd_comdat = fi_comdat 
+                    , fd_addr_naming = fi_addr_naming
+                    , fd_fun_attrs = fi_fun_attrs
+                    , fd_section = fi_section
+                    , fd_comdat = fi_comdat
                     , fd_alignment = fi_alignment
-                    , fd_gc = fi_gc 
-                    , fd_prefix = fi_prefix 
-                    , fd_prologue = fi_prologue 
+                    , fd_gc = fi_gc
+                    , fd_prefix = fi_prefix
+                    , fd_prologue = fi_prologue
                     }
-    
+
 convert_to_FormalParamTypeList :: FunParamList -> FunParamTypeList
-convert_to_FormalParamTypeList (FunParamList l ma fas) = 
+convert_to_FormalParamTypeList (FunParamList l ma fas) =
   FunParamTypeList (fmap convert_to_FormalParamType l) ma fas
-  
+
 convert_to_FormalParamType :: FunParam -> FunParamType
 convert_to_FormalParamType x = case x of
   FunParamData dt pas ma v -> FunParamDataType dt pas ma
@@ -58,7 +58,7 @@ convert_to_FormalParamType x = case x of
   FunParamMeta mk fp -> FunParamMetaType mk fp
 
 irCxtOfModule :: Module a -> IrCxt
-irCxtOfModule (Module tl) = 
+irCxtOfModule (Module tl) =
   let [ToplevelDataLayout (TlDataLayout dl)] = filter (\x -> case x of
                                                           ToplevelDataLayout _ -> True
                                                           _ -> False
@@ -68,12 +68,12 @@ irCxtOfModule (Module tl) =
                                                   _ -> False
                                               ) tl
       tdefs = fmap (\(ToplevelTypeDef td) -> case td of
-                       TlDatTypeDef lhs def -> (lhs, def)) 
+                       TlDatTypeDef lhs def -> (lhs, def))
               $ filter (\x -> case x of
                            ToplevelTypeDef (TlDatTypeDef _ _) -> True
                            _ -> False
                        ) tl
-      glbs = fmap (\(ToplevelGlobal g@(TlGlobalDtype lhs _ _ _ _ _ _ _ _ t _ _ _ _)) -> (lhs, (g,t))) 
+      glbs = fmap (\(ToplevelGlobal g@(TlGlobalDtype lhs _ _ _ _ _ _ _ _ t _ _ _ _)) -> (lhs, (g,t)))
              $ filter (\x -> case x of
                           ToplevelGlobal _ -> True
                           _ -> False
@@ -91,7 +91,7 @@ irCxtOfModule (Module tl) =
               $ filter (\x -> case x of
                            ToplevelAttribute _ -> True
                            _ -> False
-                       ) tl             
+                       ) tl
   in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
                                                        , targetTriple = tt
                                                        , typedefs = M.fromList tdefs
@@ -110,7 +110,7 @@ instance IrPrint TypeEnv where
   printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
                                $+$ text "triple:" <+> printIr tt
                                $+$ text "typedefs:" <+> printIr td
-                               $+$ text "opaqueTypedefs:" <+> printIr otd                               
+                               $+$ text "opaqueTypedefs:" <+> printIr otd
 
 instance IrPrint GlobalCxt where
   printIr (GlobalCxt te gl fns atts) = text "typeEnv:" <+> printIr te

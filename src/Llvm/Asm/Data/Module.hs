@@ -125,12 +125,15 @@ data Const = C_simple SimpleConstant
 data Prefix = Prefix (TypedConstOrNull) deriving (Eq, Ord, Show)
 data Prologue = Prologue (TypedConstOrNull) deriving (Eq, Ord, Show)
 
-data MdVar = MdVar String deriving (Eq,Ord,Show)
-data MdNode = MdNode String deriving (Eq,Ord,Show)
+data MdName = MdName String deriving (Eq,Ord,Show)
+data MdNode = MdNode Word32 deriving (Eq,Ord,Show)
+data MdRef = MdRefName MdName
+           | MdRefNode MdNode
+           deriving (Eq, Ord, Show)
+                    
 data MetaConst = McStruct [MetaKindedConst]
                | McString DqString
-               | McMn MdNode
-               | McMv MdVar
+               | McMdRef MdRef
                | McRef LocalId
                | McSimple Const
                deriving (Eq,Ord,Show)
@@ -180,7 +183,8 @@ data FunName = FunNameGlobal GlobalOrLocalId
 data CallSite = CallSiteFun (Maybe CallConv) [ParamAttr] Type FunName [ActualParam] [FunAttr]
               deriving (Eq,Ord,Show)
                        
-data InlineAsmExp = InlineAsmExp Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect DqString DqString [ActualParam] [FunAttr]
+data InlineAsmExp = InlineAsmExp Type (Maybe SideEffect) (Maybe AlignStack) AsmDialect 
+                    DqString DqString [ActualParam] [FunAttr]
                   deriving (Eq, Ord, Show)
 
 data Clause = ClauseCatch (Typed Value)
@@ -209,7 +213,7 @@ data VaArg = VaArg (Typed Value) Type deriving (Eq, Ord, Show)
 
 data LandingPad = LandingPad Type Type FunName (Maybe Cleanup) [Clause] deriving (Eq, Ord, Show)
 
-data Dbg = Dbg MdVar MetaConst deriving (Eq,Show)
+data Dbg = Dbg MdRef MetaConst deriving (Eq,Show)
 
 data PhiInst = PhiInst (Maybe LocalId) Type [(Value, PercentLabel)] deriving (Eq,Show)
 
@@ -248,8 +252,8 @@ data TerminatorInst =
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
                              deriving (Eq,Show)
 
-data ActualParam = ActualParamData Type [ParamAttr] {-(Maybe Alignment)-} Value [ParamAttr]
-                 | ActualParamLabel Type [ParamAttr] {-(Maybe Alignment)-} PercentLabel [ParamAttr]
+data ActualParam = ActualParamData Type [ParamAttr] Value [ParamAttr]
+                 | ActualParamLabel Type [ParamAttr] PercentLabel [ParamAttr]
                  | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 
@@ -287,8 +291,8 @@ data FunctionPrototype = FunctionPrototype
 data Toplevel = ToplevelTriple TlTriple
               | ToplevelDataLayout TlDataLayout
               | ToplevelAlias TlAlias
-              | ToplevelDbgInit TlDbgInit
-              | ToplevelStandaloneMd TlStandaloneMd
+--              | ToplevelDbgInit TlDbgInit
+              | ToplevelUnamedMd TlUnamedMd
               | ToplevelNamedMd TlNamedMd
               | ToplevelDeclare TlDeclare
               | ToplevelDefine TlDefine
@@ -309,11 +313,11 @@ data TlDataLayout = TlDataLayout DataLayout deriving (Eq, Show)
 data TlAlias = TlAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage)
                AddrNaming (Maybe Linkage) Aliasee deriving (Eq, Show)
 
-data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Show)
+-- data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Show)
 
-data TlStandaloneMd = TlStandaloneMd String MetaKindedConst deriving (Eq, Show)
+data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Show)
 
-data TlNamedMd = TlNamedMd MdVar [MdNode] deriving (Eq, Show)
+data TlNamedMd = TlNamedMd String [MdNode] deriving (Eq, Show)
 
 data TlDeclare = TlDeclare FunctionPrototype deriving (Eq, Show)
 

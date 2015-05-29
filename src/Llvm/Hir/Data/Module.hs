@@ -16,8 +16,8 @@ import Data.Word (Word32)
 data Toplevel a = ToplevelTriple TlTriple
                 | ToplevelDataLayout TlDataLayout
                 | ToplevelAlias TlAlias
-                | ToplevelDbgInit TlDbgInit
-                | ToplevelStandaloneMd TlStandaloneMd
+--                | ToplevelDbgInit TlDbgInit
+                | ToplevelUnamedMd TlUnamedMd
                 | ToplevelNamedMd TlNamedMd
                 | ToplevelDeclare TlDeclare
                 | ToplevelDefine (TlDefine a)
@@ -60,11 +60,11 @@ data TlAlias = TlAlias { tla_lhs :: Ci.GlobalId
                        , tla_aliasee :: Ci.Aliasee
                        } deriving (Eq, Ord, Show)
 
-data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Ord, Show)
+-- data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Ord, Show)
 
-data TlStandaloneMd = TlStandaloneMd String MetaKindedConst deriving (Eq, Ord, Show)
+data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Ord, Show)
 
-data TlNamedMd = TlNamedMd Ci.MdVar [Ci.MdNode] deriving (Eq, Ord, Show)
+data TlNamedMd = TlNamedMd String [Ci.MdNode] deriving (Eq, Ord, Show)
 
 data FunParamType = FunParamDataType Dtype [ParamAttr] (Maybe Alignment) 
                   | FunParamByValType Dtype [ParamAttr] (Maybe Alignment)

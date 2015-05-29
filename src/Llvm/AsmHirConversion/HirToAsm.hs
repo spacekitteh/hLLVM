@@ -415,17 +415,21 @@ instance Conversion I.Const (Rm A.Const) where
     I.C_insertelement_P a -> Md.liftM A.C_insertelement (convert a)
 
 
-instance Conversion I.MdVar (Rm A.MdVar) where
-    convert (I.MdVar s) = return $ A.MdVar s
+instance Conversion I.MdName (Rm A.MdName) where
+  convert (I.MdName s) = return $ A.MdName s
 
 instance Conversion I.MdNode (Rm A.MdNode) where
-    convert (I.MdNode s) = return $ A.MdNode s
+  convert (I.MdNode s) = return $ A.MdNode s
+  
+instance Conversion I.MdRef (Rm A.MdRef) where  
+  convert x = case x of
+    I.MdRefName c -> Md.liftM A.MdRefName (convert c)
+    I.MdRefNode c -> Md.liftM A.MdRefNode (convert c)
 
 instance Conversion I.MetaConst (Rm A.MetaConst) where
     convert (I.McStruct c) = mapM convert c >>= return . A.McStruct
     convert (I.McString s) = return $ A.McString s
-    convert (I.McMn n) = convert n >>= return . A.McMn
-    convert (I.McMv n) = convert n >>= return . A.McMv
+    convert (I.McMdRef n) = convert n >>= return . A.McMdRef
     convert (I.McRef i) = return $ A.McRef i
     convert (I.McSimple sc) = Md.liftM A.McSimple (convert sc)
 
@@ -1182,17 +1186,16 @@ instance Conversion I.TlDataLayout (Rm A.TlDataLayout) where
 instance Conversion I.TlAlias (Rm A.TlAlias) where  
   convert (I.TlAlias  g v dll tlm na l a) = convert a >>= return . (A.TlAlias g v dll tlm na l)
 
+{-
 instance Conversion I.TlDbgInit (Rm A.TlDbgInit) where
   convert (I.TlDbgInit s i) = return (A.TlDbgInit s i)
+-}
   
-instance Conversion I.TlStandaloneMd (Rm A.TlStandaloneMd) where  
-  convert (I.TlStandaloneMd s tv) = convert tv >>= return . (A.TlStandaloneMd s)
+instance Conversion I.TlUnamedMd (Rm A.TlUnamedMd) where  
+  convert (I.TlUnamedMd s tv) = Md.liftM (A.TlUnamedMd s) (convert tv) 
 
 instance Conversion I.TlNamedMd (Rm A.TlNamedMd) where  
-  convert (I.TlNamedMd m ns) = do { m' <- convert m
-                                  ; ns' <- mapM convert ns
-                                  ; return $ A.TlNamedMd m' ns'
-                                  }
+  convert (I.TlNamedMd m ns) = Md.liftM (A.TlNamedMd m) (mapM convert ns)
                                
 instance Conversion I.TlDeclare (Rm A.TlDeclare) where                               
   convert (I.TlDeclare f) = convert f >>= return . A.TlDeclare
@@ -1299,7 +1302,7 @@ convertNode (I.Tnode a dbgs) p = do { (bl, bs, pb) <- p
                                         let blk = A.Block l (reverse phis) (reverse cs) a'
                                         in return (blk:bl, M.insert (getLabelId l) blk bs, Nothing)
                                     }
-convertNode (I.Enode _) _ = error "irrefutable:Additional node should be converted to LLVM node"
+convertNode (I.Enode _) _ = error "irrefutable:Enode should be converted to LLVM node"
   
 graphToBlocks :: H.Graph (I.Node a) H.C H.C -> Rm ([A.Block], M.Map A.LabelId A.Block)
 graphToBlocks g = do { (bl, bs, Nothing) <- H.foldGraphNodes convertNode g (return ([], M.empty, Nothing))
@@ -1310,8 +1313,7 @@ toplevel2Ast :: I.Toplevel a -> Rm A.Toplevel
 toplevel2Ast (I.ToplevelTriple q) = Md.liftM A.ToplevelTriple (convert q)
 toplevel2Ast (I.ToplevelDataLayout q) = Md.liftM A.ToplevelDataLayout (convert q)
 toplevel2Ast (I.ToplevelAlias g) = Md.liftM A.ToplevelAlias (convert g)
-toplevel2Ast (I.ToplevelDbgInit s) = Md.liftM A.ToplevelDbgInit (convert s)
-toplevel2Ast (I.ToplevelStandaloneMd s) = Md.liftM (A.ToplevelStandaloneMd) (convert s)
+toplevel2Ast (I.ToplevelUnamedMd s) = Md.liftM (A.ToplevelUnamedMd) (convert s)
 toplevel2Ast (I.ToplevelNamedMd m) = Md.liftM A.ToplevelNamedMd (convert m) 
 toplevel2Ast (I.ToplevelDeclare f) = Md.liftM A.ToplevelDeclare (convert f)
 toplevel2Ast (I.ToplevelDefine f) = Md.liftM A.ToplevelDefine (convert f)
