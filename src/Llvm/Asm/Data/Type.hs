@@ -39,7 +39,7 @@ data MetaKind = Mtype Type
               | Mmetadata
               deriving (Eq, Ord, Show)
                    
-data FormalParam = FormalParamData Type [ParamAttr] {-(Maybe Alignment)-} Fparam [ParamAttr]
+data FormalParam = FormalParamData Type [ParamAttr] Fparam -- [ParamAttr]
                  | FormalParamMeta MetaKind Fparam
                  deriving (Eq,Ord,Show)
 

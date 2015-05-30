@@ -722,13 +722,13 @@ instance Substitutable Cinst where
 
 
 instance Substitutable Minst where
-  substitute chg (Minst cs g mps mlid) =
-    Minst cs (substitute chg g) (substitute chg mps) (substitute chg mlid)
+  substitute chg (Minst cs g mps) =
+    Minst cs (substitute chg g) (substitute chg mps) 
 
-instance Substitutable MetaParam where
+instance Substitutable MetaOperand where
   substitute chg mp = case mp of
-    MetaParamMeta x -> MetaParamMeta $ substitute chg x
-    MetaParamData dt pa1 ma v pa2 -> MetaParamData dt pa1 ma (substitute chg v) pa2
+    MetaOperandMeta x -> MetaOperandMeta $ substitute chg x
+    MetaOperandData dt pa ma v -> MetaOperandData dt pa ma (substitute chg v)
 
 instance Substitutable Tinst where
   substitute chg x = case x of
@@ -758,11 +758,11 @@ instance Substitutable InvokeFunInterface where
 instance Substitutable CallAsmInterface where
   substitute chg x@CallAsmInterface{..} = x { cai_actualParams = substitute chg cai_actualParams}
 
-instance Substitutable ActualParam where
+instance Substitutable CallOperand where
   substitute chg c = case c of
-    ActualParamData dt pa ma v -> ActualParamData dt pa ma (substitute chg v)
-    ActualParamByVal dt pa ma v -> ActualParamByVal dt pa ma (substitute chg v)    
-    ActualParamLabel t pa ma v -> ActualParamLabel t pa ma (substitute chg v)
+    CallOperandData dt pa ma v -> CallOperandData dt pa ma (substitute chg v)
+    CallOperandByVal dt pa ma v -> CallOperandByVal dt pa ma (substitute chg v)    
+    CallOperandLabel t pa ma v -> CallOperandLabel t pa ma (substitute chg v)
 
 instance Substitutable FunParamTypeList where
   substitute chg (FunParamTypeList fps mvp fa) = FunParamTypeList (substitute chg fps) mvp fa
@@ -781,7 +781,6 @@ instance Substitutable FunParam where
   substitute chg fp = case fp of
     FunParamData dt pa1 ma x -> FunParamData dt pa1 ma (substitute chg x)
     FunParamByVal dt pa1 ma x -> FunParamByVal dt pa1 ma (substitute chg x)  
-    FunParamMeta mk x -> FunParamMeta mk (substitute chg x)
 
 instance Substitutable Fparam where
   substitute chg fp = case fp of
@@ -928,19 +927,17 @@ instance Substitutable MetaConst where
     McStruct l -> McStruct (substitute chg l)
     McString _ -> mc
     McMdRef _ -> mc 
-    McRef s -> McRef (substitute chg s)
+    McSsa s -> McSsa (substitute chg s)
     McSimple c -> McSimple (substitute chg c)
 
 instance Substitutable a => Substitutable (Module a) where
   substitute chg (Module l) = Module $ substitute chg l
-
 
 instance Substitutable NOOP where
   substitute _  = id
 
 instance Ord k => Substitutable (M.Map (GlobalId, k) v) where
   substitute chg m = M.mapKeys (\(gid, k) -> (substitute chg gid, k)) m
-
 
 instance Substitutable Prefix where
   substitute chg (Prefix x) = Prefix $ substitute chg x

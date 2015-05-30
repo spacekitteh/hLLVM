@@ -59,16 +59,40 @@ istore :: T Dtype Value -> T (Type ScalarB P) Value -> Cinst
 istore v p = I_store (IsNot Volatile) v p Nothing Nothing
 
 
+i_alloca :: FileLoc -> Cinst
+i_alloca loc = I_alloca { result = errorLoc loc "please assign a new variable name"
+                        , inAllocaAttr = IsNot InAllocaAttr
+                        , dtype = errorLoc loc "please specify the allocated date type"
+                        , size = Nothing
+                        , alignment = Nothing
+                        }
+
+i_getelementptr :: FileLoc -> Cinst
+i_getelementptr loc = I_getelementptr { result = errorLoc loc "please assign a new variable name"
+                                      , inBounds = IsNot InBounds
+                                      , pointer = errorLoc loc "please assign a pointer"
+                                      , indices = []
+                                      }
+
+
+i_store :: FileLoc -> Cinst
+i_store loc = I_store { volatile = IsNot Volatile
+                      , storedvalue = errorLoc loc "please specified the stored value"
+                      , pointer = errorLoc loc " please assign a pointer"
+                      , alignment = Nothing
+                      , nontemporal = Nothing
+                      }
+
 icallcmd :: GlobalId -> [(Dtype, Value)] -> Cinst
 icallcmd fname params = I_call_fun (FunId fname) 
                         (CallFunInterface TcNon Ccc [] (CallSiteTypeRet $ RtypeVoidU Tvoid) 
-                         Nothing (fmap (\(dt,v) -> ActualParamData dt [] Nothing v) params) []) Nothing
+                         Nothing (fmap (\(dt,v) -> CallOperandData dt [] Nothing v) params) []) Nothing
 
 icallfun :: GlobalId -> [(Dtype, Value)] -> Dtype -> LocalId -> Cinst
 icallfun fname params retType rid =
   I_call_fun (FunId fname) 
   (CallFunInterface TcNon Ccc [] (CallSiteTypeRet $ ucast retType) 
-   Nothing (fmap (\(dt,v) -> ActualParamData dt [] Nothing v) params) []) (Just rid)
+   Nothing (fmap (\(dt,v) -> CallOperandData dt [] Nothing v) params) []) (Just rid)
 
 
 llvm_sizeof :: Dtype -> Type ScalarB I -> Const

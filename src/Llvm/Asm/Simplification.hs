@@ -120,9 +120,9 @@ rnDefFormalParamList (FormalParamList fps b fa) = do { fps' <- mapM rnDefFormalP
                                                
 rnDefFormalParam :: FormalParam -> MS FormalParam
 rnDefFormalParam x = case x of
-  (FormalParamData t pas1 pid pas2) -> 
+  (FormalParamData t pas1 pid) -> 
     do { pid' <- rnDefFparam pid
-       ; return $ FormalParamData (normalType t) pas1 pid' pas2
+       ; return $ FormalParamData (normalType t) pas1 pid'
        }
   (FormalParamMeta e pid) -> 
     do { pid1 <- rnDefFparam pid
@@ -359,8 +359,8 @@ rnInlineAsmExp (InlineAsmExp t dia b1 b2 qs1 qs2 aps fas) =
      }
 
 rnActualParam :: ActualParam -> MS ActualParam
-rnActualParam (ActualParamData t ps v pa) = S.liftM (\x -> ActualParamData t ps x pa) (rnValue v)
-rnActualParam (ActualParamLabel t ps v pa) = S.liftM (\x -> ActualParamLabel t ps x pa) (rnPercentLabel v)
+rnActualParam (ActualParamData t pa v) = S.liftM (\x -> ActualParamData t pa x) (rnValue v)
+rnActualParam (ActualParamLabel t pa v) = S.liftM (\x -> ActualParamLabel t pa x) (rnPercentLabel v)
 rnActualParam (ActualParamMeta mc) = S.liftM ActualParamMeta (rnMetaKindedConst mc)
                                         
 
@@ -418,7 +418,7 @@ rnTargetLabel (TargetLabel x) = S.liftM TargetLabel (rnPercentLabel x)
 
 
 rnMetaConst :: MetaConst -> MS MetaConst
-rnMetaConst (McRef l) = S.liftM McRef (rnLocalId l)
+rnMetaConst (McSsa l) = S.liftM McSsa (rnLocalId l)
 rnMetaConst (McStruct c) = S.liftM McStruct (S.mapM (mapMetaKindedConst rnMetaConst) c)
 rnMetaConst mc@(McSimple sc) = return mc
 rnMetaConst x = return x
@@ -587,10 +587,10 @@ rnInlineAsm2 (InlineAsmExp t dia b1 b2 qs1 qs2 aps fas) =
      }
   
 rnActualParam2 :: ActualParam -> RD ActualParam
-rnActualParam2 (ActualParamData t ps v pa) = S.liftM (\x -> ActualParamData t ps x pa) (rnValue2 v)
-rnActualParam2 (ActualParamLabel t ps v pa) = 
+rnActualParam2 (ActualParamData t pa v) = S.liftM (\x -> ActualParamData t pa x) (rnValue2 v)
+rnActualParam2 (ActualParamLabel t pa v) = 
   do { r <- R.ask
-     ; S.liftM (\x -> ActualParamLabel t ps x pa) (rnPercentLabel2 (fst r) v)
+     ; S.liftM (\x -> ActualParamLabel t pa x) (rnPercentLabel2 (fst r) v)
      }
 rnActualParam2 (ActualParamMeta mc) = S.liftM ActualParamMeta (rnMetaKindedConst2 mc)
                                         
@@ -661,7 +661,7 @@ mapTypedConstOrNull f (TypedConst tc) = S.liftM TypedConst (f tc)
 mapTypedConstOrNull f UntypedNull = return UntypedNull
 
 rnMetaConst2 :: MetaConst -> RD MetaConst
-rnMetaConst2 (McRef l) = R.liftM McRef (rnLocalId2 l)
+rnMetaConst2 (McSsa l) = R.liftM McSsa (rnLocalId2 l)
 rnMetaConst2 (McStruct l) = R.liftM McStruct (S.mapM (mapMetaKindedConst rnMetaConst2) l) -- Const (rnConst2 c)
 rnMetaConst2 (McSimple sc) = return $ McSimple sc
 rnMetaConst2 x = return x
@@ -702,21 +702,21 @@ rnLabelId2 g l = case l of
                         }
   _ -> return l
 
-isImplicitNum :: GlobalId -> Word32 {-Integer-} -> RD Bool
+isImplicitNum :: GlobalId -> Word32 -> RD Bool
 isImplicitNum g i = do { (_,r) <- R.ask
                        ; case M.lookup g r of
                          Nothing -> return False
                          Just st -> return $ St.member i (implicitNumbers st) 
                        }
                     
-isExplicitNum :: GlobalId -> Word32 {-Integer-} -> RD Bool
+isExplicitNum :: GlobalId -> Word32 -> RD Bool
 isExplicitNum g i = do { (_,r) <- R.ask
                        ; case M.lookup g r of
                          Nothing -> return False
                          Just st -> return $ St.member i (explicitNumbers st) 
                        }
 
-isExplicitDqNum :: GlobalId -> Word32 {-Integer-} -> RD Bool
+isExplicitDqNum :: GlobalId -> Word32 -> RD Bool
 isExplicitDqNum g i = do { (_,r) <- R.ask
                          ; case M.lookup g r of
                            Nothing -> return False

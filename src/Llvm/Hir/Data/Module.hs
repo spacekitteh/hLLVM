@@ -16,7 +16,6 @@ import Data.Word (Word32)
 data Toplevel a = ToplevelTriple TlTriple
                 | ToplevelDataLayout TlDataLayout
                 | ToplevelAlias TlAlias
---                | ToplevelDbgInit TlDbgInit
                 | ToplevelUnamedMd TlUnamedMd
                 | ToplevelNamedMd TlNamedMd
                 | ToplevelDeclare TlDeclare
@@ -60,8 +59,6 @@ data TlAlias = TlAlias { tla_lhs :: Ci.GlobalId
                        , tla_aliasee :: Ci.Aliasee
                        } deriving (Eq, Ord, Show)
 
--- data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Ord, Show)
-
 data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Ord, Show)
 
 data TlNamedMd = TlNamedMd String [Ci.MdNode] deriving (Eq, Ord, Show)
@@ -70,9 +67,11 @@ data FunParamType = FunParamDataType Dtype [ParamAttr] (Maybe Alignment)
                   | FunParamByValType Dtype [ParamAttr] (Maybe Alignment)
                   | FunParamMetaType MetaKind Fparam
                   deriving (Eq,Ord,Show)
+                                                      
 
 data FunParamTypeList = FunParamTypeList [FunParamType] (Maybe VarArgParam) [FunAttr]
                       deriving (Eq,Ord,Show)
+                               
 
 data FunctionDeclare = FunctionDeclare { fd_linkage :: Maybe Linkage
                                        , fd_visibility :: Maybe Visibility
@@ -91,8 +90,19 @@ data FunctionDeclare = FunctionDeclare { fd_linkage :: Maybe Linkage
                                        , fd_prefix :: Maybe Prefix
                                        , fd_prologue :: Maybe Prologue
                                        } deriving (Eq,Ord,Show)
-
+                                                  
 data TlDeclare = TlDeclare FunctionDeclare deriving (Eq)
+
+
+{-
+data MetaFunParamType = MetaFunParamType MetaKind Fparam 
+                      deriving (Eq, Ord, Show)
+
+data TlMetaFunDeclare = TlMetaFunDeclare { metafun_name :: GlobalId  
+                                         , metafun_param_list :: [MetaFunParamType]
+                                         }
+-}
+
 
 type NOOP = ()
 

@@ -7,7 +7,6 @@ pType :: P Type
 pType =
     do { t <- choice [ try (liftM Tprimitive pPrimType)
                      , pTypeName
-                     --, upref
                      , array
                      , try pstruct
                      , vector
@@ -17,10 +16,9 @@ pType =
        ; post t
        }
  where
---   upref    = chartok '\\' >> liftM TupRef decimal
    array    = brackets (avbody Tarray)
    vector   = angles (avbody Tvector)
-   avbody f = do { n <- lexeme unsignedInt -- decimal
+   avbody f = do { n <- lexeme unsignedInt
                  ; ignore $ chartok 'x'
                  ; t <- pType
                  ; return (f n t)
@@ -129,11 +127,10 @@ pFormalParamList = do { ignore $ chartok '('
     where
         param = choice [do { at <- pType
                            ; ar1 <- many pParamAttr
-                           -- ; an <- opt pAlign
                            ; lv <- opt pLocalId
                            ; let lv' = maybe FimplicitParam FexplicitParam lv 
                            ; ar2 <- many pParamAttr
-                           ; return $ FormalParamData at  ar1 {-an-} lv' ar2
+                           ; return $ FormalParamData at (ar1++ar2) lv'
                            }
                        , do { mt <- pMetaKind
                             ; lv <- opt pLocalId
@@ -144,7 +141,7 @@ pFormalParamList = do { ignore $ chartok '('
 
 pSelTy :: P Type
 pSelTy = choice [ reserved "i1" >> return (Tprimitive $ TpI 1)
-                , angles $ do { n <- unsignedInt -- decimal
+                , angles $ do { n <- unsignedInt
                               ; ignore $ chartok 'x'
                               ; reserved "i1"
                               ; return $ Tvector n (Tprimitive $ TpI 1)

@@ -149,7 +149,7 @@ instance AsmPrint MetaConst where
   toLlvm (McStruct c) = char '!' <> braces (commaSepList (fmap toLlvm c))
   toLlvm (McString s) = char '!' <> (toLlvm s)
   toLlvm (McMdRef n) = toLlvm n
-  toLlvm (McRef s) = toLlvm s
+  toLlvm (McSsa s) = toLlvm s
   toLlvm (McSimple sc) = toLlvm sc
 
 instance AsmPrint MetaKindedConst where
@@ -276,10 +276,8 @@ instance AsmPrint Rhs where
 
 instance AsmPrint ActualParam where
   toLlvm x = case x of
-    ActualParamData t att1 v att2 ->
-      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm v, hsep $ fmap toLlvm att2]
-    ActualParamLabel t att1 v att2 ->
-      hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm v, hsep $ fmap toLlvm att2]      
+    ActualParamData t att1 v -> hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm v]
+    ActualParamLabel t att1 v -> hsep [toLlvm t, hsep $ fmap toLlvm att1, toLlvm v]
     ActualParamMeta mc -> toLlvm mc
 
 instance AsmPrint Dbg where
@@ -346,7 +344,6 @@ instance AsmPrint Toplevel where
   toLlvm (ToplevelDataLayout (TlDataLayout s)) = hsep [text "target", text "datalayout", equals, toLlvm s]
   toLlvm (ToplevelAlias (TlAlias lhs vis dll tlm naddr link aliasee)) = 
     hsep [toLlvm lhs, equals, toLlvm vis, toLlvm dll, toLlvm tlm, toLlvm naddr, text "alias", toLlvm link, toLlvm aliasee]
---  toLlvm (ToplevelDbgInit (TlDbgInit s i)) = error "DbgInit is not implemented"
   toLlvm (ToplevelUnamedMd smd) = toLlvm smd
   toLlvm (ToplevelNamedMd (TlNamedMd mv nds)) = char '!' <> text mv <+> equals 
                                                 <+> char '!'<>(braces (commaSepList $ fmap toLlvm nds))
@@ -373,8 +370,7 @@ instance AsmPrint TlUnamedMd where
 
 instance AsmPrint FormalParam where
   toLlvm x = case x of
-    (FormalParamData t att1 id att2) -> (toLlvm t) <+> (hsep $ fmap toLlvm att1) 
-                                        <+> (toLlvm id) <+> (hsep $ fmap toLlvm att2)
+    (FormalParamData t att1 id) -> (toLlvm t) <+> (hsep $ fmap toLlvm att1) <+> (toLlvm id)
     (FormalParamMeta e lv) -> toLlvm e <+> toLlvm lv
 
 instance AsmPrint FormalParamList where

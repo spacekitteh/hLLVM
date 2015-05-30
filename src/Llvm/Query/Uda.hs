@@ -63,10 +63,11 @@ instance Uda Value where
   storeTo x = S.insert x S.empty
   loadFrom x = S.insert x S.empty
  
-instance Uda ActualParam where
+instance Uda CallOperand where
   use ap = case ap of
-    ActualParamData _ _ _ v -> use v
-    ActualParamLabel _ _ _ _ -> S.empty 
+    CallOperandData _ _ _ v -> use v
+    CallOperandByVal _ _ _ v -> use v
+    CallOperandLabel _ _ _ _ -> S.empty 
   def _ = errorLoc FLC $ "cannot happen"
   storeTo _ = errorLoc FLC $ "cannot happen"
   loadFrom _ = errorLoc FLC $ "cannot happen"
@@ -78,12 +79,6 @@ instance Uda x => Uda [x] where
   storeTo l = S.unions (fmap storeTo l)
   loadFrom l = S.unions (fmap loadFrom l)
 
-{-
-instance Uda CallSite where
-  use x = case x of
-    CsFun _ _ _ _ l _ -> use l
-  def _ = S.empty  
--}
 
 instance Uda CallFunInterface where
   use CallFunInterface{..} = use cfi_actualParams

@@ -208,11 +208,11 @@ data MdNode = MdNode Word32 deriving (Eq,Ord,Show)
 data MdRef = MdRefName MdName
            | MdRefNode MdNode
            deriving (Eq, Ord, Show)
-                    
+
 data MetaConst = McStruct [MetaKindedConst]
                | McString DqString
                | McMdRef MdRef
-               | McRef LocalId
+               | McSsa LocalId
                | McSimple Const
                deriving (Eq,Ord,Show)
 
@@ -241,23 +241,23 @@ data CallFunInterface = CallFunInterface { cfi_tail :: TailCall
                                          , cfi_conv :: CallConv
                                          , cfi_retAttrs :: [RetAttr]
                                          , cfi_type :: CallSiteType
-                                         , cfi_firstParamAsRet :: Maybe FirstParamAsRet
-                                         , cfi_actualParams :: [ActualParam]
+                                         , cfi_firstParamAsRet :: Maybe FirstOperandAsRet
+                                         , cfi_actualParams :: [CallOperand]
                                          , cfi_funAttrs :: [FunAttr]
                                          } deriving (Eq, Ord, Show)
 
 data InvokeFunInterface = InvokeFunInterface { ifi_conv :: CallConv
                                              , ifi_retAttrs :: [RetAttr]
                                              , ifi_type :: CallSiteType
-                                             , ifi_firstParamAsRet :: Maybe FirstParamAsRet                                               
-                                             , ifi_actualParams :: [ActualParam]
+                                             , ifi_firstParamAsRet :: Maybe FirstOperandAsRet                                               
+                                             , ifi_actualParams :: [CallOperand]
                                              , ifi_funAttrs :: [FunAttr]
                                              } deriving (Eq, Ord, Show)
 
 data CallAsmInterface = CallAsmInterface { cai_type :: CallSiteType
                                          , cai_sideeffect :: Maybe SideEffect
                                          , cai_alignstack :: Maybe AlignStack
-                                         , cai_actualParams :: [ActualParam]
+                                         , cai_actualParams :: [CallOperand]
                                          , cai_funAttrs :: [FunAttr]
                                          } deriving (Eq, Ord, Show)
 
@@ -277,29 +277,6 @@ data Pinst = Pinst { ftype :: Ftype
                    , flowout :: LocalId
                    } deriving (Eq, Ord, Show)
 
-i_alloca :: FileLoc -> Cinst
-i_alloca loc = I_alloca { result = errorLoc loc "please assign a new variable name"
-                        , inAllocaAttr = IsNot InAllocaAttr
-                        , dtype = errorLoc loc "please specify the allocated date type"
-                        , size = Nothing
-                        , alignment = Nothing
-                        }
-
-i_getelementptr :: FileLoc -> Cinst
-i_getelementptr loc = I_getelementptr { result = errorLoc loc "please assign a new variable name"
-                                      , inBounds = IsNot InBounds
-                                      , pointer = errorLoc loc "please assign a pointer"
-                                      , indices = []
-                                      }
-
-
-i_store :: FileLoc -> Cinst
-i_store loc = I_store { volatile = IsNot Volatile
-                      , storedvalue = errorLoc loc "please specified the stored value"
-                      , pointer = errorLoc loc " please assign a pointer"
-                      , alignment = Nothing
-                      , nontemporal = Nothing
-                      }
 
 -- | Computation Instructions compute and cause side effects
 data Cinst where {
@@ -460,7 +437,7 @@ data Cinst where {
 
   I_landingpad :: { resultType :: Dtype
                   , persFnType :: Dtype
-                  , persFn :: FunPtr -- PersFn
+                  , persFn :: FunPtr
                   , cleanup :: Maybe Cleanup
                   , clauses :: [Clause]
                   , result :: LocalId
@@ -959,11 +936,14 @@ data Cinst where {
 
   I_llvm_read_register :: { memLen :: MemLen
                           , meta :: MetaKindedConst
+                          , result :: LocalId
                           } -> Cinst;
+  
   I_llvm_write_register :: { memLen :: MemLen
                            , meta :: MetaKindedConst
                            , value :: Value
                            } -> Cinst;
+  
   I_llvm_stacksave :: { result :: LocalId } -> Cinst;
   I_llvm_stackrestore :: { pointer :: T (Type ScalarB P) Value } -> Cinst;
   I_llvm_prefetch :: Value -> Value -> Value -> Value -> Cinst;
@@ -1041,11 +1021,11 @@ data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)
 
 -- | LLVM metadata instructions
-data Minst = Minst CallSiteType GlobalId [MetaParam] (Maybe LocalId) deriving (Eq, Ord, Show)
+data Minst = Minst CallSiteType GlobalId [MetaOperand] deriving (Eq, Ord, Show)
 
-data MetaParam = MetaParamMeta MetaKindedConst
-               | MetaParamData Dtype [ParamAttr] (Maybe Alignment) Value [ParamAttr]
-               deriving (Eq, Ord, Show)
+data MetaOperand = MetaOperandMeta MetaKindedConst
+                 | MetaOperandData Dtype [ParamAttr] (Maybe Alignment) Value
+                 deriving (Eq, Ord, Show)
 {- -}
 -- | Terminator instructions cause control flow transferring and
 -- | side effects (which is unfortunately difficult to seperate out)
@@ -1077,13 +1057,13 @@ data Tinst = T_unreachable
            | T_unwind
            deriving (Eq, Ord, Show)
 
-data ActualParam = ActualParamData Dtype [ParamAttr] (Maybe Alignment) Value
-                 | ActualParamByVal Dtype [ParamAttr] (Maybe Alignment) Value
-                 | ActualParamLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label
+data CallOperand = CallOperandData Dtype [ParamAttr] (Maybe Alignment) Value
+                 | CallOperandByVal Dtype [ParamAttr] (Maybe Alignment) Value
+                 | CallOperandLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label
                  deriving (Eq,Ord,Show)
 
-data FirstParamAsRet = FirstParamAsRet Dtype [ParamAttr] (Maybe Alignment) Value
-                     deriving (Eq,Ord,Show)
+data FirstOperandAsRet = FirstOperandAsRet Dtype [ParamAttr] (Maybe Alignment) Value
+                       deriving (Eq,Ord,Show)
 
 data Value = Val_ssa LocalId
            | Val_const Const
@@ -1118,11 +1098,12 @@ data FunctionInterface = FunctionInterface { fi_linkage :: Maybe Linkage
 
 data FunParam = FunParamData Dtype [ParamAttr] (Maybe Alignment) LocalId 
               | FunParamByVal Dtype [ParamAttr] (Maybe Alignment) LocalId
-              | FunParamMeta MetaKind Fparam
               deriving (Eq,Ord,Show)
                        
 data FunParamList = FunParamList [FunParam] (Maybe VarArgParam) [FunAttr]
-                     deriving (Eq,Ord,Show)
+                  deriving (Eq,Ord,Show)
+                           
+data MetaFunParam = MetaFunParam MetaKind Fparam deriving (Eq, Ord, Show)
 
 data Prefix = Prefix TypedConstOrNull deriving (Eq, Ord, Show)
 data Prologue = Prologue TypedConstOrNull deriving (Eq, Ord, Show)

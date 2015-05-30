@@ -467,12 +467,12 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
 #ifdef DEBUG
       _ -> errorLoc FLC $ show n
 #endif
-    getValuesFromParams :: Maybe FirstParamAsRet -> [ActualParam] -> S.Set Value
+    getValuesFromParams :: Maybe FirstOperandAsRet -> [CallOperand] -> S.Set Value
     getValuesFromParams fp ls = let x = foldl (\p e -> case e of
-                                                 ActualParamData _ _ _ v -> S.insert v p
+                                                 CallOperandData _ _ _ v -> S.insert v p
                                                  _ -> p
                                               ) S.empty ls
-                                in maybe x (\(FirstParamAsRet _ _ _ v) -> S.insert v x) fp
+                                in maybe x (\(FirstOperandAsRet _ _ _ v) -> S.insert v x) fp
 
 scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => S.Set LocalId -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
 scanGraph fm entry graph =

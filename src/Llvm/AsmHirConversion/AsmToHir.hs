@@ -804,7 +804,7 @@ convert_MetaConst :: A.MetaConst -> (MM I.MetaConst)
 convert_MetaConst (A.McStruct c) = Md.liftM I.McStruct (mapM convert_MetaKindedConst c)
 convert_MetaConst (A.McString s) = return $ I.McString s
 convert_MetaConst (A.McMdRef n) = Md.liftM I.McMdRef (convert_MdRef n)
-convert_MetaConst (A.McRef i) = return $ I.McRef i
+convert_MetaConst (A.McSsa i) = return $ I.McSsa i
 convert_MetaConst (A.McSimple sc) = Md.liftM I.McSimple (convert_Const sc)
 
 convert_MetaKindedConst :: A.MetaKindedConst -> MM I.MetaKindedConst
@@ -849,15 +849,15 @@ convert_Value :: A.Value -> (MM I.Value)
 convert_Value (A.Val_local a) = return $ I.Val_ssa a
 convert_Value (A.Val_const a) = Md.liftM I.Val_const (convert_Const a)
 
-convert_to_Minst :: Maybe A.LocalId -> A.CallSite -> MM (Maybe I.Minst)
-convert_to_Minst lhs x = case x of
+convert_to_Minst :: A.CallSite -> MM (Maybe I.Minst)
+convert_to_Minst x = case x of
   (A.CallSiteFun cc pa t fn aps fa) | any isMetaParam aps ->
     do { mp <- typeDefs
        ; fna <- convert_FunId fn
        ; let ert = A.splitCallReturnType t
              erta = eitherRet mp ert
        ; apsa <- mapM convert_MetaParam aps                
-       ; return (Just $ I.Minst erta fna apsa lhs)
+       ; return (Just $ I.Minst erta fna apsa)
        }
   _ -> return Nothing 
 
@@ -1205,15 +1205,29 @@ convert_Rhs :: (Maybe A.LocalId, A.Rhs) -> MM (I.Node a H.O H.O)
 convert_Rhs (mlhs, A.RhsMemOp c) = Md.liftM (\x -> I.Cnode x []) (convert_MemOp (mlhs, c))
 convert_Rhs (mlhs, A.RhsExpr e) = Md.liftM (\x -> I.Cnode x []) (convert_Expr_CInst (mlhs, e))
 convert_Rhs (lhs, A.RhsCall b cs) = 
-  do { mc <- convert_to_Minst lhs cs
-     ; case mc of
-       Just mi -> return $ I.Mnode mi []
-       Nothing -> 
-         Md.liftM (\x -> I.Cnode x []) $ 
-         do { (isvoid, fnptr, csi) <- convert_to_CallFunInterface b cs
-            ; return $ maybe (I.I_call_fun fnptr csi lhs) id (specializeCallSite lhs fnptr csi)
-            }
-     }
+  case specializeRegisterIntrinsic lhs cs of
+    Just (Just r, ml, [m]) -> do { ma <- convert_MetaParam m 
+                                 ; case ma of
+                                   I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_read_register ml mc r) []
+                                   _ -> errorLoc FLC $ show ma
+                                 }
+    Just (Nothing, ml, [m,v]) -> do { ma <- convert_MetaParam m
+                                    ; (I.CallOperandData _ _ _ va) <- convert_ActualParam v
+                                    ; case ma of
+                                      I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_write_register ml mc va) []
+                                      _ -> errorLoc FLC $ show ma
+                                    }
+    Nothing -> 
+      do { mc <- convert_to_Minst cs
+         ; case mc of
+           Just mi | lhs == Nothing -> return $ I.Mnode mi []
+           Just _ -> errorLoc FLC $ show lhs ++ " " ++ show cs
+           Nothing -> 
+             Md.liftM (\x -> I.Cnode x []) $ 
+             do { (isvoid, fnptr, csi) <- convert_to_CallFunInterface b cs
+                ; return $ maybe (I.I_call_fun fnptr csi lhs) id (specializeCallSite lhs fnptr csi)
+                }
+         }
 convert_Rhs (lhs, A.RhsInlineAsm cs) = 
   Md.liftM (\x -> I.Cnode x []) $ 
   do { (isvoid, asm, csi) <- convert_to_CallAsmInterface cs
@@ -1282,9 +1296,9 @@ convert_Rhs (lhs,rhs) =  errorLoc FLC $ "AstIrConversion:irrefutable error lhs:"
 
 
 
-specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe I.FirstParamAsRet)
+specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe I.FirstOperandAsRet)
 specializeFirstParamAsRet x = case x of
-  (A.ActualParamData t pa1 v pa2) ->
+  (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
@@ -1294,14 +1308,14 @@ specializeFirstParamAsRet x = case x of
                           A.PaAlign _ -> True
                           _ -> False
                      ]
-       ; let (plist, bl) = stripOffPa (pa1++pa2) preds
+       ; let (plist, bl) = stripOffPa pa preds
        ; case bl of 
          [Nothing, _, _] -> return Nothing
-         [Just _, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FirstParamAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
-         [Just _, Nothing, Nothing] -> return $ Just $ I.FirstParamAsRet (dcast FLC ta) plist Nothing va
+         [Just _, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FirstOperandAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
+         [Just _, Nothing, Nothing] -> return $ Just $ I.FirstOperandAsRet (dcast FLC ta) plist Nothing va
          [Just _, Just (A.PaAlign n)] -> errorLoc FLC "byval cannot be used with sret"
        }
-  (A.ActualParamLabel t pa1 v pa2) ->
+  (A.ActualParamLabel t pa v) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_PercentLabel v
@@ -1311,9 +1325,9 @@ specializeFirstParamAsRet x = case x of
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
   
-convert_ActualParam :: A.ActualParam -> MM I.ActualParam
+convert_ActualParam :: A.ActualParam -> MM I.CallOperand
 convert_ActualParam x = case x of
-  (A.ActualParamData t pa1 v pa2) ->
+  (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
@@ -1322,26 +1336,26 @@ convert_ActualParam x = case x of
                           A.PaAlign _ -> True
                           _ -> False
                      ]
-       ; let (plist, bl) = stripOffPa (pa1++pa2) preds
+       ; let (plist, bl) = stripOffPa pa preds
        ; case bl of 
-         [Nothing, Nothing] -> return $ I.ActualParamData (dcast FLC ta) plist Nothing va
-         [Nothing, Just (A.PaAlign n)] -> return $ I.ActualParamData (dcast FLC ta) plist (Just $ A.Alignment n) va
-         [Just _, Nothing] -> return $ I.ActualParamByVal (dcast FLC ta) (pa1++pa2) Nothing va
-         [Just _, Just (A.PaAlign n)] -> return $ I.ActualParamByVal (dcast FLC ta) plist (Just $ A.Alignment n) va
+         [Nothing, Nothing] -> return $ I.CallOperandData (dcast FLC ta) plist Nothing va
+         [Nothing, Just (A.PaAlign n)] -> return $ I.CallOperandData (dcast FLC ta) plist (Just $ A.Alignment n) va
+         [Just _, Nothing] -> return $ I.CallOperandByVal (dcast FLC ta) pa Nothing va
+         [Just _, Just (A.PaAlign n)] -> return $ I.CallOperandByVal (dcast FLC ta) plist (Just $ A.Alignment n) va
        }
-  (A.ActualParamLabel t pa1 v pa2) ->
+  (A.ActualParamLabel t pa v) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_PercentLabel v
        ; let preds = [\x -> case x of 
                          A.PaAlign _ -> True
                          _ -> False]
-       ; let (plist, bl) = stripOffPa (pa1++pa2) preds
+       ; let (plist, bl) = stripOffPa pa preds
        ; let ma = case bl of 
                [Nothing] -> Nothing
                [Just (A.PaAlign n)] -> Just $ A.Alignment n
        ; case ta of
-         I.UtypeLabelX lbl -> return $ I.ActualParamLabel lbl plist ma va
+         I.UtypeLabelX lbl -> return $ I.CallOperandLabel lbl plist ma va
        }    
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
@@ -1350,16 +1364,16 @@ isMetaParam x = case x of
   A.ActualParamMeta _ -> True
   _ -> False
 
-convert_MetaParam :: A.ActualParam -> MM I.MetaParam 
+convert_MetaParam :: A.ActualParam -> MM I.MetaOperand 
 convert_MetaParam x = case x of
-  A.ActualParamMeta mc -> Md.liftM I.MetaParamMeta (convert_MetaKindedConst mc)
-  A.ActualParamData t pa1 v pa2 ->
+  A.ActualParamMeta mc -> Md.liftM I.MetaOperandMeta (convert_MetaKindedConst mc)
+  A.ActualParamData t pa v ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
        ; case ta of
          I.UtypeLabelX lbl -> errorLoc FLC $ show x
-         _ -> return $ I.MetaParamData (dcast FLC ta) pa1 (Nothing) va pa2
+         _ -> return $ I.MetaOperandData (dcast FLC ta) pa (Nothing) va
        }
   _ -> errorLoc FLC $ show x ++ " is passed to convert_MetaParam"
 
@@ -1401,13 +1415,13 @@ convert_to_FunParamType :: A.FormalParam -> MM I.FunParamType
 convert_to_FunParamType x = 
   do { mp <- typeDefs
      ; case x of
-       (A.FormalParamData dt pa1 _ pa2) ->
+       (A.FormalParamData dt pa _) ->
          let preds = [ (A.PaByVal==)
                      ,\x -> case x of 
                           A.PaAlign _ -> True
                           _ -> False
                      ]
-         in case stripOffPa (pa1++pa2) preds of
+         in case stripOffPa pa preds of
            (palist, bl) -> case bl of
              [Nothing, Nothing] -> return $ I.FunParamDataType (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing 
              [Nothing, Just (A.PaAlign n)] -> return $ I.FunParamDataType (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n)
@@ -1440,21 +1454,20 @@ convert_to_FunParam :: A.FormalParam -> MM I.FunParam
 convert_to_FunParam x = 
   do { mp <- typeDefs
      ; case x of
-       (A.FormalParamData dt pa1 (A.FexplicitParam fp) pa2) ->
+       (A.FormalParamData dt pa (A.FexplicitParam fp)) ->
          let preds = [ (A.PaByVal==)
                      ,\x -> case x of 
                           A.PaAlign _ -> True
                           _ -> False
                      ]
-             (palist, bl) = stripOffPa (pa1++pa2) preds
+             (palist, bl) = stripOffPa pa preds
          in case bl of
              [Nothing, Nothing] -> return $ I.FunParamData (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
              [Nothing, Just (A.PaAlign n)] -> return $ I.FunParamData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
              [Just _, Nothing] -> return $ I.FunParamByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
              [Just _, Just (A.PaAlign n)] -> return $ I.FunParamByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
              _ -> errorLoc FLC $ show bl
-       (A.FormalParamData _ _ A.FimplicitParam _) -> errorLoc FLC "implicit param should be normalized in AsmSimplification"
-       (A.FormalParamMeta mk fp) -> return $ I.FunParamMeta (tconvert mp mk) fp
+       (A.FormalParamData _ _ A.FimplicitParam) -> errorLoc FLC "implicit param should be normalized in AsmSimplification"
      }
 
 convert_to_FunParamList :: A.FormalParamList -> MM I.FunParamList
@@ -1531,7 +1544,7 @@ convert_PhiInstWithDbg (A.PhiInstWithDbg ins dbgs) =
      ; return (ins0, dbgs0)
      }
 
-convert_CInstWithDbg :: A.ComputingInstWithDbg -> MM (I.Node a H.O H.O) -- , [I.Dbg])
+convert_CInstWithDbg :: A.ComputingInstWithDbg -> MM (I.Node a H.O H.O)
 convert_CInstWithDbg (A.ComputingInstWithDbg ins dbgs) = 
   do { ins0 <- convert_CInst ins 
      ; dbgs0 <- mapM convert_Dbg dbgs
@@ -1614,11 +1627,6 @@ convert_TlDataLayout (A.TlDataLayout x) = return (I.TlDataLayout x)
 
 convert_TlAlias :: A.TlAlias -> (MM I.TlAlias)
 convert_TlAlias (A.TlAlias  g v dll tlm na l a) = convert_Aliasee a >>= return . (I.TlAlias g v dll tlm na l)
-
-{-
-convert_TlDbgInit :: A.TlDbgInit -> (MM I.TlDbgInit)
-convert_TlDbgInit (A.TlDbgInit s i) = return (I.TlDbgInit s i)
--}
   
 convert_TlUnamedMd :: A.TlUnamedMd -> (MM I.TlUnamedMd)
 convert_TlUnamedMd (A.TlUnamedMd s tv) = convert_MetaKindedConst tv >>= return . (I.TlUnamedMd s)
@@ -1684,7 +1692,6 @@ toplevel2Ir :: A.Toplevel -> MM (I.Toplevel a)
 toplevel2Ir (A.ToplevelTriple q) = Md.liftM I.ToplevelTriple (convert_TlTriple q)
 toplevel2Ir (A.ToplevelDataLayout q) = Md.liftM I.ToplevelDataLayout (convert_TlDataLayout q)
 toplevel2Ir (A.ToplevelAlias q) = Md.liftM I.ToplevelAlias (convert_TlAlias q)
--- toplevel2Ir (A.ToplevelDbgInit s) = Md.liftM I.ToplevelDbgInit (convert_TlDbgInit s)
 toplevel2Ir (A.ToplevelUnamedMd s) = Md.liftM I.ToplevelUnamedMd (convert_TlUnamedMd s)
 toplevel2Ir (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
 toplevel2Ir (A.ToplevelDeclare f) = Md.liftM I.ToplevelDeclare (convert_TlDeclare f)

@@ -381,7 +381,7 @@ instance IrPrint MetaConst where
   printIr (McStruct c) = char '!' <> braces (commaSepList (fmap printIr c))
   printIr (McString s) = char '!' <> (printIr s)
   printIr (McMdRef n) = printIr n
-  printIr (McRef s) = text $ show s
+  printIr (McSsa s) = text $ show s
   printIr (McSimple sc) = printIr sc
 
 instance IrPrint (GetElementPtr s Value) where
@@ -489,27 +489,24 @@ instance IrPrint (InsertValue Value) where
   printIr (InsertValue vect tv idx) = text "insertvalue" <+> 
                                       hsep (punctuate comma ((printIr vect):(printIr tv):(fmap integral idx)))
 
-instance IrPrint ActualParam where
+instance IrPrint CallOperand where
   printIr x = case x of
-    (ActualParamData t att1 align v) ->
+    (CallOperandData t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
-    (ActualParamByVal t att1 align v) ->
+    (CallOperandByVal t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr (PaByVal:att1), printIr align, printIr v]      
-    (ActualParamLabel t att1 align v) ->
+    (CallOperandLabel t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
 
-instance IrPrint FirstParamAsRet where
-  printIr (FirstParamAsRet t att1 align v) =
+instance IrPrint FirstOperandAsRet where
+  printIr (FirstOperandAsRet t att1 align v) =
     hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
 
 
-
-instance IrPrint MetaParam where
+instance IrPrint MetaOperand where
   printIr x = case x of
-    (MetaParamData t att1 align v att2) ->
-      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v, hsep $ fmap printIr att2]
-    (MetaParamMeta mc) -> printIr mc
-
+    MetaOperandData t att1 align v -> hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+    MetaOperandMeta mc -> printIr mc
 
 instance IrPrint Dbg where
   printIr (Dbg mv meta) = printIr mv <+> printIr meta
@@ -664,9 +661,11 @@ instance IrPrint Cinst where
     I_llvm_memcpy md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
     I_llvm_memmove md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memmove" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
     I_llvm_memset md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memset" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
+    I_llvm_read_register ml ma lhs -> hsep [printIr lhs, equals, text "llvm.read_register", printIr ml, printIr ma]
+    I_llvm_write_register ml ma mv -> hsep [text "llvm.write_register", printIr ml, printIr ma, printIr mv]
 
 instance IrPrint Minst where
-  printIr (Minst cs fn params lhs) = printIr cs <+> printIr fn <+> hsep (fmap printIr params)
+  printIr (Minst cs fn params) = printIr cs <+> printIr fn <+> hsep (fmap printIr params)
 
 instance IrPrint MemLen where
   printIr m = case m of
@@ -722,7 +721,7 @@ instance IrPrint MetaKind where
 
 instance IrPrint MetaKindedConst where
   printIr x = case x of
-    (MetaKindedConst mk mc) -> printIr mk <+> printIr mc
+    MetaKindedConst mk mc -> printIr mk <+> printIr mc
     UnmetaKindedNull -> text "null"
 
 instance IrPrint (Type s x) where
@@ -822,7 +821,10 @@ instance IrPrint FunParam where
       (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align) <+> printIr x
     (FunParamByVal t att1 align x) ->
       (printIr t) <+> (hsep $ fmap printIr (PaByVal:att1)) <> (maybe empty ((comma <+>) . printIr) align) <+> printIr x
-    (FunParamMeta e lv) -> printIr e <+> printIr lv
+      
+      
+instance IrPrint MetaFunParam where      
+  printIr (MetaFunParam e lv) = printIr e <+> printIr lv
 
 instance IrPrint FunParamList where
   printIr (FunParamList params var atts) =

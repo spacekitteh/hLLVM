@@ -190,7 +190,7 @@ pConversion = do { op <- pConvertOp
 pGetElemPtr :: P (GetElementPtr Value)
 pGetElemPtr = do { reserved "getelementptr"
                  ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
-                 ; tc1 <- pTypedPointer -- AddrValue
+                 ; tc1 <- pTypedPointer
                  ; idx <- many (try (comma >> pTypedValue))
                  ; return $ GetElementPtr ib tc1 idx
                  }
@@ -271,7 +271,7 @@ pAsm = do { t <- pType
 
 
 pCallSite :: P CallSite
-pCallSite = choice [try pCallFun] -- , pAsm]
+pCallSite = choice [try pCallFun]
          
 pCall :: P Rhs
 pCall = do { tl <- option TcNon pTailCall 
@@ -288,17 +288,16 @@ pRhsInlineAsm = do { tl <- option TcNon pTailCall
 pActualParam :: P ActualParam
 pActualParam = choice [do { t <- pType
                           ; atts0 <- many pParamAttr
-                          -- ; a <- opt pAlign
                           ; case t of
                             Tprimitive TpLabel -> 
                               do { v <- pPercentLabel
                                  ; atts1 <- many pParamAttr
-                                 ; return $ ActualParamLabel t atts0 {-a-} v atts1
+                                 ; return $ ActualParamLabel t (atts0++atts1) v
                                  }
                             _  -> 
                               do { v <- pValue
                                  ; atts1 <- many pParamAttr
-                                 ; return $ ActualParamData t atts0 {-a-} v atts1
+                                 ; return $ ActualParamData t (atts0++atts1) v
                                  }
                           }
                       ,liftM ActualParamMeta pMetaKindedConst
@@ -323,7 +322,7 @@ pLandingPad = do { reserved "landingpad"
                  ; rt <- pType
                  ; reserved "personality"
                  ; ft <- pType
-                 ; ix <- pFunName -- PersFn
+                 ; ix <- pFunName
                  ; cl <- option Nothing (reserved "cleanup" >> return (Just Cleanup))
                  ; c <- many pClause
                  ; return $ RhsLandingPad $ LandingPad rt ft ix cl c

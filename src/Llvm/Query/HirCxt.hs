@@ -55,7 +55,11 @@ convert_to_FormalParamType :: FunParam -> FunParamType
 convert_to_FormalParamType x = case x of
   FunParamData dt pas ma v -> FunParamDataType dt pas ma
   FunParamByVal dt pas ma v -> FunParamByValType dt pas ma
-  FunParamMeta mk fp -> FunParamMetaType mk fp
+  
+{-  
+convert_to_MetaFunParam :: FunParam -> MetaFunParamType  
+convert_to_MetaFunParam FunParamMeta mk fp = MetaFunParamType mk fp
+-}
 
 irCxtOfModule :: Module a -> IrCxt
 irCxtOfModule (Module tl) =

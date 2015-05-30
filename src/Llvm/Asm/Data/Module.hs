@@ -93,8 +93,9 @@ convertOpMap :: M.Map ConvertOp String
 convertOpMap = M.fromList [(Trunc, "trunc"), (Zext, "zext"), (Sext, "sext")
                           ,(FpTrunc, "fptrunc"), (FpExt, "fpext"), (FpToUi, "fptoui")
                           ,(FpToSi, "fptosi"), (UiToFp, "uitofp"), (SiToFp, "sitofp")
-                          ,(PtrToInt, "ptrtoint"), (IntToPtr, "inttoptr"), (Bitcast, "bitcast")
-                          ,(AddrSpaceCast, "addrspacecast")]
+                          ,(PtrToInt, "ptrtoint"), (IntToPtr, "inttoptr")
+                          ,(Bitcast, "bitcast"), (AddrSpaceCast, "addrspacecast")
+                          ]
 
 -- | Complex Constants <http://llvm.org/releases/3.0/docs/LangRef.html#complexconstants>
 data ComplexConstant = Cstruct Packing [TypedConstOrNull]
@@ -134,7 +135,7 @@ data MdRef = MdRefName MdName
 data MetaConst = McStruct [MetaKindedConst]
                | McString DqString
                | McMdRef MdRef
-               | McRef LocalId
+               | McSsa LocalId
                | McSimple Const
                deriving (Eq,Ord,Show)
 
@@ -252,8 +253,8 @@ data TerminatorInst =
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
                              deriving (Eq,Show)
 
-data ActualParam = ActualParamData Type [ParamAttr] Value [ParamAttr]
-                 | ActualParamLabel Type [ParamAttr] PercentLabel [ParamAttr]
+data ActualParam = ActualParamData Type [ParamAttr] Value -- [ParamAttr]
+                 | ActualParamLabel Type [ParamAttr] PercentLabel -- [ParamAttr]
                  | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 
@@ -291,7 +292,6 @@ data FunctionPrototype = FunctionPrototype
 data Toplevel = ToplevelTriple TlTriple
               | ToplevelDataLayout TlDataLayout
               | ToplevelAlias TlAlias
---              | ToplevelDbgInit TlDbgInit
               | ToplevelUnamedMd TlUnamedMd
               | ToplevelNamedMd TlNamedMd
               | ToplevelDeclare TlDeclare
@@ -312,8 +312,6 @@ data TlDataLayout = TlDataLayout DataLayout deriving (Eq, Show)
 
 data TlAlias = TlAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage)
                AddrNaming (Maybe Linkage) Aliasee deriving (Eq, Show)
-
--- data TlDbgInit = TlDbgInit String Word32 deriving (Eq, Show)
 
 data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Show)
 

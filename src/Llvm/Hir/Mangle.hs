@@ -102,7 +102,7 @@ instance Mangle ParamAttr where
 instance Mangle RetAttr where
   mangle x = render $ printIr x
 
-instance Mangle ActualParam where
+instance Mangle CallOperand where
   mangle x = render $ printIr x
   
 instance Mangle (Type s r) where

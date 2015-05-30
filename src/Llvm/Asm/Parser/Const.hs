@@ -217,7 +217,7 @@ pMetaConst = choice[ char '!' >> choice [ liftM McStruct (braces (sepBy pMetaKin
                                         , liftM (McMdRef . MdRefNode . MdNode) unsignedInt
                                         ]
                     , liftM McSimple pConst
-                    , liftM McRef pLocalId 
+                    , liftM McSsa pLocalId 
                     ]
                                 
                     

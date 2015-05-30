@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, RecordWildCards #-}
 module Llvm.AsmHirConversion.IntrinsicsSpecialization where
 
+import qualified Llvm.Asm.Data as A
 import Llvm.Hir
 import Llvm.ErrorLoc
 import Data.Maybe
@@ -10,24 +11,55 @@ import Data.Maybe
 
 #define FLC  (FileLoc $(srcLoc))
 
+specializeRegisterIntrinsic :: Maybe LocalId -> A.CallSite -> Maybe (Maybe LocalId, MemLen, [A.ActualParam])
+specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
+  (Just r, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (GlobalIdAlphaNum nm))) [m] _) 
+    | (nm == "llvm.read_register.i32" || nm == "llvm.read_register.i64") -> 
+      let ml = case nm of
+            "llvm.read_register.i32" -> MemLenI32
+            "llvm.read_register.i64" -> MemLenI64
+      in Just (Just r, ml, [m])
+  (Nothing, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (GlobalIdAlphaNum nm))) [m,v] _) 
+    | (nm == "llvm.write_register.i32" || nm == "llvm.write_register.i64") -> 
+      let ml = case nm of
+            "llvm.write_register.i32" -> MemLenI32
+            "llvm.write_register.i64" -> MemLenI64
+      in Just (Nothing, ml, [m,v])
+  (_, _) -> Nothing
+
+unspecializeRegisterIntrinsic :: Cinst -> Maybe (GlobalId, Type ScalarB I, [MetaOperand], Maybe LocalId)
+unspecializeRegisterIntrinsic cinst = case cinst of
+  I_llvm_read_register mLen mc r ->
+    let (nm, typ) = case mLen of
+          MemLenI32 -> (GlobalIdAlphaNum "llvm.read_register.i32", i32)
+          MemLenI64 -> (GlobalIdAlphaNum "llvm.read_register.i64", i64)
+    in Just (nm, typ, [MetaOperandMeta mc], Just r)
+  I_llvm_write_register mLen mc val ->
+    let (nm, typ) = case mLen of
+          MemLenI32 -> (GlobalIdAlphaNum "llvm.write_register.i32", i32)
+          MemLenI64 -> (GlobalIdAlphaNum "llvm.write_register.i64", i64)
+    in Just (nm, typ, [MetaOperandMeta mc, MetaOperandData (ucast typ) [] Nothing val], Nothing)
+  _ -> Nothing
+
+
 specializeCallSite :: Maybe LocalId -> FunPtr -> CallFunInterface -> Maybe Cinst
 specializeCallSite lhs fptr csi = case (fptr, csi) of
   (FunId (GlobalIdAlphaNum "llvm.va_start"),
-   CallFunInterface TcNon Ccc [] _ Nothing [ActualParamData t1 [] Nothing v] []) | isNothing lhs -> 
+   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v] []) | isNothing lhs -> 
     Just $ I_llvm_va_start v
   (FunId (GlobalIdAlphaNum "llvm.va_end"),
-   CallFunInterface TcNon Ccc [] _ Nothing [ActualParamData t1 [] Nothing v] []) | isNothing lhs -> 
+   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v] []) | isNothing lhs -> 
     Just $ I_llvm_va_end v
   (FunId (GlobalIdAlphaNum "llvm.va_copy"),
-   CallFunInterface TcNon Ccc [] _ Nothing [ActualParamData t1 [] Nothing v1
-                                   ,ActualParamData t2 [] Nothing v2] []) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
+   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v1
+                                   ,CallOperandData t2 [] Nothing v2] []) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
   (FunId (GlobalIdAlphaNum nm), 
    CallFunInterface TcNon Ccc [] _ Nothing
-   [ActualParamData t1 [] Nothing v1 -- dest
-   ,ActualParamData t2 [] Nothing v2 -- src or setValue
-   ,ActualParamData t3 [] Nothing v3 -- len
-   ,ActualParamData t4 [] Nothing v4 -- align
-   ,ActualParamData t5 [] Nothing v5 -- volatile
+   [CallOperandData t1 [] Nothing v1 -- dest
+   ,CallOperandData t2 [] Nothing v2 -- src or setValue
+   ,CallOperandData t3 [] Nothing v3 -- len
+   ,CallOperandData t4 [] Nothing v4 -- align
+   ,CallOperandData t5 [] Nothing v5 -- volatile
    ] []) | isNothing lhs && (nm == "llvm.memcpy.p0i8.p0i8.i32" 
                              || nm == "llvm.memcpy.p0i8.p0i8.i64"
                              || nm == "llvm.memmove.p0i8.p0i8.i32"
@@ -92,8 +124,8 @@ unspecializeIntrinsics inst = case inst of
         Nothing [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] []) Nothing
   _ -> Nothing
     
-tvToAp :: Ucast t Dtype => T t Value -> ActualParam
-tvToAp (T t v) = ActualParamData (ucast t) [] Nothing v
+tvToAp :: Ucast t Dtype => T t Value -> CallOperand
+tvToAp (T t v) = CallOperandData (ucast t) [] Nothing v
   
                  
                  
