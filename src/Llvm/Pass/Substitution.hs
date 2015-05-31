@@ -72,7 +72,6 @@ instance Substitutable v => Substitutable (ExtractElement r v) where
   substitute chg (ExtractElement v i) =
     ExtractElement (substitute chg v) (substitute chg i)
 
-
 instance Substitutable v => Substitutable (InsertElement r v) where
   substitute chg (InsertElement v e i) =
     InsertElement (substitute chg v) (substitute chg e) (substitute chg i)
@@ -83,7 +82,6 @@ instance Substitutable v => Substitutable (ExtractValue v) where
 instance Substitutable v => Substitutable (InsertValue v) where
   substitute chg (InsertValue v e ns) =
     InsertValue (substitute chg v) (substitute chg e) ns
-
 
 instance Substitutable Const where
   substitute chg@Changer{..} cst =
@@ -669,9 +667,8 @@ instance Substitutable Cinst where
         i@I_llvm_frameaddress{..} -> i { level = substitute chg level }
         I_llvm_frameescape vs -> I_llvm_frameescape (substitute chg vs)
         i@I_llvm_framerecover{..} -> undefined
-        i@I_llvm_read_register{..} -> i
-        i@I_llvm_write_register{..} -> i { value = substitute chg value
-                                         }
+        i@I_llvm_read_register {..} -> i { result = substitute chg result }
+        i@I_llvm_write_register {..} -> i { value = substitute chg value }
         i@I_llvm_stacksave{..} -> i { result = cid result }
         i@I_llvm_stackrestore{..} -> i { pointer = (substitute chg) pointer }
         i@I_llvm_prefetch{..} -> undefined
@@ -696,7 +693,7 @@ instance Substitutable Cinst where
                                  , len = (substitute chg) len
                                  , align = (substitute chg) align
                                  , isvolatile = (substitute chg) isvolatile
-                                 }
+                                 }                                                   
                            {-
   i@I_llvm_math_f32 :: MathUnaryOp -> Value -> LocalId -> Cinst;
   i@I_llvm_math_f64 :: MathUnaryOp -> Value -> LocalId -> Cinst;
@@ -722,8 +719,13 @@ instance Substitutable Cinst where
 
 
 instance Substitutable Minst where
-  substitute chg (Minst cs g mps) =
-    Minst cs (substitute chg g) (substitute chg mps) 
+  substitute chg mi = case mi of
+    Minst cs g mps -> Minst cs (substitute chg g) (substitute chg mps) 
+    M_llvm_dbg_declare m1 m2 -> M_llvm_dbg_declare (substitute chg m1) (substitute chg m2)
+    M_llvm_dbg_func_start m -> M_llvm_dbg_func_start (substitute chg m)
+    M_llvm_dbg_stoppoint m1 m2 m3 -> M_llvm_dbg_stoppoint (substitute chg m1) (substitute chg m2) (substitute chg m3)
+    M_llvm_dbg_value m1 m2 m3 -> M_llvm_dbg_value (substitute chg m1) (substitute chg m2) (substitute chg m3)    
+    M_llvm_dbg_region_end m -> M_llvm_dbg_region_end (substitute chg m)
 
 instance Substitutable MetaOperand where
   substitute chg mp = case mp of
@@ -750,13 +752,18 @@ instance Substitutable Tinst where
     T_unwind -> T_unwind
 
 instance Substitutable CallFunInterface where
-  substitute chg x@CallFunInterface{..} = x { cfi_actualParams = substitute chg cfi_actualParams}
+  substitute chg x@CallFunInterface{..} = x { cfi_firstParamAsRet = substitute chg cfi_firstParamAsRet
+                                            , cfi_actualParams = substitute chg cfi_actualParams}
 
 instance Substitutable InvokeFunInterface where
-  substitute chg x@InvokeFunInterface{..} = x { ifi_actualParams = substitute chg ifi_actualParams}
+  substitute chg x@InvokeFunInterface{..} = x { ifi_firstParamAsRet = substitute chg ifi_firstParamAsRet
+                                              , ifi_actualParams = substitute chg ifi_actualParams}
 
 instance Substitutable CallAsmInterface where
   substitute chg x@CallAsmInterface{..} = x { cai_actualParams = substitute chg cai_actualParams}
+
+instance Substitutable FirstOperandAsRet where
+  substitute chg (FirstOperandAsRet dt pa ma v) = FirstOperandAsRet dt pa ma (substitute chg v)
 
 instance Substitutable CallOperand where
   substitute chg c = case c of

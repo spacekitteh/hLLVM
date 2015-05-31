@@ -62,11 +62,6 @@ instance IrPrint TlAlias where
     hsep [printIr lhs, equals, printIr vis, printIr dll, printIr tlm
          , printIr na, text "alias", printIr link, printIr aliasee]
 
-{-
-instance IrPrint TlDbgInit where
-  printIr (TlDbgInit s i) = hsep [text "dbginit", text s, integral i]
--}
-
 instance IrPrint TlUnamedMd where
   printIr (TlUnamedMd s t) = char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
 
@@ -663,6 +658,8 @@ instance IrPrint Cinst where
     I_llvm_memset md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memset" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
     I_llvm_read_register ml ma lhs -> hsep [printIr lhs, equals, text "llvm.read_register", printIr ml, printIr ma]
     I_llvm_write_register ml ma mv -> hsep [text "llvm.write_register", printIr ml, printIr ma, printIr mv]
+    I_llvm_stacksave lhs -> hsep [printIr lhs, equals, text "llvm.stacksave"]
+    I_llvm_stackrestore v -> hsep [text "llvm.stackrestore", printIr v]
 
 instance IrPrint Minst where
   printIr mi = case mi of

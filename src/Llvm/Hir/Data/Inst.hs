@@ -943,7 +943,6 @@ data Cinst where {
                            , meta :: MetaKindedConst
                            , value :: Value
                            } -> Cinst;
-  
   I_llvm_stacksave :: { result :: LocalId } -> Cinst;
   I_llvm_stackrestore :: { pointer :: T (Type ScalarB P) Value } -> Cinst;
   I_llvm_prefetch :: Value -> Value -> Value -> Value -> Cinst;

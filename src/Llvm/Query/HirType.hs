@@ -11,7 +11,7 @@ import Llvm.ErrorLoc
 
 import Llvm.Hir.Data.Type
 import Llvm.Hir.Data.DataLayoutInfo
-import Llvm.Hir.Composer (i1)
+import Llvm.Hir.Composer (i1,i8,ptr0)
 import qualified Data.Map as M
 import qualified Data.Bits as B 
 import Llvm.Hir.Data.Inst
@@ -226,15 +226,10 @@ getStructLayout te@TypeEnv{..} (pk, tys) =
                       Packed -> AlignInByte 1
                       Unpacked -> getTypeAlignment te ty AlignAbi
                     (SizeInByte nextOffsetByte) = nextDataFieldOffset curSize tyAlign
-                    {-
-                                                  if curSizeByte B..&. (tyAlignByte - 1) /= 0 then roundUpAlignment curSize tyAlign
-                                                  else curSize -}
                     (SizeInByte tySize) = getTypeAllocSize te ty
                 in (SizeInByte $ nextOffsetByte + tySize, (OffsetInByte nextOffsetByte):offsets, AlignInByte $ max tyAlignByte structAlignment0)
               ) (SizeInByte 0, [], AlignInByte 1) tys
   in StructLayout { structSize = nextDataFieldOffset totalSize alignment 
-                                 {- if (totalSizeByte B..&. (alignmentByte - 1)) /= 0 then roundUpAlignment totalSize alignment
-                                 else totalSize -}
                   , structAlignment = alignment
                   , numElements = toInteger $ length tys
                   , memberOffsets = reverse offsets
@@ -636,6 +631,8 @@ instance TypeOf Cinst Dtype where
     I_llvm_memset{..}->Nothing
     I_llvm_returnaddress{..} -> Nothing
     I_llvm_frameaddress{..} -> Nothing
+    I_llvm_stacksave{..} -> Just $ ucast $ ptr0 i8
+    I_llvm_stackrestore{..} -> Nothing
     I_llvm_libm_una{..} -> case muop of
       Sqrt t _ -> Just $ ucast t
       Sin t _ -> Just $ ucast t

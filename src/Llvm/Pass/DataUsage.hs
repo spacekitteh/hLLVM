@@ -459,6 +459,10 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                              $ aTv addAddrStoringValue dest
                              $ aTv addAddrCaptured dest
                              $ aTv addAddrCaptured setValue f
+        I_llvm_read_register{..} -> f                             
+        I_llvm_write_register{..} -> f
+        I_llvm_stacksave{..} -> f
+        I_llvm_stackrestore{..} -> f
         I_llvm_libm_una{..} -> f
         I_llvm_libm_bin{..} -> f
         I_llvm_powi{..} -> f
@@ -470,6 +474,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
     getValuesFromParams :: Maybe FirstOperandAsRet -> [CallOperand] -> S.Set Value
     getValuesFromParams fp ls = let x = foldl (\p e -> case e of
                                                  CallOperandData _ _ _ v -> S.insert v p
+                                                 CallOperandByVal _ _ _ v -> S.insert v p
                                                  _ -> p
                                               ) S.empty ls
                                 in maybe x (\(FirstOperandAsRet _ _ _ v) -> S.insert v x) fp

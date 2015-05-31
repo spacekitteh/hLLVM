@@ -86,6 +86,12 @@ specializeCallSite lhs fptr csi = case (fptr, csi) of
                                     (T (dcast FLC t1) v1) (T (dcast FLC t2) v2) (T (dcast FLC t3) v3)
                                     (T (dcast FLC t4) v4) (T (dcast FLC t5) v5)  
     in Just $ mod
+  (FunId (GlobalIdAlphaNum "llvm.stacksave"),
+   CallFunInterface TcNon Ccc [] _ Nothing [] []) | isJust lhs -> 
+    Just $ I_llvm_stacksave $ fromJust lhs
+  (FunId (GlobalIdAlphaNum "llvm.stackrestore"),
+   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v] []) | isNothing lhs -> 
+    Just $ I_llvm_stackrestore (T (dcast FLC t1) v)
   _ -> Nothing
 
 
@@ -122,12 +128,16 @@ unspecializeIntrinsics inst = case inst of
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
        (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
         Nothing [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] []) Nothing
+  I_llvm_stacksave v -> 
+    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stacksave")) 
+    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeScalarP $ ptr0 i8)) Nothing [] []) (Just v)
+  I_llvm_stackrestore tv -> 
+    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stackrestore")) 
+    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) Nothing [tvToAp tv] []) Nothing
   _ -> Nothing
     
 tvToAp :: Ucast t Dtype => T t Value -> CallOperand
 tvToAp (T t v) = CallOperandData (ucast t) [] Nothing v
-  
-                 
                  
 specializeTlGlobal :: TlGlobal -> Maybe TlIntrinsic
 specializeTlGlobal tl = case tl of

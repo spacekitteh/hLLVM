@@ -2,6 +2,7 @@
 module Llvm.Query.HirCxt where
 import qualified Llvm.Hir.Data as Ci
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Llvm.Hir.Data
 import Llvm.Hir.Print
 import qualified Compiler.Hoopl as H
@@ -13,7 +14,7 @@ data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
                        } deriving (Eq, Ord, Show)
 
 data FunCxt = FunCxt { funInterface :: FunctionInterface
-                     , dbgDeclares :: M.Map Ci.LocalId Ci.MdRef
+                     , dbgDeclares :: S.Set (Minst, [Dbg])
                      } deriving (Eq, Ord, Show)
 
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
@@ -27,9 +28,9 @@ data IrCxt = IrCxt { globalCxt :: GlobalCxt
                    , funCxt :: FunCxt
                    } deriving (Eq, Ord, Show)
 
-
+convert_to_FunctionDeclareType :: FunctionInterface -> FunctionDeclare
 convert_to_FunctionDeclareType
-  (FunctionInterface {..}) =
+  FunctionInterface {..} =
     FunctionDeclare { fd_linkage = fi_linkage
                     , fd_visibility = fi_visibility
                     , fd_dllstorage = fi_dllstorage
@@ -54,8 +55,8 @@ convert_to_FormalParamTypeList (FunParamList l ma fas) =
 
 convert_to_FormalParamType :: FunParam -> FunParamType
 convert_to_FormalParamType x = case x of
-  FunParamData dt pas ma v -> FunParamDataType dt pas ma
-  FunParamByVal dt pas ma v -> FunParamByValType dt pas ma
+  FunParamData dt pas ma _ -> FunParamDataType dt pas ma
+  FunParamByVal dt pas ma _ -> FunParamByValType dt pas ma
 
 
 irCxtOfModule :: Module a -> IrCxt
@@ -135,14 +136,13 @@ instance IrPrint IrCxt where
                         $+$ text "funCxt:" <+> printIr l
 
 
-
 funCxtOfTlDefine :: TlDefine a -> FunCxt
 funCxtOfTlDefine (TlDefine fi _ graph) = 
-  let dbgs = H.foldGraphNodes fld graph M.empty
+  let dbgs = H.foldGraphNodes fld graph S.empty
   in FunCxt { funInterface = fi
             , dbgDeclares = dbgs }
   where
-    fld :: Node a e x -> M.Map Ci.LocalId Ci.MdRef -> M.Map Ci.LocalId Ci.MdRef
+    fld :: Node a e x -> S.Set (Minst, [Dbg]) -> S.Set (Minst, [Dbg])
     fld n = case n of
-      Ci.Mnode v _ -> id
+      Ci.Mnode m@(M_llvm_dbg_declare _ _) dbgs -> S.insert (m, dbgs) 
       _ -> id
