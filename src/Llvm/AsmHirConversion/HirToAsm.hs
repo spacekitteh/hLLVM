@@ -497,12 +497,13 @@ instance Conversion I.GlobalOrLocalId (Rm A.GlobalOrLocalId) where
     convert g = return g
 
 instance Conversion I.Minst (Rm A.ComputingInst) where
-  convert (I.Minst cst fn params) = 
-    do { fna <- convert (I.FunId fn)
-       ; cst0 <- convert cst
-       ; apa <- mapM convert params
-       ; return $ A.ComputingInst Nothing $ A.RhsCall A.TcNon $ A.CallSiteFun Nothing [] cst0 fna apa []
-       }
+  convert mi = 
+    let I.Minst cst fn params = unspecializeMinst mi
+    in do { fna <- convert (I.FunId fn)
+          ; cst0 <- convert cst
+          ; apa <- mapM convert params
+          ; return $ A.ComputingInst Nothing $ A.RhsCall A.TcNon $ A.CallSiteFun Nothing [] cst0 fna apa []
+          }
 
 instance Conversion I.Cinst (Rm A.ComputingInst) where
   convert cinst = case unspecializeRegisterIntrinsic cinst of

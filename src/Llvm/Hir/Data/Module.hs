@@ -59,7 +59,11 @@ data TlAlias = TlAlias { tla_lhs :: Ci.GlobalId
                        , tla_aliasee :: Ci.Aliasee
                        } deriving (Eq, Ord, Show)
 
-data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Ord, Show)
+data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst 
+                | TlUnamedMd_DW_subprogram Word32 MetaKindedConst
+                | TlUnamedMd_DW_file_type Word32 MetaKindedConst
+                deriving (Eq, Ord, Show)
+
 
 data TlNamedMd = TlNamedMd String [Ci.MdNode] deriving (Eq, Ord, Show)
 
@@ -92,17 +96,6 @@ data FunctionDeclare = FunctionDeclare { fd_linkage :: Maybe Linkage
                                        } deriving (Eq,Ord,Show)
                                                   
 data TlDeclare = TlDeclare FunctionDeclare deriving (Eq)
-
-
-{-
-data MetaFunParamType = MetaFunParamType MetaKind Fparam 
-                      deriving (Eq, Ord, Show)
-
-data TlMetaFunDeclare = TlMetaFunDeclare { metafun_name :: GlobalId  
-                                         , metafun_param_list :: [MetaFunParamType]
-                                         }
--}
-
 
 type NOOP = ()
 

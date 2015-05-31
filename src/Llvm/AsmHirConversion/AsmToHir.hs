@@ -625,7 +625,6 @@ convert_Const x =
   in case x of
     A.C_simple a -> return $ convert_SimpleConst a
     A.C_complex a -> convert_ComplexConstant a
---    A.C_localId a -> return $ I.C_localId a
     A.C_labelId a -> Md.liftM I.C_labelId (convert_LabelId a)
     A.C_blockAddress g a -> do { a' <- convert_PercentLabel a
                               ; return $ I.C_block g a'
@@ -857,7 +856,7 @@ convert_to_Minst x = case x of
        ; let ert = A.splitCallReturnType t
              erta = eitherRet mp ert
        ; apsa <- mapM convert_MetaParam aps                
-       ; return (Just $ I.Minst erta fna apsa)
+       ; return (Just $ specializeMinst $ I.Minst erta fna apsa)
        }
   _ -> return Nothing 
 

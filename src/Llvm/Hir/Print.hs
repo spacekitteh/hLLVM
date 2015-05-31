@@ -665,7 +665,13 @@ instance IrPrint Cinst where
     I_llvm_write_register ml ma mv -> hsep [text "llvm.write_register", printIr ml, printIr ma, printIr mv]
 
 instance IrPrint Minst where
-  printIr (Minst cs fn params) = printIr cs <+> printIr fn <+> hsep (fmap printIr params)
+  printIr mi = case mi of
+    Minst cs fn params -> printIr cs <+> printIr fn <+> hsep (fmap printIr params)
+    M_llvm_dbg_declare m1 m2 -> text "llvm.dbg.declare" <+> printIr m1 <+> printIr m2
+    M_llvm_dbg_func_start m1 -> text "llvm.dbg.func.start" <+> printIr m1
+    M_llvm_dbg_stoppoint m1 m2 m3 -> text "llvm.dbg.stoppoint" <+> printIr m1 <+> printIr m2 <+> printIr m3
+    M_llvm_dbg_value m1 m2 m3 -> text "llvm.dbg.value" <+> printIr m1 <+> printIr m2 <+> printIr m3   
+    M_llvm_dbg_region_end m1 -> text "llvm.dbg.region.end" <+> printIr m1
 
 instance IrPrint MemLen where
   printIr m = case m of

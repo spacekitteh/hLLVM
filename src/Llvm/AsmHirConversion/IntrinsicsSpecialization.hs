@@ -171,4 +171,23 @@ unspecializeTlIntrinsics tl = case tl of
       
     
     
+specializeMinst :: Minst -> Minst    
+specializeMinst mi = case mi of
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.declare") [m1,m2] ->  M_llvm_dbg_declare m1 m2
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.value") [m1,m2,m3] -> M_llvm_dbg_value m1 m2 m3
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.func.start") [m1] -> M_llvm_dbg_func_start m1
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.region.end") [m1] -> M_llvm_dbg_region_end m1  
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.stopppoint") [m1,m2,m3] -> M_llvm_dbg_stoppoint m1 m2 m3
+  _ -> mi
+    
+    
+unspecializeMinst :: Minst -> Minst
+unspecializeMinst mi = case mi of
+  M_llvm_dbg_declare m1 m2 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.declare") [m1,m2]
+  M_llvm_dbg_value m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.value") [m1,m2,m3]
+  M_llvm_dbg_func_start m1 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.func.start") [m1]
+  M_llvm_dbg_region_end m1 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.region.end") [m1]
+  M_llvm_dbg_stoppoint m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.stoppoint") [m1,m2,m3]  
+  _ -> mi
+                            
     

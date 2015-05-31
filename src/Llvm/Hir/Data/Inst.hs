@@ -1021,7 +1021,16 @@ data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)
 
 -- | LLVM metadata instructions
-data Minst = Minst CallSiteType GlobalId [MetaOperand] deriving (Eq, Ord, Show)
+data Minst = Minst CallSiteType GlobalId [MetaOperand]
+           | M_llvm_dbg_declare MetaOperand MetaOperand
+           | M_llvm_dbg_func_start MetaOperand
+           | M_llvm_dbg_stoppoint MetaOperand MetaOperand MetaOperand
+           | M_llvm_dbg_value MetaOperand MetaOperand MetaOperand
+           | M_llvm_dbg_region_end MetaOperand
+           deriving (Eq, Ord, Show)
+
+
+
 
 data MetaOperand = MetaOperandMeta MetaKindedConst
                  | MetaOperandData Dtype [ParamAttr] (Maybe Alignment) Value

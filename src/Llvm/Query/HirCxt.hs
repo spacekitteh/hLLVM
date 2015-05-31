@@ -1,10 +1,10 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, GADTs #-}
 module Llvm.Query.HirCxt where
-import qualified Llvm.Hir.Data.Inst as Ci
+import qualified Llvm.Hir.Data as Ci
 import qualified Data.Map as M
 import Llvm.Hir.Data
-import Llvm.Hir.Data.DataLayoutInfo
 import Llvm.Hir.Print
+import qualified Compiler.Hoopl as H
 
 data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
                        , targetTriple :: Ci.TargetTriple
@@ -12,14 +12,15 @@ data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
                        , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
-data FunCxt = FunCxt { funName :: String
-                     , funParameters :: M.Map Ci.LocalId Ci.Dtype
+data FunCxt = FunCxt { funInterface :: FunctionInterface
+                     , dbgDeclares :: M.Map Ci.LocalId Ci.MdRef
                      } deriving (Eq, Ord, Show)
 
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
                            , functions :: M.Map Ci.GlobalId FunctionDeclare
                            , attributes :: M.Map Word32 [FunAttr]
+                           , unamedMetadata :: M.Map Word32 MetaKindedConst
                            } deriving (Eq, Ord, Show)
 
 data IrCxt = IrCxt { globalCxt :: GlobalCxt
@@ -55,11 +56,7 @@ convert_to_FormalParamType :: FunParam -> FunParamType
 convert_to_FormalParamType x = case x of
   FunParamData dt pas ma v -> FunParamDataType dt pas ma
   FunParamByVal dt pas ma v -> FunParamByValType dt pas ma
-  
-{-  
-convert_to_MetaFunParam :: FunParam -> MetaFunParamType  
-convert_to_MetaFunParam FunParamMeta mk fp = MetaFunParamType mk fp
--}
+
 
 irCxtOfModule :: Module a -> IrCxt
 irCxtOfModule (Module tl) =
@@ -84,8 +81,8 @@ irCxtOfModule (Module tl) =
                       ) tl
       funs = fmap (\tl -> case tl of
                       ToplevelDeclare (TlDeclare fp@FunctionDeclare{..}) -> (fd_fun_name, fp)
-                      ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> (fi_fun_name, convert_to_FunctionDeclareType fp)
-                  )
+                      ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> 
+                        (fi_fun_name, convert_to_FunctionDeclareType fp))
              $ filter (\x -> case x of
                           ToplevelDeclare _ -> True
                           ToplevelDefine{..} -> True
@@ -96,6 +93,11 @@ irCxtOfModule (Module tl) =
                            ToplevelAttribute _ -> True
                            _ -> False
                        ) tl
+      unameMeta = fmap (\(ToplevelUnamedMd (TlUnamedMd n mc)) -> (n, mc))
+                  $ filter (\x -> case x of
+                               ToplevelUnamedMd _ -> True
+                               _ -> False
+                           ) tl
   in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
                                                        , targetTriple = tt
                                                        , typedefs = M.fromList tdefs
@@ -104,9 +106,10 @@ irCxtOfModule (Module tl) =
                                    , globals = M.fromList glbs
                                    , functions = M.fromList funs
                                    , attributes = M.fromList attrs
+                                   , unamedMetadata = M.fromList unameMeta
                                    }
-           , funCxt = FunCxt { funName = ""
-                             , funParameters = M.empty
+           , funCxt = FunCxt { funInterface = error "funInterface is not initialized." 
+                             , dbgDeclares = error "dbgDeclare is not initialized."
                              }
            }
 
@@ -117,15 +120,29 @@ instance IrPrint TypeEnv where
                                $+$ text "opaqueTypedefs:" <+> printIr otd
 
 instance IrPrint GlobalCxt where
-  printIr (GlobalCxt te gl fns atts) = text "typeEnv:" <+> printIr te
-                                       $+$ text "globals:" <+> printIr gl
-                                       $+$ text "functions:" <+> printIr fns
-                                       $+$ text "attributes:" <+> printIr atts
+  printIr (GlobalCxt te gl fns atts um) = text "typeEnv:" <+> printIr te
+                                          $+$ text "globals:" <+> printIr gl
+                                          $+$ text "functions:" <+> printIr fns
+                                          $+$ text "attributes:" <+> printIr atts
+                                          $+$ text "unamedMetadata:" <+> printIr um
 
 instance IrPrint FunCxt where
-  printIr (FunCxt fn p) = text "funName:" <+> text fn
-                          $+$ text "funParameters:" <+> printIr p
+  printIr (FunCxt fi dbgDeclares) = text "funInterface:" <+> printIr fi
+                                    $+$ text "dbgDeclares:" <+> printIr dbgDeclares
 
 instance IrPrint IrCxt where
   printIr (IrCxt g l) = text "globalCxt:" <+> printIr g
                         $+$ text "funCxt:" <+> printIr l
+
+
+
+funCxtOfTlDefine :: TlDefine a -> FunCxt
+funCxtOfTlDefine (TlDefine fi _ graph) = 
+  let dbgs = H.foldGraphNodes fld graph M.empty
+  in FunCxt { funInterface = fi
+            , dbgDeclares = dbgs }
+  where
+    fld :: Node a e x -> M.Map Ci.LocalId Ci.MdRef -> M.Map Ci.LocalId Ci.MdRef
+    fld n = case n of
+      Ci.Mnode v _ -> id
+      _ -> id
