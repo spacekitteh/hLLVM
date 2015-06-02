@@ -19,8 +19,7 @@ import Llvm.Hir.Cast
 import Llvm.Util.Monadic (maybeM, pairM)
 import Llvm.AsmHirConversion.TypeConversion
 import Control.Monad.Reader
-import Llvm.AsmHirConversion.IntrinsicsSpecialization
-import Llvm.AsmHirConversion.CallSpecialization
+import Llvm.AsmHirConversion.Specialization
 import Llvm.ErrorLoc
 
 
@@ -1192,14 +1191,10 @@ instance Conversion I.TlDataLayout (Rm A.TlDataLayout) where
 
 instance Conversion I.TlAlias (Rm A.TlAlias) where  
   convert (I.TlAlias  g v dll tlm na l a) = convert a >>= return . (A.TlAlias g v dll tlm na l)
-
-{-
-instance Conversion I.TlDbgInit (Rm A.TlDbgInit) where
-  convert (I.TlDbgInit s i) = return (A.TlDbgInit s i)
--}
   
 instance Conversion I.TlUnamedMd (Rm A.TlUnamedMd) where  
-  convert (I.TlUnamedMd s tv) = Md.liftM (A.TlUnamedMd s) (convert tv) 
+  convert x = let (I.TlUnamedMd s tv) = unspecializeUnamedMd x
+              in Md.liftM (A.TlUnamedMd s) (convert tv) 
 
 instance Conversion I.TlNamedMd (Rm A.TlNamedMd) where  
   convert (I.TlNamedMd m ns) = Md.liftM (A.TlNamedMd m) (mapM convert ns)

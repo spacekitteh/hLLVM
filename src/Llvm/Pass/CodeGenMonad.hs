@@ -58,10 +58,6 @@ data CodeCache ad = CodeCache { insts :: [Node ad O O]
 
 type Cc ad a = Context (CodeCache ad) LocalId String a
 
-{-
-mkNode :: Cinst -> Node ad O O
-mkNode c = Cnode c
--}
 
 newLocalId :: LocalId -> String -> LocalId
 newLocalId l suffix = case l of
@@ -81,8 +77,6 @@ getLocalBase g = case g of
   GlobalIdAlphaNum s -> LocalIdDqString $ "@" ++ s
   GlobalIdDqString s -> LocalIdDqString $ "@" ++ s
         
-                        
-       
 baseOf :: Value -> LocalId       
 baseOf nb = case nb of
   Val_ssa s -> s
@@ -101,13 +95,16 @@ new :: String -> (LocalId -> Cinst) -> Cc ad LocalId
 new rhsPrefix partialInst = 
   do { s <- get
      ; bs <- ask
-     ; lhs <- if rhsPrefix == "" then undefined
-              else let x = newLocalId bs rhsPrefix
-                   in if S.member x (usedLhs s) 
-                      then error $ (show x) ++ " is already defined in the current computation with the base: " ++ show bs
-                      else modify (\cc@CodeCache{..} -> cc {usedLhs = S.insert x usedLhs}) >> return x 
-     ; modify (\cc@CodeCache{..} -> cc { insts = (Cnode (partialInst lhs) []):insts})
-     ; return lhs
+     ; if bs == undefined then
+         error "irrefutable error:the new value base name is not specified"
+       else do { lhs <- if rhsPrefix == "" then undefined
+                        else let x = newLocalId bs rhsPrefix
+                             in if S.member x (usedLhs s) 
+                                then return x
+                                else modify (\cc@CodeCache{..} -> cc {usedLhs = S.insert x usedLhs}) >> return x 
+               ; modify (\cc@CodeCache{..} -> cc { insts = (Cnode (partialInst lhs) []):insts})
+               ; return lhs
+               }
      }
 
 nativeNewValue :: String -> (LocalId -> Cinst) -> Cc ad Value
@@ -122,11 +119,13 @@ newNode n = modify (\cc@CodeCache{..} -> cc { insts = n:insts })
 theEnd :: Cc ad ()
 theEnd = return ()
 
+undefinedBase :: LocalId
+undefinedBase = LocalIdDqString "base is not specified"
 
 emitNodes :: Cc ad a -> [Node ad O O]
 emitNodes cca = fst (emitAll cca)
 
 emitAll :: Cc ad a -> ([Node ad O O], a)
-emitAll cca = case runContextWithSnR cca (CodeCache [] S.empty) (LocalIdDqString "base is not specified") of
+emitAll cca = case runContextWithSnR cca (CodeCache [] S.empty) undefinedBase of
   Left e -> error (show e)
   Right (a,s) -> (reverse (insts s), a)

@@ -18,8 +18,7 @@ import Llvm.Util.Monadic (maybeM, pairM)
 import Llvm.AsmHirConversion.TypeConversion
 import Data.Maybe (fromJust)
 import Control.Monad.Reader
-import Llvm.AsmHirConversion.IntrinsicsSpecialization
-import Llvm.AsmHirConversion.CallSpecialization
+import Llvm.AsmHirConversion.Specialization
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: A.GlobalId
@@ -1628,7 +1627,9 @@ convert_TlAlias :: A.TlAlias -> (MM I.TlAlias)
 convert_TlAlias (A.TlAlias  g v dll tlm na l a) = convert_Aliasee a >>= return . (I.TlAlias g v dll tlm na l)
   
 convert_TlUnamedMd :: A.TlUnamedMd -> (MM I.TlUnamedMd)
-convert_TlUnamedMd (A.TlUnamedMd s tv) = convert_MetaKindedConst tv >>= return . (I.TlUnamedMd s)
+convert_TlUnamedMd (A.TlUnamedMd s tv) = do { mc <- convert_MetaKindedConst tv 
+                                            ; return $ specializeUnamedMd (I.TlUnamedMd s mc) 
+                                            }
   
                                                  
 convert_TlNamedMd :: A.TlNamedMd -> (MM I.TlNamedMd)

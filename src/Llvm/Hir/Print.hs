@@ -63,7 +63,10 @@ instance IrPrint TlAlias where
          , printIr na, text "alias", printIr link, printIr aliasee]
 
 instance IrPrint TlUnamedMd where
-  printIr (TlUnamedMd s t) = char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
+  printIr x = case x of
+    TlUnamedMd s t -> char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
+    TlUnamedMd_DW_file_type n mc -> char '!'<>(integer $ fromIntegral n) <+> equals <+> printIr mc
+      
 
 instance IrPrint TlNamedMd where
   printIr (TlNamedMd mv nds) = char '!' <> text mv <+> 

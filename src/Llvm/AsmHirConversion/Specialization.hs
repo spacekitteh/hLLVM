@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE CPP, TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, RecordWildCards #-}
-module Llvm.AsmHirConversion.IntrinsicsSpecialization where
+module Llvm.AsmHirConversion.Specialization where
 
 import qualified Llvm.Asm.Data as A
 import Llvm.Hir
@@ -10,6 +10,36 @@ import Data.Maybe
 
 
 #define FLC  (FileLoc $(srcLoc))
+
+
+specializeRetAttr :: ParamAttr -> RetAttr    
+specializeRetAttr x = case x of
+  PaZeroExt -> RetAttrZeroExt
+  PaSignExt -> RetAttrSignExt
+  PaInReg -> RetAttrInReg
+  PaNoAlias -> RetAttrNoAlias
+  PaDereferenceable n -> RetAttrDereferenceable n
+  _ -> errorLoc FLC $ show x
+
+unspecializeRetAttr :: RetAttr -> ParamAttr  
+unspecializeRetAttr x = case x of
+  RetAttrZeroExt -> PaZeroExt
+  RetAttrSignExt -> PaSignExt
+  RetAttrInReg -> PaInReg
+  RetAttrNoAlias -> PaNoAlias
+  RetAttrDereferenceable n -> PaDereferenceable n
+
+
+specializeParamAsRetAttr :: ParamAttr -> Maybe ParamAsRetAttr
+specializeParamAsRetAttr x = case x of
+  PaSRet -> Just ParamAsRetAttr
+  _ -> Nothing
+
+
+unspecializeParamAsRetAttr :: ParamAsRetAttr -> ParamAttr
+unspecializeParamAsRetAttr x = case x of
+  ParamAsRetAttr -> PaSRet
+
 
 specializeRegisterIntrinsic :: Maybe LocalId -> A.CallSite -> Maybe (Maybe LocalId, MemLen, [A.ActualParam])
 specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
@@ -201,3 +231,15 @@ unspecializeMinst mi = case mi of
   _ -> mi
                             
     
+       
+specializeUnamedMd :: TlUnamedMd -> TlUnamedMd
+specializeUnamedMd x = case x of
+  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> TlUnamedMd_DW_file_type n mc
+  _ -> x
+  
+  
+unspecializeUnamedMd :: TlUnamedMd -> TlUnamedMd  
+unspecializeUnamedMd x = case x of
+  TlUnamedMd_DW_file_type n mc -> (TlUnamedMd n (MetaKindedConst Mmetadata 
+                                                 (McStruct [MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786473")), mc])))
+  _ -> x
