@@ -95,9 +95,9 @@ new :: String -> (LocalId -> Cinst) -> Cc ad LocalId
 new rhsPrefix partialInst = 
   do { s <- get
      ; bs <- ask
-     ; if bs == undefined then
+     ; if bs == unspecifiedBase then
          error "irrefutable error:the new value base name is not specified"
-       else do { lhs <- if rhsPrefix == "" then undefined
+       else do { lhs <- if rhsPrefix == "" then errorLoc FLC $ "rhsPrefix is an empty string"
                         else let x = newLocalId bs rhsPrefix
                              in if S.member x (usedLhs s) 
                                 then return x
@@ -119,13 +119,13 @@ newNode n = modify (\cc@CodeCache{..} -> cc { insts = n:insts })
 theEnd :: Cc ad ()
 theEnd = return ()
 
-undefinedBase :: LocalId
-undefinedBase = LocalIdDqString "base is not specified"
+unspecifiedBase :: LocalId
+unspecifiedBase = LocalIdDqString "base is not specified"
 
 emitNodes :: Cc ad a -> [Node ad O O]
 emitNodes cca = fst (emitAll cca)
 
 emitAll :: Cc ad a -> ([Node ad O O], a)
-emitAll cca = case runContextWithSnR cca (CodeCache [] S.empty) undefinedBase of
+emitAll cca = case runContextWithSnR cca (CodeCache [] S.empty) unspecifiedBase of
   Left e -> error (show e)
   Right (a,s) -> (reverse (insts s), a)

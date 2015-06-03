@@ -1,7 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, TemplateHaskell, CPP #-}
 {-# LANGUAGE RecordWildCards,  TypeSynonymInstances, FlexibleInstances #-}
 module Llvm.Pass.Substitution where
+
+import Llvm.ErrorLoc
+#define FLC (FileLoc $(srcLoc))
 
 import Control.Monad
 import Data.Maybe
@@ -661,21 +664,21 @@ instance Substitutable Cinst where
         i@I_llvm_gcroot{..} -> i { ptrloc = substitute chg ptrloc
                                  , metadata = substitute chg metadata
                                  }
-        i@I_llvm_gcread{..} -> undefined
-        i@I_llvm_gcwrite{..} -> undefined
+        i@I_llvm_gcread{..} -> errorLoc FLC "unsupport"
+        i@I_llvm_gcwrite{..} -> errorLoc FLC "unsupport"
         i@I_llvm_returnaddress{..} -> i { level = substitute chg level }
         i@I_llvm_frameaddress{..} -> i { level = substitute chg level }
         I_llvm_frameescape vs -> I_llvm_frameescape (substitute chg vs)
-        i@I_llvm_framerecover{..} -> undefined
+        i@I_llvm_framerecover{..} -> errorLoc FLC "unsupport"
         i@I_llvm_read_register {..} -> i { result = substitute chg result }
         i@I_llvm_write_register {..} -> i { value = substitute chg value }
         i@I_llvm_stacksave{..} -> i { result = cid result }
         i@I_llvm_stackrestore{..} -> i { pointer = (substitute chg) pointer }
-        i@I_llvm_prefetch{..} -> undefined
-        i@I_llvm_pcmarker{..} -> undefined
+        i@I_llvm_prefetch{..} -> errorLoc FLC "unsupport"
+        i@I_llvm_pcmarker{..} -> errorLoc FLC "unsupport"
         i@I_llvm_readcyclecounter{..} -> i { result = cid result}
-        i@I_llvm_clear_cache {..} -> undefined
-        i@I_llvm_instprof_increment{..} -> undefined
+        i@I_llvm_clear_cache {..} -> errorLoc FLC "unsupport"
+        i@I_llvm_instprof_increment{..} -> errorLoc FLC "unsupport"
         i@I_llvm_memcpy{..} -> i { dest = (substitute chg) dest
                                  , src = (substitute chg) src
                                  , len = (substitute chg) len
@@ -903,7 +906,8 @@ instance Substitutable Aliasee where
     AliaseeGEPV x -> AliaseeGEPV (substitute chg x)
 
 instance Substitutable TlNamedMd where
-  substitute chg (TlNamedMd mv mns) = TlNamedMd mv (substitute chg mns)
+  substitute chg x = case x of
+    TlNamedMd mv mns -> TlNamedMd mv (substitute chg mns)
 
 instance Substitutable MdName where
   substitute _ = id
@@ -912,7 +916,10 @@ instance Substitutable MdNode where
   substitute _ = id
 
 instance Substitutable TlUnamedMd where
-  substitute chg (TlUnamedMd s mk) = TlUnamedMd s (substitute chg mk)
+  substitute chg x = case x of
+    TlUnamedMd s mc -> TlUnamedMd s (substitute chg mc)
+    TlUnamedMd_DW_file_type n mc -> TlUnamedMd_DW_file_type n (substitute chg mc)
+    TlUnamedMd_DW_subprogram n mc -> TlUnamedMd_DW_subprogram n (substitute chg mc)
 
 instance Substitutable MetaKindedConst where
   substitute chg mk = case mk of

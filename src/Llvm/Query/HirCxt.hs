@@ -28,6 +28,28 @@ data IrCxt = IrCxt { globalCxt :: GlobalCxt
                    , funCxt :: FunCxt
                    } deriving (Eq, Ord, Show)
 
+instance IrPrint TypeEnv where
+  printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
+                               $+$ text "triple:" <+> printIr tt
+                               $+$ text "typedefs:" <+> printIr td
+                               $+$ text "opaqueTypedefs:" <+> printIr otd
+
+instance IrPrint GlobalCxt where
+  printIr (GlobalCxt te gl fns atts um) = text "typeEnv:" <+> printIr te
+                                          $+$ text "globals:" <+> printIr gl
+                                          $+$ text "functions:" <+> printIr fns
+                                          $+$ text "attributes:" <+> printIr atts
+                                          $+$ text "unamedMetadata:" <+> printIr um
+
+instance IrPrint FunCxt where
+  printIr (FunCxt fi dbgDeclares) = text "funInterface:" <+> printIr fi
+                                    $+$ text "dbgDeclares:" <+> printIr dbgDeclares
+
+instance IrPrint IrCxt where
+  printIr (IrCxt g l) = text "globalCxt:" <+> printIr g
+                        $+$ text "funCxt:" <+> printIr l
+
+
 convert_to_FunctionDeclareType :: FunctionInterface -> FunctionDeclare
 convert_to_FunctionDeclareType
   FunctionInterface {..} =
@@ -60,7 +82,28 @@ convert_to_FormalParamType x = case x of
 
 
 irCxtOfModule :: Module a -> IrCxt
-irCxtOfModule (Module tl) =
+irCxtOfModule m = 
+  IrCxt { globalCxt = globalCxtOfModule m
+        , funCxt = FunCxt { funInterface = error "funInterface is not initialized." 
+                          , dbgDeclares = error "dbgDeclare is not initialized."
+                          }
+        }
+
+
+funCxtOfTlDefine :: TlDefine a -> FunCxt
+funCxtOfTlDefine (TlDefine fi _ graph) = 
+  let dbgs = H.foldGraphNodes fld graph S.empty
+  in FunCxt { funInterface = fi
+            , dbgDeclares = dbgs }
+  where
+    fld :: Node a e x -> S.Set (Minst, [Dbg]) -> S.Set (Minst, [Dbg])
+    fld n = case n of
+      Ci.Mnode m@(M_llvm_dbg_declare _ _) dbgs -> S.insert (m, dbgs) 
+      _ -> id
+      
+      
+globalCxtOfModule :: Module a -> GlobalCxt
+globalCxtOfModule (Module tl) =
   let [ToplevelDataLayout (TlDataLayout dl)] = filter (\x -> case x of
                                                           ToplevelDataLayout _ -> True
                                                           _ -> False
@@ -99,50 +142,14 @@ irCxtOfModule (Module tl) =
                                ToplevelUnamedMd _ -> True
                                _ -> False
                            ) tl
-  in IrCxt { globalCxt = GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
-                                                       , targetTriple = tt
-                                                       , typedefs = M.fromList tdefs
-                                                       , opaqueTypeDefs = M.empty
-                                                       }
-                                   , globals = M.fromList glbs
-                                   , functions = M.fromList funs
-                                   , attributes = M.fromList attrs
-                                   , unamedMetadata = M.fromList unameMeta
+  in GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
+                                   , targetTriple = tt
+                                   , typedefs = M.fromList tdefs
+                                   , opaqueTypeDefs = M.empty
                                    }
-           , funCxt = FunCxt { funInterface = error "funInterface is not initialized." 
-                             , dbgDeclares = error "dbgDeclare is not initialized."
-                             }
-           }
-
-instance IrPrint TypeEnv where
-  printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
-                               $+$ text "triple:" <+> printIr tt
-                               $+$ text "typedefs:" <+> printIr td
-                               $+$ text "opaqueTypedefs:" <+> printIr otd
-
-instance IrPrint GlobalCxt where
-  printIr (GlobalCxt te gl fns atts um) = text "typeEnv:" <+> printIr te
-                                          $+$ text "globals:" <+> printIr gl
-                                          $+$ text "functions:" <+> printIr fns
-                                          $+$ text "attributes:" <+> printIr atts
-                                          $+$ text "unamedMetadata:" <+> printIr um
-
-instance IrPrint FunCxt where
-  printIr (FunCxt fi dbgDeclares) = text "funInterface:" <+> printIr fi
-                                    $+$ text "dbgDeclares:" <+> printIr dbgDeclares
-
-instance IrPrint IrCxt where
-  printIr (IrCxt g l) = text "globalCxt:" <+> printIr g
-                        $+$ text "funCxt:" <+> printIr l
-
-
-funCxtOfTlDefine :: TlDefine a -> FunCxt
-funCxtOfTlDefine (TlDefine fi _ graph) = 
-  let dbgs = H.foldGraphNodes fld graph S.empty
-  in FunCxt { funInterface = fi
-            , dbgDeclares = dbgs }
-  where
-    fld :: Node a e x -> S.Set (Minst, [Dbg]) -> S.Set (Minst, [Dbg])
-    fld n = case n of
-      Ci.Mnode m@(M_llvm_dbg_declare _ _) dbgs -> S.insert (m, dbgs) 
-      _ -> id
+               , globals = M.fromList glbs
+               , functions = M.fromList funs
+               , attributes = M.fromList attrs
+               , unamedMetadata = M.fromList unameMeta
+               }
+      

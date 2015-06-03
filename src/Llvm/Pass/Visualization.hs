@@ -109,7 +109,6 @@ allocateVisualIds mp =
   let sl = Ds.toList $ Ds.unions (Dm.elems mp)
   in fst $ foldl (\(p,idx) e -> (Dm.insert e idx p, idx+1)) (Dm.empty,0) sl
 
-
 scanModule :: (CheckpointMonad m, FuelMonad m) => VisualPlugin a -> Module a -> m VisualIds
 scanModule visPlugin (Module l) = 
   do { l0 <- mapM (\x -> case x of
@@ -166,7 +165,7 @@ rwDefine rwNodeOO te gmp (TlDefine fn entry graph) =
 
 rwModule :: VisualPlugin a -> Module a -> Dm.Map String GlobalId -> Module a
 rwModule visPlugin m@(Module l) duM = 
-  let (globals, duC) = stringize duM
+  let (globals, duC) = stringnize duM
       irCxt = irCxtOfModule m
   in Module $ globals 
      ++ (fmap (ToplevelDeclare . TlDeclare) (visFunctions visPlugin))
@@ -178,13 +177,12 @@ rwModule visPlugin m@(Module l) duM =
                   _ -> x
               ) l)
 
-stringize :: Dm.Map String GlobalId -> ([Toplevel a], Dm.Map String Const)
-stringize mp = 
+stringnize :: Dm.Map String GlobalId -> ([Toplevel a], Dm.Map String Const)
+stringnize mp = 
   let mp0 = Dm.mapWithKey (\c lhs -> internalize (lhs,c)) mp
   in (fmap ToplevelGlobal $ Dm.elems $ Dm.map llvmDef mp0, Dm.map llvmRef mp0)
 
 visualize :: VisualPlugin a -> Module a -> Module a
 visualize visPlugin m = 
-  let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel
-           ((scanModule visPlugin m)::H.SimpleFuelMonad VisualIds)
+  let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel ((scanModule visPlugin m)::H.SimpleFuelMonad VisualIds)
   in rwModule visPlugin m (Dm.map (\x -> GlobalIdAlphaNum $ ".visual_" ++ show x) mp)
