@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies, TupleSections #-}
 
 module Llvm.Pass.SizeofVerification where
 import Data.Maybe
@@ -25,6 +25,7 @@ This pass composes a standalone main function to check if hLLVM's type query
 implementation is equalivent to LLVM's implementation
 -}
 
+{- this should be simplified as just a graph folding pass -}
 type Visualized = Ds.Set Dtype 
 
 
@@ -66,48 +67,40 @@ scanDefine te (TlDefine fn entry graph) =
      ; return (fromMaybe emptyVisualized (H.lookupFact entry a))
      }
   
-scanModule :: (CheckpointMonad m, FuelMonad m, Ord a) => Module a -> m Visualized
+scanModule :: (CheckpointMonad m, FuelMonad m, Ord a) => Module a -> m (Ds.Set Dtype)
 scanModule m@(Module l) = 
   let IrCxt{..} = irCxtOfModule m
-  in do { l0 <- mapM (\x -> case x of
-                         ToplevelGlobal tglb -> case tglb of
-                           TlGlobalDtype{..} -> return $ Ds.insert tlg_dtype Ds.empty
-                           _ -> return Ds.empty
-                         ToplevelTypeDef tdef -> case tdef of
-                           TlDatTypeDef _ t -> return $ Ds.insert t Ds.empty
-                           _ -> return Ds.empty
-                         ToplevelDefine def ->
-                           do { fct <- scanDefine (typeEnv globalCxt) def
-                              ; return fct
-                              }
-                         _ -> return Ds.empty 
-                     ) l
-        ; return (Ds.unions l0)
-        }
+  in foldM (\p x -> case x of
+               ToplevelGlobal tglb -> case tglb of
+                 TlGlobalDtype{..} -> return $ Ds.insert tlg_dtype p
+                 _ -> return p
+               ToplevelTypeDef tdef -> case tdef of
+                 TlDatTypeDef _ t -> return $ Ds.insert t p
+                 _ -> return p
+               ToplevelDefine def ->
+                 do { fct <- scanDefine (typeEnv globalCxt) def
+                    ; return $ Ds.union fct p
+                    }
+               _ -> return p 
+           ) Ds.empty l
 
 
-type VisualIds = Dm.Map Dtype Int
-                    
-allocateVisualIds :: Visualized -> VisualIds
-allocateVisualIds mp = 
-  let sl = Ds.toList mp
-  in fst $ foldl (\(p,idx) e -> (Dm.insert e idx p, idx+1)) (Dm.empty,0) sl
-
-stringize :: Dm.Map Dtype GlobalId -> ([Toplevel a], Dm.Map Dtype Const)
+stringize :: Ds.Set Dtype -> ([Toplevel a], Dm.Map Dtype Const)
 stringize mp = 
-  let mp0 = Dm.mapWithKey (\c lhs -> internalize (lhs,render $ printIr c)) mp
-  in (fmap ToplevelGlobal $ Dm.elems $ Dm.map llvmDef mp0, Dm.map llvmRef mp0)
-
+  let (kvs, tpls) = runSimpleLlvmGlobalGen ".sizeof_" 0 (mapM (\c -> do { (DefAndRef _ (T (_::Dtype) c0)) <- internalize (render $ printIr c)
+                                                                        ; return (c, c0) 
+                                                                        }) $ Ds.toList mp)
+  in (tpls, Dm.fromList kvs)
+     
 
 mkVerificationModule :: Ord a => Module a -> Module a
 mkVerificationModule m@(Module l) = 
   let IrCxt{..} = irCxtOfModule m
       vis = H.runSimpleUniqueMonad $ H.runWithFuel H.infiniteFuel ((scanModule m):: H.SimpleFuelMonad Visualized)
-      (globals, duC) = stringize (Dm.map (\x -> GlobalIdAlphaNum $ ".visual_" ++ show x) $ allocateVisualIds vis)
+      (globals, duC) = stringize vis
       dataLayoutAndTriple = getDataLayoutAndTriple m
       insts = fmap (mkCheck (typeEnv globalCxt) duC)
               $ (filter (\x -> case x  of
-                            DtypeScalarI (TpI 1) -> False {- bool type is boring -}
                             DtypeScalarP _ -> False {- pointer type is boring -}
                             _ -> True
                         )

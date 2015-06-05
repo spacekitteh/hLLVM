@@ -1,11 +1,16 @@
-{-# LANGUAGE RecordWildCards, GADTs #-}
+{-# LANGUAGE RecordWildCards, GADTs, TemplateHaskell,CPP #-}
 module Llvm.Query.HirCxt where
+
+#define FLC  (FileLoc $(srcLoc))
+
 import qualified Llvm.Hir.Data as Ci
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Llvm.Hir.Data
 import Llvm.Hir.Print
 import qualified Compiler.Hoopl as H
+import Llvm.Query.Conversion (strToApInt)
+import Llvm.ErrorLoc
 
 data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
                        , targetTriple :: Ci.TargetTriple
@@ -21,7 +26,7 @@ data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
                            , functions :: M.Map Ci.GlobalId FunctionDeclare
                            , attributes :: M.Map Word32 [FunAttr]
-                           , unamedMetadata :: M.Map Word32 MetaKindedConst
+                           , unamedMetadata :: M.Map Word32 TlUnamedMd
                            } deriving (Eq, Ord, Show)
 
 data IrCxt = IrCxt { globalCxt :: GlobalCxt
@@ -137,7 +142,10 @@ globalCxtOfModule (Module tl) =
                            ToplevelAttribute _ -> True
                            _ -> False
                        ) tl
-      unameMeta = fmap (\(ToplevelUnamedMd (TlUnamedMd n mc)) -> (n, mc))
+      unameMeta = fmap (\(ToplevelUnamedMd um) -> case um of
+                           TlUnamedMd n _ -> (n, um)
+                           TlUnamedMd_DW_file_type n _ -> (n, um)
+                           _ -> errorLoc FLC $ show um)
                   $ filter (\x -> case x of
                                ToplevelUnamedMd _ -> True
                                _ -> False
@@ -152,4 +160,63 @@ globalCxtOfModule (Module tl) =
                , attributes = M.fromList attrs
                , unamedMetadata = M.fromList unameMeta
                }
-      
+
+
+data FileInfo = FileInfo { dir :: String
+                         , file :: String
+                         } deriving (Eq, Ord, Show)
+
+data PositionInfo = PositionInfo { line :: Word32
+                                 , column :: Word32
+                                 } deriving (Eq, Ord, Show)
+                                            
+data SrcInfo = SrcInfo { fileInfo :: FileInfo
+                       , positionInfo :: Maybe PositionInfo
+                       } deriving (Eq, Ord, Show)
+
+localIdSrcInfoMap :: M.Map Word32 TlUnamedMd -> S.Set (Minst, [Dbg]) -> M.Map LocalId SrcInfo
+localIdSrcInfoMap mdMap set = 
+  foldl (\mp (mi, dbgs) -> 
+          case mi of
+            M_llvm_dbg_declare (MetaOperandMeta m1) (MetaOperandMeta m2) -> 
+              case (getLocalId m1, getMdRef m2) of
+                (Nothing, Nothing) -> mp
+                (Just lid, Just (MdRefNode (MdNode mf))) -> case (getFileInfo mf, dbgs) of
+                  (Just fref, [Dbg (MdRefName (MdName "dbg")) (McMdRef (MdRefNode (MdNode n)))]) -> 
+                    M.insert lid (SrcInfo fref (getLineColumn n)) mp
+                  (_,_) -> mp
+            _ -> mp
+        ) M.empty (S.toList set)
+  where getLocalId m = case m of
+          MetaKindedConst Mmetadata (McStruct [MetaKindedConst (Mtype _) (McSsa lid)]) -> Just lid
+          _ -> Nothing
+        getMdRef m = case m of
+          MetaKindedConst Mmetadata (McMdRef mref) -> Just mref
+          _ -> Nothing
+        getFileInfo num = case getFileRef num of          
+          Just fref -> case M.lookup fref mdMap of
+            Just (TlUnamedMd_DW_file_type _ (MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode ref))))) -> 
+              case M.lookup ref mdMap of
+                Just (TlUnamedMd _ (MetaKindedConst Mmetadata (McStruct [MetaKindedConst Mmetadata (McString (DqString file))
+                                                                        ,MetaKindedConst Mmetadata (McString (DqString dir))]))) -> 
+                  Just $ FileInfo file dir
+                _ -> Nothing     
+            _ -> Nothing  
+          Nothing -> undefined
+        getFileRef num = case M.lookup num mdMap of
+          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> 
+            Just fref
+          _ -> Nothing
+        getLineColumn :: Word32 -> Maybe PositionInfo
+        getLineColumn n = case M.lookup n mdMap of
+          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [MetaKindedConst (Mtype _) (McSimple (C_int line))
+                                                          ,MetaKindedConst (Mtype _) (McSimple (C_int col))
+                                                          ,_,_]))) -> 
+            Just $ PositionInfo (fromIntegral $ strToApInt line) (fromIntegral $ strToApInt col)
+          _ -> Nothing
+        findFileName :: Word32 -> Maybe FileInfo
+        findFileName ref = case M.lookup ref mdMap of
+          Just (TlUnamedMd _ (MetaKindedConst Mmetadata (McStruct [MetaKindedConst Mmetadata (McString (DqString file))
+                                                                  ,MetaKindedConst Mmetadata (McString (DqString dir))]))) -> 
+            Just $ FileInfo file dir
+          _ -> Nothing          

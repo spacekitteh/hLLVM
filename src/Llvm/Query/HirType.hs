@@ -686,3 +686,11 @@ class SizeOf a where
 instance SizeOf Dtype where
   sizeof te dt = let (SizeInByte s) = getTypeAllocSize te dt
                  in fromIntegral s
+                    
+                    
+class DataSizeOf a where                    
+  dataSizeOf :: TypeEnv -> a -> Word32
+  
+instance DataSizeOf Dtype where                    
+  dataSizeOf te dt = let (SizeInByte s) = getTypeStoreSize te dt
+                     in fromIntegral s

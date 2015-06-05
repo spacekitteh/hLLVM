@@ -39,7 +39,6 @@ instance Error e => Applicative (Context s r e) where
   pure x = Ctxt $ pure x 
   (<*>) = ap
 
-
 instance Error e => Monad (Context s r e) where
   return x = Ctxt $ return x 
   (>>=) m k = Ctxt $ unCtxt m >>= \x -> unCtxt $ k x

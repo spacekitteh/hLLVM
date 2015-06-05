@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies, TupleSections #-}
 
 module Llvm.Pass.Visualization where
 import Data.Maybe
@@ -16,7 +16,7 @@ import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Llvm.Query.HirType
 import Llvm.Hir.Print
-import Control.Monad (liftM,foldM)
+import Control.Monad (liftM,foldM, mapM)
 
 {- 
 
@@ -102,24 +102,16 @@ scanDefine visualPlugin (TlDefine fn entry graph) =
      ; return (fromMaybe emptyVisualized (H.lookupFact entry a))
      }
   
-type VisualIds = Dm.Map String Int
-                    
-allocateVisualIds :: Dm.Map GlobalId Visualized -> VisualIds
-allocateVisualIds mp = 
-  let sl = Ds.toList $ Ds.unions (Dm.elems mp)
-  in fst $ foldl (\(p,idx) e -> (Dm.insert e idx p, idx+1)) (Dm.empty,0) sl
-
-scanModule :: (CheckpointMonad m, FuelMonad m) => VisualPlugin a -> Module a -> m VisualIds
+scanModule :: (CheckpointMonad m, FuelMonad m) => VisualPlugin a -> Module a -> m (Ds.Set String)
 scanModule visPlugin (Module l) = 
-  do { l0 <- mapM (\x -> case x of
-                      ToplevelDefine def@(TlDefine fn _ _) ->
-                        do { fct <- scanDefine visPlugin def
-                           ; return (Dm.insert (fi_fun_name fn) fct Dm.empty)
-                           }
-                      _ -> return Dm.empty 
-                  ) l
-     ; return $ allocateVisualIds (Dm.unions l0)
-     }
+  foldM (\p x -> case x of
+            ToplevelDefine def@(TlDefine fn _ _) ->
+              do { fct <- scanDefine visPlugin def
+                 ; return (Ds.union fct p)
+                 }
+            _ -> return p
+         ) Ds.empty l
+
 
 {- rewrite this with foldBlock -}
 rwBlockCC :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]) 
@@ -163,7 +155,7 @@ rwDefine rwNodeOO te gmp (TlDefine fn entry graph) =
   let graph0 = mapGraphBlocks (rwBlock rwNodeOO te gmp) graph
   in TlDefine fn entry graph0
 
-rwModule :: VisualPlugin a -> Module a -> Dm.Map String GlobalId -> Module a
+rwModule :: VisualPlugin a -> Module a -> Ds.Set String -> Module a
 rwModule visPlugin m@(Module l) duM = 
   let (globals, duC) = stringnize duM
       irCxt = irCxtOfModule m
@@ -177,12 +169,14 @@ rwModule visPlugin m@(Module l) duM =
                   _ -> x
               ) l)
 
-stringnize :: Dm.Map String GlobalId -> ([Toplevel a], Dm.Map String Const)
+stringnize ::  Ds.Set String  -> ([Toplevel a], Dm.Map String Const)
 stringnize mp = 
-  let mp0 = Dm.mapWithKey (\c lhs -> internalize (lhs,c)) mp
-  in (fmap ToplevelGlobal $ Dm.elems $ Dm.map llvmDef mp0, Dm.map llvmRef mp0)
+  let (kvs, tpl) = runSimpleLlvmGlobalGen ".visual_" 0 (mapM (\c -> do { (DefAndRef _ (T (_::Dtype) c0)) <- internalize c
+                                                                       ; return (c, c0) 
+                                                                       }) (Ds.toList mp))
+  in (tpl, Dm.fromList kvs)
 
 visualize :: VisualPlugin a -> Module a -> Module a
 visualize visPlugin m = 
-  let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel ((scanModule visPlugin m)::H.SimpleFuelMonad VisualIds)
-  in rwModule visPlugin m (Dm.map (\x -> GlobalIdAlphaNum $ ".visual_" ++ show x) mp)
+  let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel ((scanModule visPlugin m)::H.SimpleFuelMonad (Ds.Set String))
+  in rwModule visPlugin m mp
