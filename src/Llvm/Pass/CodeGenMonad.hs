@@ -95,8 +95,8 @@ new rhsPrefix partialInst =
   do { s <- get
      ; bs <- ask
      ; if bs == unspecifiedBase then
-         error "irrefutable error:the new value base name is not specified"
-       else do { lhs <- if rhsPrefix == "" then errorLoc FLC $ "rhsPrefix is an empty string"
+         return $ LocalIdDqString "irrefutable error:the new value base name is not specified"
+       else do { lhs <- if rhsPrefix == "" then return $ newLocalId bs "rhsPrefix is an empty string"
                         else let x = newLocalId bs rhsPrefix
                              in if S.member x (usedLhs s) 
                                 then return x

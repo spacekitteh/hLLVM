@@ -7,6 +7,7 @@ import Llvm.Hir.Cast
 import Llvm.Hir.Composer
 import Control.Monad ()
 import Control.Monad.State
+import qualified Data.Map as M
 
 {-
  Internalization converts a "metadata" value to a first class value that can be referred by LLVM code.
@@ -20,7 +21,7 @@ data DefAndRef a r = DefAndRef { llvmDef :: Toplevel a
                                , llvmRef :: r
                                }
 
-class Internalization x r where
+class (Ord x, Eq x) => Internalization x r where
   internalize :: LlvmGlobalGenMonad a m => x -> m (DefAndRef a r)
 
 instance Internalization String (T Dtype Const) where
@@ -63,4 +64,5 @@ instance LlvmGlobalGenMonad a (StateT [Toplevel a] (State (String, Int))) where
   cacheToplevel x = modify (x:)
 
 runSimpleLlvmGlobalGen :: String -> Int -> (StateT [Toplevel a] (State (String, Int))) x -> (x, [Toplevel a])
-runSimpleLlvmGlobalGen prefix initCnt f = evalState (runStateT f []) (prefix, initCnt)
+runSimpleLlvmGlobalGen prefix initCnt f = let (x, l) = evalState (runStateT f []) (prefix, initCnt)
+                                          in (x, reverse l)

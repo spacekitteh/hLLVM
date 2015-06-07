@@ -58,6 +58,7 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
             | Change { input :: FilePath, output :: Maybe String}
             | Visualize { input :: FilePath, output :: Maybe String}
+            | SrcInfoDbg { input :: FilePath, output :: Maybe String}              
             deriving (Show, Data, Typeable, Eq)
 
 outFlags x = x &= help "Output file, stdout is used if it's not specified" &= typFile
@@ -100,6 +101,10 @@ visual = Visualize { input = def &= typ "<INPUT>"
                    , output = outFlags Nothing
                    } &= help "Test Visialize Pass"
 
+srcInfo = SrcInfoDbg { input = def &= typ "<INPUT>"
+                     , output = outFlags Nothing
+                     } &= help "SrcInfo test pass"
+
 
 pass = Pass { input = def &= typ "<INPUT>"
             , output = outFlags Nothing
@@ -113,9 +118,9 @@ phifixup = PhiFixUp { input = def &= typ "<INPUT>"
                     } &= help "Test PhiFixUp pass"
 
 mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast
-                           , pass, astcanonic, phifixup
-                           , datause, changer, visual
-                           , typeq] &= help "Test sub components"
+                           ,pass, astcanonic, phifixup
+                           ,datause, changer, visual
+                           ,srcInfo, typeq] &= help "Test sub components"
        &= program "Test" &= summary "Test driver v1.0"
 
 main :: IO ()
@@ -199,6 +204,24 @@ main = do { sel <- cmdArgsRun mode
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh
                                   }
+            SrcInfoDbg ix ox -> do { inh <- openFile ix ReadMode
+                                   ; outh <- openFileOrStdout ox
+                                   ; ast <- testParser ix inh
+                                   ; let ast' = A.simplify ast
+                                   ; let (m, ir@(I.Module ls)::I.Module I.NOOP) = testAst2Ir ast'
+                                         irCxt = irCxtOfModule ir
+                                         srcInfo1 = srcInfoMap (unamedMetadata $ globalCxt irCxt)
+                                         sl = foldl (\p s -> case s of
+                                                        I.ToplevelDefine tld -> 
+                                                          (localIdSrcInfoMap (unamedMetadata $ globalCxt irCxt) (dbgDeclares $ funCxtOfTlDefine tld)):p
+                                                        _ -> 
+                                                          p
+                                                    ) [] ls
+                                   ; writeOutIr srcInfo1 outh
+                                   ; writeOutIr (reverse sl) outh
+                                   ; hClose inh
+                                   ; closeFileOrStdout ox outh
+                                   }
             PhiFixUp ix ox f -> do { inh <- openFile ix ReadMode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh

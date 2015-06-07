@@ -29,9 +29,18 @@ class Ucast l1 l2 where
 class Dcast l1 l2 where
   dcast :: FileLoc -> l1 -> l2
   
+
+instance Ucast l l where
+  ucast = id
+  
+instance Dcast l l where  
+  dcast _ = id
+  
 {- horizontal casting -}
+  {- does not make sense
 class Hcast l1 l2 where 
   hcast :: FileLoc -> l1 -> l2
+-}
 
 
 {- A datum that can be casted to a constant -}
@@ -117,17 +126,8 @@ u32ToTv = toTV
 
 
 
-instance Ucast Const Const where
-  ucast = id
-
 instance Ucast Const Value where
   ucast = Val_const
-
-instance Ucast Value Value where
-  ucast = id
-
-instance Dcast Value Value where
-  dcast _ = id
 
 instance Dcast Value Const where
   dcast lc x = case x of
@@ -145,8 +145,6 @@ instance (Dcast s t, Dcast v u) => Dcast (T s v) (T t u) where
 
 
 {- Type s r, which represents all types,  ucast to Utype -}
-instance Ucast (Type s r) (Type s r) where
-  ucast = id
   
 instance Ucast (Type s r) Utype where
   ucast x = case x of

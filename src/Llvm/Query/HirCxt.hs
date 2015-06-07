@@ -35,9 +35,9 @@ data IrCxt = IrCxt { globalCxt :: GlobalCxt
 
 instance IrPrint TypeEnv where
   printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
-                               $+$ text "triple:" <+> printIr tt
-                               $+$ text "typedefs:" <+> printIr td
-                               $+$ text "opaqueTypedefs:" <+> printIr otd
+                                   $+$ text "triple:" <+> printIr tt
+                                   $+$ text "typedefs:" <+> printIr td
+                                   $+$ text "opaqueTypedefs:" <+> printIr otd
 
 instance IrPrint GlobalCxt where
   printIr (GlobalCxt te gl fns atts um) = text "typeEnv:" <+> printIr te
@@ -51,9 +51,7 @@ instance IrPrint FunCxt where
                                     $+$ text "dbgDeclares:" <+> printIr dbgDeclares
 
 instance IrPrint IrCxt where
-  printIr (IrCxt g l) = text "globalCxt:" <+> printIr g
-                        $+$ text "funCxt:" <+> printIr l
-
+  printIr (IrCxt g l) = text "globalCxt:" <+> printIr g $+$ text "funCxt:" <+> printIr l
 
 convert_to_FunctionDeclareType :: FunctionInterface -> FunctionDeclare
 convert_to_FunctionDeclareType
@@ -145,6 +143,7 @@ globalCxtOfModule (Module tl) =
       unameMeta = fmap (\(ToplevelUnamedMd um) -> case um of
                            TlUnamedMd n _ -> (n, um)
                            TlUnamedMd_DW_file_type n _ -> (n, um)
+                           TlUnamedMd_DW_subprogram n _ -> (n, um)
                            _ -> errorLoc FLC $ show um)
                   $ filter (\x -> case x of
                                ToplevelUnamedMd _ -> True
@@ -166,57 +165,75 @@ data FileInfo = FileInfo { dir :: String
                          , file :: String
                          } deriving (Eq, Ord, Show)
 
+instance IrPrint FileInfo where
+  printIr (FileInfo d f) = text d <> text f
+
 data PositionInfo = PositionInfo { line :: Word32
                                  , column :: Word32
                                  } deriving (Eq, Ord, Show)
                                             
+instance IrPrint PositionInfo where                                            
+  printIr (PositionInfo l c) = integer (fromIntegral l) <> colon <> integer (fromIntegral l)
+                                            
 data SrcInfo = SrcInfo { fileInfo :: FileInfo
                        , positionInfo :: Maybe PositionInfo
                        } deriving (Eq, Ord, Show)
+                                  
+instance IrPrint SrcInfo where                                  
+  printIr (SrcInfo f p) = printIr f <> colon <> printIr p
+
+srcInfoMap :: M.Map Word32 TlUnamedMd -> M.Map Word32 SrcInfo
+srcInfoMap mdMap = foldl (\mp (w, um) -> maybe mp (\srcInfo -> M.insert w srcInfo mp) (getSrcInfo mdMap w)) M.empty (M.toList mdMap)
 
 localIdSrcInfoMap :: M.Map Word32 TlUnamedMd -> S.Set (Minst, [Dbg]) -> M.Map LocalId SrcInfo
 localIdSrcInfoMap mdMap set = 
   foldl (\mp (mi, dbgs) -> 
-          case mi of
-            M_llvm_dbg_declare (MetaOperandMeta m1) (MetaOperandMeta m2) -> 
-              case (getLocalId m1, getMdRef m2) of
-                (Nothing, Nothing) -> mp
-                (Just lid, Just (MdRefNode (MdNode mf))) -> case (getFileInfo mf, dbgs) of
-                  (Just fref, [Dbg (MdRefName (MdName "dbg")) (McMdRef (MdRefNode (MdNode n)))]) -> 
-                    M.insert lid (SrcInfo fref (getLineColumn n)) mp
-                  (_,_) -> mp
-            _ -> mp
+          case (mi, dbgs) of
+            (M_llvm_dbg_declare (MetaOperandMeta m1) (MetaOperandMeta m2), [Dbg (MdRefName (MdName "dbg")) (McMdRef (MdRefNode (MdNode n)))]) -> 
+              maybe mp (\(lid, srcInfo) -> M.insert lid srcInfo mp) 
+              $ do { lid <- getLocalId m1
+                   ; mf <- getMdRef m2
+                   ; fref <- getFileRef mf
+                   ; finfo <- getFileInfo mdMap fref 
+                   ; (SrcInfo _ pos) <- getSrcInfo mdMap n
+                   ; return (lid, SrcInfo finfo pos)
+                   }
+            (_,_) -> mp
         ) M.empty (S.toList set)
   where getLocalId m = case m of
           MetaKindedConst Mmetadata (McStruct [MetaKindedConst (Mtype _) (McSsa lid)]) -> Just lid
           _ -> Nothing
         getMdRef m = case m of
-          MetaKindedConst Mmetadata (McMdRef mref) -> Just mref
+          MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode mf))) -> Just mf
           _ -> Nothing
-        getFileInfo num = case getFileRef num of          
-          Just fref -> case M.lookup fref mdMap of
-            Just (TlUnamedMd_DW_file_type _ (MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode ref))))) -> 
-              case M.lookup ref mdMap of
-                Just (TlUnamedMd _ (MetaKindedConst Mmetadata (McStruct [MetaKindedConst Mmetadata (McString (DqString file))
-                                                                        ,MetaKindedConst Mmetadata (McString (DqString dir))]))) -> 
-                  Just $ FileInfo file dir
-                _ -> Nothing     
-            _ -> Nothing  
-          Nothing -> undefined
         getFileRef num = case M.lookup num mdMap of
-          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> 
-            Just fref
+          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> Just fref
           _ -> Nothing
-        getLineColumn :: Word32 -> Maybe PositionInfo
-        getLineColumn n = case M.lookup n mdMap of
-          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [MetaKindedConst (Mtype _) (McSimple (C_int line))
-                                                          ,MetaKindedConst (Mtype _) (McSimple (C_int col))
-                                                          ,_,_]))) -> 
-            Just $ PositionInfo (fromIntegral $ strToApInt line) (fromIntegral $ strToApInt col)
-          _ -> Nothing
-        findFileName :: Word32 -> Maybe FileInfo
-        findFileName ref = case M.lookup ref mdMap of
-          Just (TlUnamedMd _ (MetaKindedConst Mmetadata (McStruct [MetaKindedConst Mmetadata (McString (DqString file))
-                                                                  ,MetaKindedConst Mmetadata (McString (DqString dir))]))) -> 
-            Just $ FileInfo file dir
-          _ -> Nothing          
+         
+getFileInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
+getFileInfo mdMap fref = case M.lookup fref mdMap of
+  Just (TlUnamedMd_DW_file_type _ (MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode ref))))) -> getFileName mdMap ref
+  Nothing -> errorLoc FLC $ show fref
+
+getFileInfoFromSubprog :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo             
+getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of
+  Just (TlUnamedMd_DW_subprogram _ [_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
+    getFileInfo mdMap fref
+  _ -> Nothing
+
+getSrcInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe SrcInfo
+getSrcInfo mdMap n = case M.lookup n mdMap of
+  Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [MetaKindedConst (Mtype _) (McSimple (C_int lin))
+                                                  ,MetaKindedConst (Mtype _) (McSimple (C_int col))
+                                                  ,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode subprog))),UnmetaKindedNull]))) -> 
+    do { fileInfo <- getFileInfoFromSubprog mdMap subprog
+       ; return $ SrcInfo fileInfo (Just $ PositionInfo (fromIntegral $ strToApInt lin) (fromIntegral $ strToApInt col))
+       }
+  _ -> Nothing
+  
+getFileName :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
+getFileName mdMap ref = case M.lookup ref mdMap of
+  Just (TlUnamedMd _ (MetaKindedConst Mmetadata (McStruct [MetaKindedConst Mmetadata (McString (DqString file))
+                                                          ,MetaKindedConst Mmetadata (McString (DqString dir))]))) ->
+    Just $ FileInfo dir file 
+  _ -> Nothing
