@@ -37,7 +37,7 @@ data VisualPlugin a = VisualPlugin {
   -- If the set does not exist, all functions are visualized
   , includedFunctions :: Maybe (Ds.Set GlobalId) 
   , visFunctions :: [FunctionDeclare]
-  , captureCinsts :: Cinst -> Ds.Set String -> Ds.Set String                                     
+  , captureCinsts :: Cinst -> Ds.Set String -> Ds.Set String
   , visNodeOO :: TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]
   }
 
@@ -171,10 +171,11 @@ rwModule visPlugin m@(Module l) duM =
 
 stringnize ::  Ds.Set String  -> ([Toplevel a], Dm.Map String Const)
 stringnize mp = 
-  let (kvs, tpl) = runSimpleLlvmGlobalGen ".visual_" 0 (mapM (\c -> do { (DefAndRef _ (T (_::Dtype) c0)) <- internalize c
-                                                                       ; return (c, c0) 
-                                                                       }) (Ds.toList mp))
-  in (tpl, Dm.fromList kvs)
+  let (kvs, tpl) = runSimpleLlvmGlobalGen ".visual_" 0 
+                   (mapM (\c -> do { (DefAndRef _ (T _ c0)) <- internalize c
+                                   ; return (c, c0) 
+                                   }) (Ds.toList mp))
+  in (Dm.elems $ Dm.map llvmDef tpl, Dm.fromList kvs)
 
 visualize :: VisualPlugin a -> Module a -> Module a
 visualize visPlugin m = 

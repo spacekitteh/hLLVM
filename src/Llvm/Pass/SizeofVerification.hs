@@ -87,10 +87,11 @@ scanModule m@(Module l) =
 
 stringize :: Ds.Set Dtype -> ([Toplevel a], Dm.Map Dtype Const)
 stringize mp = 
-  let (kvs, tpls) = runSimpleLlvmGlobalGen ".sizeof_" 0 (mapM (\c -> do { (DefAndRef _ (T (_::Dtype) c0)) <- internalize (render $ printIr c)
-                                                                        ; return (c, c0) 
-                                                                        }) $ Ds.toList mp)
-  in (tpls, Dm.fromList kvs)
+  let (kvs, tpls) = runSimpleLlvmGlobalGen ".sizeof_" 0 
+                    (mapM (\c -> do { (DefAndRef _ (T _ c0)) <- internalize (render $ printIr c)
+                                    ; return (c, c0) 
+                                    }) $ Ds.toList mp)
+  in (Dm.elems $ Dm.map llvmDef tpls, Dm.fromList kvs)
      
 
 mkVerificationModule :: Ord a => Module a -> Module a

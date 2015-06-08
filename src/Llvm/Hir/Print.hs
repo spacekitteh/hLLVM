@@ -145,7 +145,7 @@ instance IrPrint a => IrPrint (Node a e x) where
   printIr (Mnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)
   printIr (Tnode t dbgs) = commaSepList $ (printIr t):(fmap printIr dbgs)
   printIr (Comment s) = vcat $ fmap (\x -> text ";" <> text x) (commentize s)
-  printIr (Enode a) = printIr a
+  printIr (Enode a dbgs) = commaSepList $ (printIr a):(fmap printIr dbgs)
 
 instance IrPrint a => IrPrint (H.Graph (Node a) H.C H.C) where
   printIr g = braces (H.foldGraphNodes (\n -> \s -> s $$ (printIr n)) g empty)

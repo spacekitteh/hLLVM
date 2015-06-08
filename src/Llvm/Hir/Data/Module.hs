@@ -169,7 +169,7 @@ data Node a e x where
   -- | The clients of this library should never handle this node. If 
   -- | a Enode represents anything other than NOOP, which is (), it should alwasy be  
   -- | converted back to other nodes. 
-  Enode :: a -> Node a H.O H.O
+  Enode :: a -> [Dbg] -> Node a H.O H.O
   Tnode  :: Ci.Tinst -> [Dbg] -> Node a H.O H.C  
 
 instance Show a => Show (Node a e x) where
@@ -179,7 +179,7 @@ instance Show a => Show (Node a e x) where
     Cnode v dbgs -> "Cnode : Node O O:" ++ show v ++ show dbgs
     Mnode v dbgs -> "Mnode : Node O O:" ++ show v ++ show dbgs    
     Comment s -> "Comment : Node O O:" ++ show (commentize s)
-    Enode a -> "Enode : Node O O:" ++ show a
+    Enode a dbgs -> "Enode : Node O O:" ++ show a ++ show dbgs
     Tnode v dbgs -> "Tnode : Node O C:" ++ show v ++ show dbgs    
 
 instance Eq a => Eq (Node a e x) where
@@ -189,7 +189,7 @@ instance Eq a => Eq (Node a e x) where
     (Cnode v1 d1, Cnode v2 d2) -> v1 == v2 && d1 == d2
     (Mnode v1 d1, Mnode v2 d2) -> v1 == v2 && d1 == d2    
     (Comment v1, Comment v2) -> commentize v1 == commentize v2
-    (Enode a1, Enode a2) -> a1 == a2
+    (Enode a1 d1, Enode a2 d2) -> a1 == a2 && d1 == d2
     (Tnode v1 d1, Tnode v2 d2) -> v1 == v2 && d1 == d2    
     (_, _) -> False
 
@@ -200,7 +200,7 @@ instance (Show a, Ord a) => Ord (Node a e x) where
     (Cnode v1 d1, Cnode v2 d2) -> compare (v1,d1) (v2,d2)
     (Mnode v1 d1, Mnode v2 d2) -> compare (v1,d1) (v2,d2)    
     (Comment v1, Comment v2) -> compare (commentize v1) (commentize v2)
-    (Enode v1, Enode v2) -> compare v1 v2
+    (Enode v1 d1, Enode v2 d2) -> compare (v1,d1) (v2,d2)
     (Tnode v1 d1, Tnode v2 d2) -> compare (v1,d1) (v2,d2)
     (_, _) -> compare (show x1) (show x2)
 

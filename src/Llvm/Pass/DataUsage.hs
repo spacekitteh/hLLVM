@@ -229,7 +229,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
           _ -> f0
       Lnode _ -> f
       Pnode (Pinst{..}) _ -> foldl (\p (e, _) -> propogateUpPtrUsage flowout e p) f flowins
-      Enode x -> update x f
+      Enode x _ -> update x f
       Comment _ -> f
       Cnode comp _ -> case comp of
         I_alloca{..} ->

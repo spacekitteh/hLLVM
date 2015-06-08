@@ -1304,7 +1304,7 @@ convertNode (I.Tnode a dbgs) p = do { (bl, bs, pb) <- p
                                         let blk = A.Block l (reverse phis) (reverse cs) a'
                                         in return (blk:bl, M.insert (getLabelId l) blk bs, Nothing)
                                     }
-convertNode (I.Enode _) _ = error "irrefutable:Enode should be converted to LLVM node"
+convertNode (I.Enode _ _) _ = error "irrefutable:Enode should be converted to LLVM node"
   
 graphToBlocks :: H.Graph (I.Node a) H.C H.C -> Rm ([A.Block], M.Map A.LabelId A.Block)
 graphToBlocks g = do { (bl, bs, Nothing) <- H.foldGraphNodes convertNode g (return ([], M.empty, Nothing))
