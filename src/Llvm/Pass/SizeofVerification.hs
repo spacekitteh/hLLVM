@@ -53,7 +53,7 @@ bwdScan te =
       bwdTran (Pnode _ _) f = f
       bwdTran (Mnode _ _) f = f
       bwdTran (Comment _) f = f
-      bwdTran (Enode _) f = f
+      bwdTran (Enode _ _) f = f
       bwdTran (Cnode comp _) f = let (mtyp::Maybe Dtype) = typeof te comp
                                  in maybe f (flip Ds.insert f) mtyp 
   in H.BwdPass { H.bp_lattice = visLattice

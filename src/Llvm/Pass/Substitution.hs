@@ -265,7 +265,7 @@ instance Substitutable a => Substitutable (Node a e x) where
     Cnode x dbgs -> Cnode (substitute chg x) (substitute chg dbgs)
     Mnode x dbgs -> Mnode (substitute chg x) (substitute chg dbgs)
     Comment _ -> node
-    Enode x -> Enode (substitute chg x)
+    Enode x dbgs -> Enode (substitute chg x) (substitute chg dbgs)
     Tnode ti dbgs -> Tnode (substitute chg ti) (substitute chg dbgs)
 
 instance Substitutable Clause where
