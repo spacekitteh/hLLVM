@@ -920,6 +920,7 @@ instance Substitutable TlUnamedMd where
     TlUnamedMd s mc -> TlUnamedMd s (substitute chg mc)
     TlUnamedMd_DW_file_type n mc -> TlUnamedMd_DW_file_type n (substitute chg mc)
     TlUnamedMd_DW_subprogram n mc -> TlUnamedMd_DW_subprogram n (substitute chg mc)
+    TlUnamedMd_DW_lexical_block n mc -> TlUnamedMd_DW_subprogram n (substitute chg mc)
 
 instance Substitutable MetaKindedConst where
   substitute chg mk = case mk of

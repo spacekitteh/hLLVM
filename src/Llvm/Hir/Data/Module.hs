@@ -61,6 +61,7 @@ data TlAlias = TlAlias { tla_lhs :: Ci.GlobalId
 
 data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst 
                 | TlUnamedMd_DW_subprogram Word32 [MetaKindedConst]
+                | TlUnamedMd_DW_lexical_block Word32 [MetaKindedConst]
                 | TlUnamedMd_DW_file_type Word32 MetaKindedConst
                 deriving (Eq, Ord, Show)
 

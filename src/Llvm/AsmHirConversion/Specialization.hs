@@ -235,8 +235,11 @@ specializeUnamedMd :: TlUnamedMd -> TlUnamedMd
 specializeUnamedMd x = case x of
   (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> 
     TlUnamedMd_DW_file_type n mc
-  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786478")), m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]))) ->
+  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786478"))
+                                                     , m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]))) ->
     TlUnamedMd_DW_subprogram n [m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]
+  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786443")), m1,m2,m3,m4,m5,m6]))) ->
+    TlUnamedMd_DW_lexical_block n [m1,m2,m3,m4,m5,m6]
   _ -> x
 
 unspecializeUnamedMd :: TlUnamedMd -> TlUnamedMd  
@@ -245,4 +248,6 @@ unspecializeUnamedMd x = case x of
     (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786473")), mc])))
   TlUnamedMd_DW_subprogram n mcs -> 
     (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct ([MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786478"))]++mcs))))
+  TlUnamedMd_DW_lexical_block n mcs -> 
+    (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct ([MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786443"))]++mcs))))    
   _ -> x

@@ -144,6 +144,7 @@ globalCxtOfModule (Module tl) =
                            TlUnamedMd n _ -> (n, um)
                            TlUnamedMd_DW_file_type n _ -> (n, um)
                            TlUnamedMd_DW_subprogram n _ -> (n, um)
+                           TlUnamedMd_DW_lexical_block n _ -> (n, um)
                            _ -> errorLoc FLC $ show um)
                   $ filter (\x -> case x of
                                ToplevelUnamedMd _ -> True
@@ -219,6 +220,8 @@ getFileInfoFromSubprog :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
 getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of
   Just (TlUnamedMd_DW_subprogram _ [_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
     getFileInfo mdMap fref
+  Just (TlUnamedMd_DW_lexical_block _ [MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_]) ->
+    getFileName mdMap fref
   _ -> Nothing
 
 getSrcInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe SrcInfo
