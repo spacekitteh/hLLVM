@@ -34,7 +34,7 @@ selectUndeclaredTlGlobals (Module l) =
                 TlGlobalDtype{..} -> maybe 
 -}
 
-data SingleConstAddr = SingleConstAddr { globalId :: GlobalId
+data SingleConstAddr = SingleConstAddr { globalId :: Either (GlobalId, Label) GlobalId
                                        , reconstructor :: Const -> Const
                                        }
 
@@ -61,7 +61,7 @@ getSingleConstAddr cnst = case cnst of
   C_true -> Nothing
   C_false -> Nothing
   C_zeroinitializer -> Nothing
-  C_globalAddr g -> Just $ SingleConstAddr { globalId = g, reconstructor = id }
+  C_globalAddr g -> Just $ SingleConstAddr { globalId = Right g, reconstructor = id }
   C_getelementptr b (T t c) idx -> case getSingleConstAddr c of
     Nothing -> Nothing
     Just ca -> Just $ ca { reconstructor = \x -> C_getelementptr b (T t (reconstructor ca x)) idx}
@@ -81,5 +81,5 @@ getSingleConstAddr cnst = case cnst of
   C_array _ -> Nothing
   C_arrayN _ _ -> Nothing
   C_labelId _ -> errorLoc FLC ("unsupported " ++ show cnst)
-  C_block _ _ -> errorLoc FLC ("unsupported " ++ show cnst)
+  C_block g l -> Just $ SingleConstAddr { globalId = Left (g, l), reconstructor = id } -- errorLoc FLC ("unsupported " ++ show cnst)
   _ -> Nothing

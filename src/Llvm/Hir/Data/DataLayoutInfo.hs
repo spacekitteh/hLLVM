@@ -40,7 +40,7 @@ defaultDataLayoutInfo = DataLayoutInfo { endianess = error $ show "endian is not
                                        , mangling = Nothing
                                        }
 
-getDataLayoutInfo :: DataLayout -> DataLayoutInfo                                 
+getDataLayoutInfo :: DataLayout -> DataLayoutInfo
 getDataLayoutInfo (DataLayout ls) = foldl (\p v -> case v of
                                                  DlE x -> p { endianess = x}
                                                  DlS x -> p { stackAlign = x}
