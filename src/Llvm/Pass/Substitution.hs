@@ -228,16 +228,16 @@ instance Substitutable x => Substitutable (T t x) where
 instance Substitutable FunctionInterface where
   substitute chg fp@FunctionInterface {..} =
     fp { fi_fun_name = substitute chg fi_fun_name
-       , fi_param_list = substitute chg fi_param_list
+       , fi_signature = substitute chg fi_signature
        , fi_comdat = substitute chg fi_comdat
        , fi_prefix = substitute chg fi_prefix
        , fi_prologue = substitute chg fi_prologue
        }
 
 instance Substitutable FunctionDeclare where
-  substitute chg fp@FunctionDeclare {..} =
+  substitute chg fp@FunctionDeclareData {..} =
     fp { fd_fun_name = substitute chg fd_fun_name
-       , fd_param_list = substitute chg fd_param_list
+       , fd_signature = substitute chg fd_signature
        , fd_comdat = substitute chg fd_comdat
        , fd_prefix = substitute chg fd_prefix
        , fd_prologue = substitute chg fd_prologue
@@ -754,43 +754,24 @@ instance Substitutable Tinst where
     T_resume (T dt v) -> T_resume (T dt (substitute chg v))
     T_unwind -> T_unwind
 
+instance Substitutable a => Substitutable (FunSignature a) where
+  substitute chg x@FunSignature{..} = x { fs_params = substitute chg fs_params }
+                                      
 instance Substitutable CallFunInterface where
-  substitute chg x@CallFunInterface{..} = x { cfi_firstParamAsRet = substitute chg cfi_firstParamAsRet
-                                            , cfi_actualParams = substitute chg cfi_actualParams}
-
+  substitute chg x@CallFunInterface{..} = x { cfi_signature = substitute chg cfi_signature }
+  
 instance Substitutable InvokeFunInterface where
-  substitute chg x@InvokeFunInterface{..} = x { ifi_firstParamAsRet = substitute chg ifi_firstParamAsRet
-                                              , ifi_actualParams = substitute chg ifi_actualParams}
+  substitute chg x@InvokeFunInterface{..} = x { ifi_signature = substitute chg ifi_signature }
 
 instance Substitutable CallAsmInterface where
   substitute chg x@CallAsmInterface{..} = x { cai_actualParams = substitute chg cai_actualParams}
 
-instance Substitutable FirstOperandAsRet where
-  substitute chg (FirstOperandAsRet dt pa ma v) = FirstOperandAsRet dt pa ma (substitute chg v)
-
-instance Substitutable CallOperand where
+instance Substitutable a => Substitutable (FunOperand a) where
   substitute chg c = case c of
-    CallOperandData dt pa ma v -> CallOperandData dt pa ma (substitute chg v)
-    CallOperandByVal dt pa ma v -> CallOperandByVal dt pa ma (substitute chg v)    
-    CallOperandLabel t pa ma v -> CallOperandLabel t pa ma (substitute chg v)
-
-instance Substitutable FunParamTypeList where
-  substitute chg (FunParamTypeList fps mvp fa) = FunParamTypeList (substitute chg fps) mvp fa
-
-instance Substitutable FunParamType where
-  substitute chg fp = case fp of
-    FunParamDataType dt pa1 ma -> FunParamDataType dt pa1 ma 
-    FunParamByValType dt pa1 ma -> FunParamByValType dt pa1 ma
-    FunParamMetaType mk x -> FunParamMetaType mk (substitute chg x)
-
-
-instance Substitutable FunParamList where
-  substitute chg (FunParamList fps mvp fa) = FunParamList (substitute chg fps) mvp fa
-
-instance Substitutable FunParam where
-  substitute chg fp = case fp of
-    FunParamData dt pa1 ma x -> FunParamData dt pa1 ma (substitute chg x)
-    FunParamByVal dt pa1 ma x -> FunParamByVal dt pa1 ma (substitute chg x)  
+    FunOperandData dt pa ma v -> FunOperandData dt pa ma (substitute chg v)
+    FunOperandByVal dt pa ma v -> FunOperandByVal dt pa ma (substitute chg v)    
+    FunOperandLabel t pa ma v -> FunOperandLabel t pa ma (substitute chg v)
+    FunOperandAsRet dt pa ma v -> FunOperandAsRet dt pa ma (substitute chg v)
 
 instance Substitutable Fparam where
   substitute chg fp = case fp of

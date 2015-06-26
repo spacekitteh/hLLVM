@@ -39,11 +39,11 @@ data MetaKind = Mtype Type
               | Mmetadata
               deriving (Eq, Ord, Show)
                    
-data FormalParam = FormalParamData Type [ParamAttr] Fparam -- [ParamAttr]
+data FormalParam = FormalParamData Type [ParamAttr] Fparam
                  | FormalParamMeta MetaKind Fparam
                  deriving (Eq,Ord,Show)
 
-data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) [FunAttr] deriving (Eq,Ord,Show)
+data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) {-[FunAttr]-} deriving (Eq,Ord,Show)
 
 data TypeParamList = TypeParamList [Type] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 

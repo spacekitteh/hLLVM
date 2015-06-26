@@ -99,7 +99,7 @@ pInvoke lhs = do { reserved "invoke"
 
 pInvokeAsm :: Maybe LocalId -> P TerminatorInst
 pInvokeAsm lhs = do { reserved "invoke"
-                    ; callSite <- pAsm -- CallSite
+                    ; callSite <- pAsm 
                     ; reserved "to"
                     ; toLbl <- pTargetLabel
                     ; reserved "unwind"

@@ -374,8 +374,8 @@ instance AsmPrint FormalParam where
     (FormalParamMeta e lv) -> toLlvm e <+> toLlvm lv
 
 instance AsmPrint FormalParamList where
-  toLlvm (FormalParamList params var atts) =
-    parens (commaSepNonEmpty ((fmap toLlvm params) ++ [maybe empty toLlvm var])) <+> (hsep $ fmap toLlvm atts)
+  toLlvm (FormalParamList params var) = -- atts) =
+    parens (commaSepNonEmpty ((fmap toLlvm params) ++ [maybe empty toLlvm var])) -- <+> (hsep $ fmap toLlvm atts)
 
 instance AsmPrint TypeParamList where
   toLlvm (TypeParamList params b) = parens (commaSepNonEmpty ((fmap toLlvm params) ++ [maybe empty toLlvm b]))

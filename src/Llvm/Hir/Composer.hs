@@ -83,16 +83,18 @@ i_store loc = I_store { volatile = IsNot Volatile
                       , nontemporal = Nothing
                       }
 
+{-
 icallcmd :: GlobalId -> [(Dtype, Value)] -> Cinst
 icallcmd fname params = I_call_fun (FunId fname) 
                         (CallFunInterface TcNon Ccc [] (CallSiteTypeRet $ RtypeVoidU Tvoid) 
-                         Nothing (fmap (\(dt,v) -> CallOperandData dt [] Nothing v) params) []) Nothing
+                         Nothing (fmap (\(dt,v) -> FunOperandData dt [] Nothing v) params) []) Nothing
 
 icallfun :: GlobalId -> [(Dtype, Value)] -> Dtype -> LocalId -> Cinst
 icallfun fname params retType rid =
   I_call_fun (FunId fname) 
   (CallFunInterface TcNon Ccc [] (CallSiteTypeRet $ ucast retType) 
-   Nothing (fmap (\(dt,v) -> CallOperandData dt [] Nothing v) params) []) (Just rid)
+   Nothing (fmap (\(dt,v) -> FunOperandData dt [] Nothing v) params) []) (Just rid)
+-}
 
 
 llvm_sizeof :: Dtype -> Type ScalarB I -> Const

@@ -1,9 +1,10 @@
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE CPP, TemplateHaskell #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts #-}
 module Llvm.AsmHirConversion.TypeConversion where
 
 import qualified Llvm.Asm.Data.Type as A
@@ -23,6 +24,13 @@ class TypeConversion mp l1 l2 where
   
 {-Ast Type to Ir type conversion -}
 
+instance TypeConversion () I.Mtype A.Type where
+  tconvert mp t = case t of
+    I.MtypeAsRet d _ -> tconvert mp d
+    I.MtypeData d _ -> tconvert mp d
+    I.MtypeByVal d _ -> tconvert mp d
+    I.MtypeLabel d _ -> tconvert mp d
+    
 instance TypeConversion () I.Dtype A.Type where
   tconvert _ t = case t of
     I.DtypeScalarI x -> tconvert () x
@@ -69,6 +77,7 @@ stripOffPa palist pas =
                            [] -> (pl0, bl++[Nothing])
         ) (palist,[]) pas
 
+
 instance TypeConversion () I.Rtype A.Type where  
   tconvert _ t = case t of
     I.RtypeScalarI x -> tconvert () x
@@ -104,13 +113,18 @@ instance TypeConversion () I.Ftype A.Type where
     I.FtypeFirstClassD x -> tconvert () x
 
 
-instance TypeConversion MP A.TypeParamList I.TypeParamList where
-  tconvert mp (A.TypeParamList l ma) = 
+instance TypeConversion MP [A.Type] [I.Dtype] where
+  tconvert mp l = 
     let (l1::[I.Utype]) = fmap (tconvert mp) l
-    in I.TypeParamList (fmap (dcast FLC) l1) ma
+    in (fmap (dcast FLC) l1)
 
-instance TypeConversion () I.TypeParamList A.TypeParamList where
-  tconvert _ (I.TypeParamList l ma) = A.TypeParamList (fmap (tconvert ()) l) ma
+instance TypeConversion () [I.Mtype] [A.Type] where 
+  tconvert _ l = fmap (tconvert ()) l
+
+instance TypeConversion MP [A.Type] [I.Mtype] where
+  tconvert mp l = 
+    let (l1::[I.Utype]) = fmap (tconvert mp) l
+    in (fmap (\x -> I.MtypeData (dcast FLC x) Nothing) l1)
 
 instance TypeConversion MP A.Type I.Utype where
   tconvert _ (A.Tprimitive et) = case et of 
@@ -183,16 +197,16 @@ instance TypeConversion MP A.Type I.Utype where
     Tk_RecordD -> ucast $ I.TnoRecordD s
     Tk_CodeFunX -> ucast $ I.TnoCodeFunX s
     Tk_Opaque -> ucast $ I.TnoOpaqueD s
-  tconvert mp (A.Tfunction rt tp fa) = 
+  tconvert mp (A.Tfunction rt (A.TypeParamList tp mv) fa) = 
     let rt1 = dcast FLC ((tconvert mp rt)::I.Utype)
-    in I.UtypeFunX (I.Tfunction rt1 (tconvert mp tp) fa)
+    in I.UtypeFunX (I.Tfunction (rt1,[]) (tconvert mp tp) mv)
                                     
                                     
-instance TypeConversion MP A.AddrSpace I.AddrSpace where                                    
+instance TypeConversion MP A.AddrSpace I.AddrSpace where
   tconvert _ (A.AddrSpace n) = n
   tconvert _ (A.AddrSpaceUnspecified) = 0
 
-instance TypeConversion () I.AddrSpace A.AddrSpace where                                    
+instance TypeConversion () I.AddrSpace A.AddrSpace where    
   tconvert _ 0 = A.AddrSpaceUnspecified
   tconvert _ n = A.AddrSpace n
   
@@ -208,7 +222,7 @@ instance TypeConversion () I.MetaKind A.MetaKind where
     I.Mmetadata -> A.Mmetadata
 
 
-instance TypeConversion () (I.Type s r) A.Type where -- Primitive where
+instance TypeConversion () (I.Type s r) A.Type where
   tconvert _ t = case t of
     I.TpI n -> A.Tprimitive $ A.TpI n
     I.TpF n -> A.Tprimitive $ A.TpF n
@@ -277,7 +291,8 @@ instance TypeConversion () (I.Type s r) A.Type where -- Primitive where
     I.TnameOpaqueD s -> A.Tname s
     I.TquoteNameOpaqueD s -> A.TquoteName s
 
-    I.Tfunction rt tp fa -> A.Tfunction (tconvert () rt) (tconvert () tp) fa
+    I.Tfunction (rt,_) tp ma -> A.Tfunction (tconvert () rt) 
+                                (A.TypeParamList (tconvert () tp) ma) []
     I.TpNull -> A.Tprimitive A.TpNull
     I.TpLabel -> A.Tprimitive A.TpLabel
     I.Topaque -> A.Topaque

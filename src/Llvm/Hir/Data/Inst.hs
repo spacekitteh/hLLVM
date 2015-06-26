@@ -238,26 +238,18 @@ data CallSiteType = CallSiteTypeRet Rtype
                   deriving (Eq, Ord, Show)
 
 data CallFunInterface = CallFunInterface { cfi_tail :: TailCall
-                                         , cfi_conv :: CallConv
-                                         , cfi_retAttrs :: [RetAttr]
-                                         , cfi_type :: CallSiteType
-                                         , cfi_firstParamAsRet :: Maybe FirstOperandAsRet
-                                         , cfi_actualParams :: [CallOperand]
+                                         , cfi_signature :: FunSignature Value
                                          , cfi_funAttrs :: [FunAttr]
                                          } deriving (Eq, Ord, Show)
 
-data InvokeFunInterface = InvokeFunInterface { ifi_conv :: CallConv
-                                             , ifi_retAttrs :: [RetAttr]
-                                             , ifi_type :: CallSiteType
-                                             , ifi_firstParamAsRet :: Maybe FirstOperandAsRet                                               
-                                             , ifi_actualParams :: [CallOperand]
+data InvokeFunInterface = InvokeFunInterface { ifi_signature :: FunSignature Value
                                              , ifi_funAttrs :: [FunAttr]
                                              } deriving (Eq, Ord, Show)
 
-data CallAsmInterface = CallAsmInterface { cai_type :: CallSiteType
+data CallAsmInterface = CallAsmInterface { cai_type :: Type CodeFunB X 
                                          , cai_sideeffect :: Maybe SideEffect
                                          , cai_alignstack :: Maybe AlignStack
-                                         , cai_actualParams :: [CallOperand]
+                                         , cai_actualParams :: [FunOperand Value]
                                          , cai_funAttrs :: [FunAttr]
                                          } deriving (Eq, Ord, Show)
 
@@ -365,7 +357,7 @@ data Cinst where {
 
   I_call_fun :: { call_ptr :: FunPtr
                 , call_fun_interface :: CallFunInterface
-                , call_return :: Maybe LocalId 
+                , call_return :: Maybe LocalId
                 } -> Cinst;
 
   I_call_asm :: { call_asmcode :: AsmCode
@@ -938,7 +930,7 @@ data Cinst where {
                           , meta :: MetaKindedConst
                           , result :: LocalId
                           } -> Cinst;
-  
+
   I_llvm_write_register :: { memLen :: MemLen
                            , meta :: MetaKindedConst
                            , value :: Value
@@ -1065,14 +1057,6 @@ data Tinst = T_unreachable
            | T_unwind
            deriving (Eq, Ord, Show)
 
-data CallOperand = CallOperandData Dtype [ParamAttr] (Maybe Alignment) Value
-                 | CallOperandByVal Dtype [ParamAttr] (Maybe Alignment) Value
-                 | CallOperandLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) Label
-                 deriving (Eq,Ord,Show)
-
-data FirstOperandAsRet = FirstOperandAsRet Dtype [ParamAttr] (Maybe Alignment) Value
-                       deriving (Eq,Ord,Show)
-
 data Value = Val_ssa LocalId
            | Val_const Const
            deriving (Eq,Ord,Show)
@@ -1089,11 +1073,8 @@ data Aliasee = AliaseeTv (T Dtype Value)
 data FunctionInterface = FunctionInterface { fi_linkage :: Maybe Linkage
                                            , fi_visibility :: Maybe Visibility
                                            , fi_dllstorage :: Maybe DllStorageClass
-                                           , fi_call_conv :: Maybe CallConv
-                                           , fi_param_attrs :: [ParamAttr]
-                                           , fi_ret_type :: Rtype
+                                           , fi_signature :: FunSignature LocalId
                                            , fi_fun_name :: GlobalId
-                                           , fi_param_list :: FunParamList
                                            , fi_addr_naming :: Maybe AddrNaming
                                            , fi_fun_attrs :: [FunAttr]
                                            , fi_section :: Maybe Section
@@ -1104,13 +1085,6 @@ data FunctionInterface = FunctionInterface { fi_linkage :: Maybe Linkage
                                            , fi_prologue :: Maybe Prologue
                                            } deriving (Eq,Ord,Show)
 
-data FunParam = FunParamData Dtype [ParamAttr] (Maybe Alignment) LocalId 
-              | FunParamByVal Dtype [ParamAttr] (Maybe Alignment) LocalId
-              deriving (Eq,Ord,Show)
-                       
-data FunParamList = FunParamList [FunParam] (Maybe VarArgParam) [FunAttr]
-                  deriving (Eq,Ord,Show)
-                           
 data MetaFunParam = MetaFunParam MetaKind Fparam deriving (Eq, Ord, Show)
 
 data Prefix = Prefix TypedConstOrNull deriving (Eq, Ord, Show)
@@ -1120,3 +1094,15 @@ data TypedConstOrNull = TypedConst (T Dtype Const)
                       | UntypedNull deriving (Eq, Ord, Show)
 
 
+data FunSignature a = FunSignature { fs_callConv ::  CallConv
+                                   , fs_retAttrs :: [RetAttr]
+                                   , fs_type :: Type CodeFunB X
+                                   , fs_params :: [FunOperand a]
+                                   } deriving (Eq, Ord, Show)
+
+
+data FunOperand a = FunOperandData Dtype [ParamAttr] (Maybe Alignment) a
+                  | FunOperandAsRet Dtype [ParamAttr] (Maybe Alignment) a
+                  | FunOperandByVal Dtype [ParamAttr] (Maybe Alignment) a
+                  | FunOperandLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) a
+                  deriving (Eq,Ord,Show)

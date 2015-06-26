@@ -15,6 +15,7 @@ import qualified Control.Monad as Md
 import qualified Data.Map as M
 import qualified Llvm.Asm.Data as A
 import qualified Llvm.Hir.Data as I
+import Llvm.Hir.Composer (ptr0)
 import Llvm.Hir.Cast
 import Llvm.Util.Monadic (maybeM, pairM)
 import Llvm.AsmHirConversion.TypeConversion
@@ -460,29 +461,31 @@ instance Conversion I.FunPtr (Rm A.FunName) where
                                         }
 
 instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite)) where
-  convert  (fn, cfi) = case cfi of
-    I.CallFunInterface tc cc pa t fap aps fa -> 
-      do { fna <- convert fn
-         ; fapa <- convert fap
-         ; apsa <- mapM convert aps
-         ; ta <- convert t
-         ; return (tc, A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (maybe apsa (:apsa) fapa) fa)
-         }
+  convert  (fn, I.CallFunInterface { I.cfi_tail = tc, I.cfi_signature = sig, I.cfi_funAttrs = fa}) = 
+    do { fna <- convert fn
+       ; (cc, pa, ret, aps) <- convert sig
+       ; return (tc, A.CallSiteFun cc pa ret fna aps fa)
+       }
     
 instance Conversion (I.FunPtr, I.InvokeFunInterface) (Rm A.CallSite) where
-  convert  (fn, ifi) = case ifi of
-    I.InvokeFunInterface cc pa t fap aps fa ->
-      do { fna <- convert fn
-         ; fapa <- convert fap
-         ; apsa <- mapM convert aps
-         ; ta <- convert t
-         ; return (A.CallSiteFun (Just cc) (fmap unspecializeRetAttr pa) ta fna (maybe apsa (:apsa) fapa) fa)
-         }
+  convert  (fn, I.InvokeFunInterface { I.ifi_signature = sig, I.ifi_funAttrs = fa}) =  
+    do { fna <- convert fn
+       ; (cc, pa, ret, aps) <- convert sig
+       ; return (A.CallSiteFun cc pa ret fna aps fa)
+       }
+    
+instance Conversion (I.Type I.CodeFunB I.X) (Rm (A.Type, Maybe A.VarArgParam)) where    
+  convert t@(I.Tfunction (rt,_) pts ma) = return (tconvert () (ptr0 t), ma)
+                                          -- return $ tconvert () rt
+                                          
+                                          
+getReturnType :: I.Type I.CodeFunB I.X -> Rm (A.Type, Maybe A.VarArgParam)                                          
+getReturnType t@(I.Tfunction (rt,_) _ ma) = return (tconvert () rt, ma)
 
 instance Conversion (I.AsmCode, I.CallAsmInterface) (Rm A.InlineAsmExp) where
   convert (I.AsmCode dia s1 s2, I.CallAsmInterface t mse mas aps fa) = 
     do { apsa <- mapM convert aps
-       ; ta <- convert t
+       ; (ta,_) <- convert t
        ; return (A.InlineAsmExp ta mse mas dia s1 s2 apsa fa)
        }
 
@@ -1056,23 +1059,23 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
              } 
         _ -> errorLoc FLC $ show cinst
                                       
-instance Conversion I.FirstOperandAsRet (Rm A.ActualParam) where
-  convert (I.FirstOperandAsRet t pa1 ma v) = 
-    do { va <- convert v
-       ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaSRet:pa1)) va
-       }
-    
-instance Conversion I.CallOperand (Rm A.ActualParam) where
+
+instance Conversion (I.FunOperand I.Value) (Rm A.ActualParam) where
   convert x = case x of
-    I.CallOperandData t pa ma v -> do { va <- convert v 
-                                      ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa) va
-                                      }
-    I.CallOperandByVal t pa ma v -> do { va <- convert v 
-                                       ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaByVal:pa)) va
-                                       }                                      
-    I.CallOperandLabel t pa ma v -> do { va <- convert_to_PercentLabel v 
-                                       ; return $ A.ActualParamLabel (tconvert () t) (appendAlignment ma pa) va
-                                       }
+    I.FunOperandData t pa ma v -> do { va <- convert v 
+                                     ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa) va
+                                     }
+    I.FunOperandByVal t pa ma v -> do { va <- convert v 
+                                      ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaByVal:pa)) va
+                                      }                                      
+    I.FunOperandLabel t pa ma (I.Val_const (I.C_labelId v)) -> 
+      do { va <- convert_to_PercentLabel v 
+         ; return $ A.ActualParamLabel (tconvert () t) (appendAlignment ma pa) va
+         }
+    I.FunOperandAsRet t pa1 ma v ->
+      do { va <- convert v
+         ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaSRet:pa1)) va
+         }      
 
 instance Conversion I.MetaOperand (Rm A.ActualParam) where
   convert x = case x of
@@ -1100,47 +1103,144 @@ instance Conversion I.TypedConstOrNull (Rm A.TypedConstOrNull) where
     I.TypedConst tv -> Md.liftM A.TypedConst (convert tv)
     I.UntypedNull -> return A.UntypedNull
 
-instance Conversion I.FunParamType (Rm A.FormalParam) where
+instance Conversion (I.FunOperand ()) (Rm A.FormalParam) where
   convert x = case x of
-    I.FunParamDataType dt pa ma -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FimplicitParam)
-    I.FunParamByValType dt pa ma -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FimplicitParam)
-    I.FunParamMetaType mk fp -> return $  A.FormalParamMeta (tconvert () mk) fp
+    I.FunOperandData dt pa ma _ -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FimplicitParam)
+    I.FunOperandByVal dt pa ma _ -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FimplicitParam)
+    I.FunOperandAsRet dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:pa)) A.FimplicitParam
 
-instance Conversion I.FunParam (Rm A.FormalParam) where
+instance Conversion (I.FunOperand I.LocalId) (Rm A.FormalParam) where
   convert x = case x of
-    I.FunParamData dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FexplicitParam fp)
-    I.FunParamByVal dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FexplicitParam fp)
-
-instance Conversion I.FunParamTypeList (Rm A.FormalParamList) where
-  convert (I.FunParamTypeList l ma fas) =
-    do { la <- mapM convert l
-       ; return $ A.FormalParamList la ma fas
+    I.FunOperandData dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FexplicitParam fp)
+    I.FunOperandByVal dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FexplicitParam fp)
+    I.FunOperandAsRet dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:pa)) (A.FexplicitParam fp)
+  
+instance Conversion (I.FunSignature I.LocalId) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
+  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_retAttrs = attrs, I.fs_type = typ 
+                           , I.fs_params = paras } =
+    do { (ret, mv) <- getReturnType typ
+       ; paras0 <- mapM convert paras
+       ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
+       }
+         
+instance Conversion (I.FunSignature ()) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
+  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_retAttrs = attrs, I.fs_type = typ 
+                           , I.fs_params = paras } =
+    do { (ret, mv) <- getReturnType typ
+       ; paras0 <- mapM convert paras
+       ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
        }
 
-instance Conversion I.FunParamList (Rm A.FormalParamList) where
-  convert (I.FunParamList l ma fas) =
-    do { la <- mapM convert l
-       ; return $ A.FormalParamList la ma fas
+instance Conversion (I.FunSignature I.Value) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, [A.ActualParam])) where
+  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_retAttrs = attrs, I.fs_type = typ 
+                           , I.fs_params = paras } =
+    do { (ret, mv) <- convert typ
+       ; paras0 <- mapM convert paras
+       ; return (Just cc, fmap unspecializeRetAttr attrs, ret, paras0)
        }
-
+  
 
 instance Conversion I.FunctionInterface (Rm A.FunctionPrototype) where
-  convert (I.FunctionInterface f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
-    do { f13a <- convert f13
+  convert (I.FunctionInterface { I.fi_linkage = f0 
+                               , I.fi_visibility = f1 
+                               , I.fi_dllstorage = f2
+                               , I.fi_signature = f3
+                               , I.fi_fun_name = f6
+                               , I.fi_addr_naming = f8
+                               , I.fi_fun_attrs = f9 
+                               , I.fi_section = f10 
+                               , I.fi_comdat = f11
+                               , I.fi_alignment = f12 
+                               , I.fi_gc = f13
+                               , I.fi_prefix = f14 
+                               , I.fi_prologue = f15 }) =
+    do { f15a <- convert f15
        ; f14a <- convert f14
-       ; f7a <- convert f7
-       ; return $ A.FunctionPrototype f0 f1 f2 f3 f4 (tconvert () f5) f6 f7a f8 f9 f10 f10a f11 f12 f13a f14a
+       ; (f3a, f3b, f3c, f3d) <- convert f3
+       ; return $ A.FunctionPrototype { A.fp_linkage = f0 
+                                      , A.fp_visibility = f1 
+                                      , A.fp_dllstorage = f2 
+                                      , A.fp_callConv = f3a
+                                      , A.fp_retAttrs = f3b
+                                      , A.fp_retType = f3c
+                                      , A.fp_fun_name = f6
+                                      , A.fp_param_list = f3d
+                                      , A.fp_addr_naming = f8
+                                      , A.fp_fun_attrs = f9
+                                      , A.fp_section = f10
+                                      , A.fp_comdat = f11
+                                      , A.fp_alignment = f12
+                                      , A.fp_gc = f13
+                                      , A.fp_prefix = f14a
+                                      , A.fp_prologue = f15a
+                                      }
        }
 
 
 
 instance Conversion I.FunctionDeclare (Rm A.FunctionPrototype) where
-    convert (I.FunctionDeclare f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
-      do { f13a <- convert f13
+  convert x = case x of
+    I.FunctionDeclareData { I.fd_linkage = f0 
+                          , I.fd_visibility = f1 
+                          , I.fd_dllstorage = f2 
+                          , I.fd_signature = f3 
+                          , I.fd_fun_name = f6
+                          , I.fd_addr_naming = f8 
+                          , I.fd_fun_attrs = f9 
+                          , I.fd_section = f10 
+                          , I.fd_comdat = f11 
+                          , I.fd_alignment = f12 
+                          , I.fd_gc = f13 
+                          , I.fd_prefix = f14
+                          , I.fd_prologue = f15
+                          } ->
+      do { f15a <- convert f15
          ; f14a <- convert f14
-         ; f7a <- convert f7
-         ; return $ A.FunctionPrototype f0 f1 f2 f3 f4 (tconvert () f5) 
-           f6 f7a f8 f9 f10 f10a f11 f12 f13a f14a
+         ; (f3a, f3b, f3c, f3d) <- convert f3
+         ; return $ A.FunctionPrototype { A.fp_linkage = f0 
+                                        , A.fp_visibility = f1 
+                                        , A.fp_dllstorage = f2 
+                                        , A.fp_callConv = f3a
+                                        , A.fp_retAttrs = f3b
+                                        , A.fp_retType = f3c
+                                        , A.fp_fun_name = f6
+                                        , A.fp_param_list = f3d
+                                        , A.fp_addr_naming = f8
+                                        , A.fp_fun_attrs = f9
+                                        , A.fp_section = f10
+                                        , A.fp_comdat = f11
+                                        , A.fp_alignment = f12
+                                        , A.fp_gc = f13
+                                        , A.fp_prefix = f14a
+                                        , A.fp_prologue = f15a
+                                        }
+         }
+    I.FunctionDeclareMeta { I.fd_retType = f5
+                          , I.fd_fun_name = f6
+                          , I.fd_metakinds = f7
+                          , I.fd_fun_attrs = f8
+                          } -> 
+      do { let f7a = fmap (\x -> case x of
+                              Left m -> A.FormalParamMeta (tconvert () m) A.FimplicitParam
+                              Right m -> A.FormalParamData (tconvert () m) [] A.FimplicitParam
+                          ) f7
+         ; return $ A.FunctionPrototype { A.fp_linkage = Nothing
+                                        , A.fp_visibility = Nothing
+                                        , A.fp_dllstorage = Nothing
+                                        , A.fp_callConv = Nothing
+                                        , A.fp_retAttrs = []
+                                        , A.fp_retType = (tconvert () f5)
+                                        , A.fp_fun_name = f6
+                                        , A.fp_param_list = A.FormalParamList f7a Nothing
+                                        , A.fp_addr_naming = Nothing
+                                        , A.fp_fun_attrs = f8
+                                        , A.fp_section = Nothing
+                                        , A.fp_comdat = Nothing
+                                        , A.fp_alignment = Nothing
+                                        , A.fp_gc = Nothing
+                                        , A.fp_prefix = Nothing
+                                        , A.fp_prologue = Nothing
+                                        }
          }
 
 

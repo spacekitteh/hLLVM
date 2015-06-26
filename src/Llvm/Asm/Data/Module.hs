@@ -253,8 +253,8 @@ data TerminatorInst =
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
                              deriving (Eq,Show)
 
-data ActualParam = ActualParamData Type [ParamAttr] Value -- [ParamAttr]
-                 | ActualParamLabel Type [ParamAttr] PercentLabel -- [ParamAttr]
+data ActualParam = ActualParamData Type [ParamAttr] Value
+                 | ActualParamLabel Type [ParamAttr] PercentLabel
                  | ActualParamMeta MetaKindedConst
                  deriving (Eq,Ord,Show)
 
@@ -269,23 +269,23 @@ data Aliasee = AliaseeTv (Typed Value)
              | AliaseeGetElementPtr (GetElementPtr Const)
              deriving (Eq,Show)
 
-data FunctionPrototype = FunctionPrototype
-                         (Maybe Linkage)
-                         (Maybe Visibility)
-                         (Maybe DllStorageClass)
-                         (Maybe CallConv)
-                         [ParamAttr]
-                         Type
-                         GlobalId
-                         FormalParamList
-                         (Maybe AddrNaming)
-                         [FunAttr]
-                         (Maybe Section)
-                         (Maybe Comdat)
-                         (Maybe Alignment)
-                         (Maybe Gc)
-                         (Maybe Prefix)
-                         (Maybe Prologue)
+data FunctionPrototype = FunctionPrototype { fp_linkage :: Maybe Linkage
+                                           , fp_visibility :: Maybe Visibility
+                                           , fp_dllstorage :: Maybe DllStorageClass
+                                           , fp_callConv :: Maybe CallConv
+                                           , fp_retAttrs :: [ParamAttr]
+                                           , fp_retType :: Type
+                                           , fp_fun_name :: GlobalId
+                                           , fp_param_list :: FormalParamList
+                                           , fp_addr_naming :: Maybe AddrNaming
+                                           , fp_fun_attrs :: [FunAttr]
+                                           , fp_section :: Maybe Section
+                                           , fp_comdat :: Maybe Comdat
+                                           , fp_alignment :: Maybe Alignment
+                                           , fp_gc :: Maybe Gc
+                                           , fp_prefix :: Maybe Prefix
+                                           , fp_prologue :: Maybe Prologue
+                                           }
                        deriving (Eq,Ord,Show)
 
 

@@ -133,33 +133,33 @@ mkCheck te mp dt = [ Comment $ Cstring $ render $ printIr dt
 
 callLog :: [T Dtype Value] -> (Node a) O O
 callLog tvs = 
-  let aps = fmap (\(T t v) -> CallOperandData t [] Nothing v) tvs
-      callSiteType = CallSiteTypeFun (Tfunction (RtypeVoidU Tvoid) (TypeParamList [ucast $ ptr0 i8, ucast i32, ucast i32] Nothing) []) 0
+  let aps = fmap (\(T t v) -> FunOperandData t [] Nothing v) tvs
+      callSiteType = Tfunction (RtypeVoidU Tvoid, []) [MtypeData (ucast $ ptr0 i8) Nothing, MtypeData (ucast i32) Nothing
+                                                      , MtypeData (ucast i32) Nothing] Nothing
   in Cnode (I_call_fun (FunId (GlobalIdAlphaNum "check_int2")) 
-            (CallFunInterface TcNon Ccc [] callSiteType  Nothing aps []) Nothing) []
+            (CallFunInterface TcNon (FunSignature Ccc [] callSiteType aps) []) Nothing) []
 
-
-visFunctions = [FunctionDeclare { fd_linkage = Nothing
-                                , fd_visibility = Nothing
-                                , fd_dllstorage = Nothing
-                                , fd_call_conv = Nothing
-                                , fd_param_attrs = []
-                                , fd_ret_type = RtypeVoidU Tvoid
-                                , fd_fun_name = GlobalIdAlphaNum "check_int2"
-                                , fd_param_list = (FunParamTypeList [FunParamDataType (ucast $ ptr0 i8) [] Nothing 
-                                                                    ,FunParamDataType (ucast i32) [] Nothing
-                                                                    ,FunParamDataType (ucast i32) [] Nothing
-                                                                    ] 
-                                                   Nothing [])
-                                , fd_addr_naming = Nothing
-                                , fd_fun_attrs = []
-                                , fd_section = Nothing
-                                , fd_comdat = Nothing
-                                , fd_alignment = Nothing
-                                , fd_gc = Nothing
-                                , fd_prefix = Nothing
-                                , fd_prologue = Nothing
-                                }
+visFunctions = [FunctionDeclareData { fd_linkage = Nothing
+                                    , fd_visibility = Nothing
+                                    , fd_dllstorage = Nothing
+                                    , fd_signature = FunSignature { fs_callConv = Ccc
+                                                                  , fs_retAttrs = []
+                                                                  , fs_type = Tfunction (RtypeVoidU Tvoid,[]) [] Nothing
+                                                                  , fs_params = [FunOperandData (ucast $ ptr0 i8) [] Nothing ()
+                                                                                ,FunOperandData (ucast i32) [] Nothing ()
+                                                                                ,FunOperandData (ucast i32) [] Nothing ()
+                                                                                ] 
+                                                                  }
+                                    , fd_fun_name = GlobalIdAlphaNum "check_int2"
+                                    , fd_addr_naming = Nothing
+                                    , fd_fun_attrs = []
+                                    , fd_section = Nothing
+                                    , fd_comdat = Nothing
+                                    , fd_alignment = Nothing
+                                    , fd_gc = Nothing
+                                    , fd_prefix = Nothing
+                                    , fd_prologue = Nothing
+                                    }
                ]
 
 
@@ -170,11 +170,12 @@ defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph ins
         mainFp = FunctionInterface { fi_linkage = Nothing
                                    , fi_visibility = Nothing
                                    , fi_dllstorage = Nothing
-                                   , fi_call_conv = Nothing
-                                   , fi_param_attrs = []
-                                   , fi_ret_type = RtypeScalarI (TpI 32)
+                                   , fi_signature = FunSignature { fs_callConv = Ccc
+                                                                 , fs_retAttrs = []
+                                                                 , fs_type = Tfunction (RtypeScalarI (TpI 32), []) [] Nothing
+                                                                 , fs_params = []
+                                                                 }
                                    , fi_fun_name = GlobalIdAlphaNum "main"
-                                   , fi_param_list = FunParamList [] Nothing []
                                    , fi_addr_naming = Nothing
                                    , fi_fun_attrs = []
                                    , fi_section = Nothing

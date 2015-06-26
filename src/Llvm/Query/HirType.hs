@@ -462,6 +462,9 @@ instance TypeOf (T (Type ScalarB P) x) Dtype where
 instance TypeOf (T Dtype x) Dtype where
   typeof te (T t _) = Just t
 
+instance TypeOf (FunSignature Value) Dtype where
+  typeof te (FunSignature { fs_type = typ}) = typeof te typ
+    
 instance TypeOf Cinst Dtype where
   typeof te x = case x of
     I_alloca{..} -> Just $ ucast $ Tpointer (ucast dtype) 0
@@ -485,7 +488,7 @@ instance TypeOf Cinst Dtype where
     I_atomicrmw{..} -> let (T t _) = val
                        in Just $ ucast t
 
-    I_call_fun{..} -> typeof te (cfi_type call_fun_interface)
+    I_call_fun{..} -> typeof te (cfi_signature call_fun_interface)
     
     I_call_asm{..} -> typeof te (cai_type call_asm_interface)
     
@@ -664,11 +667,16 @@ instance TypeOf Rtype Dtype where
     RtypeRecordD t -> Just $ ucast t
     RtypeVoidU _ -> Nothing
     
+instance TypeOf (Type CodeFunB X) Dtype where
+  typeof te t = case t of
+    Tfunction (rt,_) _ _ -> typeof te rt
+    TnameCodeFunX n -> errorLoc FLC $ "unsupported " ++ show t
+
 instance TypeOf CallSiteType Dtype where
   typeof te x = case x of
     CallSiteTypeRet rt -> typeof te rt
     CallSiteTypeFun t as -> case t of
-      Tfunction rt _ _ -> typeof te rt
+      Tfunction (rt,_) _ _ -> typeof te rt
       TnameCodeFunX n -> errorLoc FLC $ "unsupported " ++ show x
 
 instance TypeOf Const Dtype where    

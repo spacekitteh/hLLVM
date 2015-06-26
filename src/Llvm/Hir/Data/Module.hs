@@ -68,33 +68,27 @@ data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst
 
 data TlNamedMd = TlNamedMd String [Ci.MdNode] deriving (Eq, Ord, Show)
 
-data FunParamType = FunParamDataType Dtype [ParamAttr] (Maybe Alignment) 
-                  | FunParamByValType Dtype [ParamAttr] (Maybe Alignment)
-                  | FunParamMetaType MetaKind Fparam
-                  deriving (Eq,Ord,Show)
-                                                      
 
-data FunParamTypeList = FunParamTypeList [FunParamType] (Maybe VarArgParam) [FunAttr]
-                      deriving (Eq,Ord,Show)
-                               
-
-data FunctionDeclare = FunctionDeclare { fd_linkage :: Maybe Linkage
-                                       , fd_visibility :: Maybe Visibility
-                                       , fd_dllstorage :: Maybe DllStorageClass
-                                       , fd_call_conv :: Maybe CallConv
-                                       , fd_param_attrs :: [ParamAttr]
-                                       , fd_ret_type :: Rtype
-                                       , fd_fun_name :: GlobalId
-                                       , fd_param_list :: FunParamTypeList
-                                       , fd_addr_naming :: Maybe AddrNaming
-                                       , fd_fun_attrs :: [FunAttr]
-                                       , fd_section :: Maybe Section
-                                       , fd_comdat :: Maybe Comdat
-                                       , fd_alignment :: Maybe Alignment
-                                       , fd_gc :: Maybe Gc
-                                       , fd_prefix :: Maybe Prefix
-                                       , fd_prologue :: Maybe Prologue
-                                       } deriving (Eq,Ord,Show)
+data FunctionDeclare = FunctionDeclareData { fd_linkage :: Maybe Linkage
+                                           , fd_visibility :: Maybe Visibility
+                                           , fd_dllstorage :: Maybe DllStorageClass
+                                           , fd_signature :: FunSignature ()
+                                           , fd_fun_name :: GlobalId
+                                           , fd_addr_naming :: Maybe AddrNaming
+                                           , fd_fun_attrs :: [FunAttr]
+                                           , fd_section :: Maybe Section
+                                           , fd_comdat :: Maybe Comdat
+                                           , fd_alignment :: Maybe Alignment
+                                           , fd_gc :: Maybe Gc
+                                           , fd_prefix :: Maybe Prefix
+                                           , fd_prologue :: Maybe Prologue
+                                           } 
+                     | FunctionDeclareMeta { fd_fun_name :: GlobalId
+                                           , fd_fun_attrs :: [FunAttr]
+                                           , fd_retType :: Rtype
+                                           , fd_metakinds :: [Either MetaKind Dtype]
+                                           }
+                     deriving (Eq,Ord,Show)
                                                   
 data TlDeclare = TlDeclare FunctionDeclare deriving (Eq)
 

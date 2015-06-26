@@ -56,32 +56,32 @@ instance IrPrint IrCxt where
 convert_to_FunctionDeclareType :: FunctionInterface -> FunctionDeclare
 convert_to_FunctionDeclareType
   FunctionInterface {..} =
-    FunctionDeclare { fd_linkage = fi_linkage
-                    , fd_visibility = fi_visibility
-                    , fd_dllstorage = fi_dllstorage
-                    , fd_call_conv = fi_call_conv
-                    , fd_param_attrs = fi_param_attrs
-                    , fd_ret_type = fi_ret_type
-                    , fd_fun_name = fi_fun_name
-                    , fd_param_list = convert_to_FormalParamTypeList fi_param_list
-                    , fd_addr_naming = fi_addr_naming
-                    , fd_fun_attrs = fi_fun_attrs
-                    , fd_section = fi_section
-                    , fd_comdat = fi_comdat
-                    , fd_alignment = fi_alignment
-                    , fd_gc = fi_gc
-                    , fd_prefix = fi_prefix
-                    , fd_prologue = fi_prologue
-                    }
+    FunctionDeclareData { fd_linkage = fi_linkage
+                        , fd_visibility = fi_visibility
+                        , fd_dllstorage = fi_dllstorage
+                        , fd_fun_name = fi_fun_name
+                        , fd_signature = convert_to_FormalParamTypeList fi_signature
+                        , fd_addr_naming = fi_addr_naming
+                        , fd_fun_attrs = fi_fun_attrs
+                        , fd_section = fi_section
+                        , fd_comdat = fi_comdat
+                        , fd_alignment = fi_alignment
+                        , fd_gc = fi_gc
+                        , fd_prefix = fi_prefix
+                        , fd_prologue = fi_prologue
+                        }
 
-convert_to_FormalParamTypeList :: FunParamList -> FunParamTypeList
-convert_to_FormalParamTypeList (FunParamList l ma fas) =
-  FunParamTypeList (fmap convert_to_FormalParamType l) ma fas
+convert_to_FormalParamTypeList :: FunSignature LocalId -> FunSignature ()
+convert_to_FormalParamTypeList FunSignature{..} = 
+  FunSignature fs_callConv fs_retAttrs fs_type
+  (fmap convert_to_FormalParamType fs_params)
 
-convert_to_FormalParamType :: FunParam -> FunParamType
+
+convert_to_FormalParamType :: FunOperand LocalId -> FunOperand ()
 convert_to_FormalParamType x = case x of
-  FunParamData dt pas ma _ -> FunParamDataType dt pas ma
-  FunParamByVal dt pas ma _ -> FunParamByValType dt pas ma
+  FunOperandData dt pas ma _ -> FunOperandData dt pas ma ()
+  FunOperandByVal dt pas ma _ -> FunOperandByVal dt pas ma ()
+  FunOperandAsRet dt pa ma _ -> FunOperandAsRet dt pa ma ()
 
 
 irCxtOfModule :: Module a -> IrCxt
@@ -127,7 +127,7 @@ globalCxtOfModule (Module tl) =
                           _ -> False
                       ) tl
       funs = fmap (\tl -> case tl of
-                      ToplevelDeclare (TlDeclare fp@FunctionDeclare{..}) -> (fd_fun_name, fp)
+                      ToplevelDeclare (TlDeclare fp@FunctionDeclareData{..}) -> (fd_fun_name, fp)
                       ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> 
                         (fi_fun_name, convert_to_FunctionDeclareType fp))
              $ filter (\x -> case x of

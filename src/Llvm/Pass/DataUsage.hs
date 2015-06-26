@@ -216,13 +216,13 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
           T_ret_void -> f0
           T_return vs -> foldl (flip (aTv addConst)) f0 vs
           T_invoke{..} ->
-            let vals = getValuesFromParams (ifi_firstParamAsRet invoke_fun_interface) (ifi_actualParams invoke_fun_interface)
+            let vals = getValuesFromParams (fs_params $ ifi_signature invoke_fun_interface)
             in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                               $ addAddrStoringValue e p
                      ) (f0 { invokeFunInfoSet = S.insert (invoke_ptr, invoke_fun_interface) (invokeFunInfoSet f0) }) 
                (S.toList vals)
           T_invoke_asm{..} ->
-            let vals = getValuesFromParams Nothing (cai_actualParams invoke_asm_interface)
+            let vals = getValuesFromParams (cai_actualParams invoke_asm_interface)
             in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                               $ addAddrStoringValue e p
                      ) (f0 { callAsmInfoSet = S.insert invoke_asm_interface (callAsmInfoSet f0)}) (S.toList vals)
@@ -429,14 +429,13 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                            $ aTv (propogateUpPtrUsage result) trueVP
                            $ aTv (propogateUpPtrUsage result) falseVP f
         I_call_fun{..} ->
-          let vals = getValuesFromParams (cfi_firstParamAsRet call_fun_interface) 
-                     (cfi_actualParams call_fun_interface)
+          let vals = getValuesFromParams (fs_params $ cfi_signature call_fun_interface)
           in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                             $ addAddrStoringValue e p
                    ) (f { callFunInfoSet = S.insert (call_ptr, call_fun_interface) (callFunInfoSet f) })
              (S.toList vals)
         I_call_asm{..} ->
-          let vals = getValuesFromParams Nothing (cai_actualParams call_asm_interface)
+          let vals = getValuesFromParams (cai_actualParams call_asm_interface)
           in foldl (\p e -> addConst e $ addAddrCaptured e $ addAddrStoringPtr e
                             $ addAddrStoringValue e p
                    ) (f { callAsmInfoSet = S.insert call_asm_interface (callAsmInfoSet f)}) 
@@ -471,15 +470,16 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
 #ifdef DEBUG
       _ -> errorLoc FLC $ show n
 #endif
-    getValuesFromParams :: Maybe FirstOperandAsRet -> [CallOperand] -> S.Set Value
-    getValuesFromParams fp ls = let x = foldl (\p e -> case e of
-                                                 CallOperandData _ _ _ v -> S.insert v p
-                                                 CallOperandByVal _ _ _ v -> S.insert v p
+    getValuesFromParams :: [FunOperand Value] -> S.Set Value
+    getValuesFromParams ls = foldl (\p e -> case e of
+                                                 FunOperandAsRet _ _ _ v -> S.insert v p
+                                                 FunOperandData _ _ _ v -> S.insert v p
+                                                 FunOperandByVal _ _ _ v -> S.insert v p
                                                  _ -> p
                                               ) S.empty ls
-                                in maybe x (\(FirstOperandAsRet _ _ _ v) -> S.insert v x) fp
 
-scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => S.Set LocalId -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
+scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => S.Set LocalId 
+             -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
 scanGraph fm entry graph =
   do { (_, a, _) <- H.analyzeAndRewriteBwd (bwdScan fm) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyDataUsage (H.lookupFact entry a))
@@ -488,12 +488,13 @@ scanGraph fm entry graph =
 scanDefine :: (CheckpointMonad m, FuelMonad m, Show a, DataUsageUpdator a) => IrCxt -> TlDefine a -> m DataUsage
 scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
   where formalParamIds :: S.Set LocalId
-        formalParamIds = let (FunParamList l _ _) = fi_param_list fn
+        formalParamIds = let FunSignature { fs_params = r} = fi_signature fn
                          in foldl (\p x -> case x of
-                                      FunParamData (DtypeScalarP _)  _ _ v -> S.insert v p
-                                      FunParamByVal (DtypeScalarP _)  _ _ v -> S.insert v p                                      
+                                      FunOperandAsRet (DtypeScalarP _)  _ _ v -> S.insert v p
+                                      FunOperandData (DtypeScalarP _)  _ _ v -> S.insert v p
+                                      FunOperandByVal (DtypeScalarP _)  _ _ v -> S.insert v p
                                       _ -> p
-                                  ) S.empty l
+                                  ) S.empty r
 
 scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => Module a -> IrCxt -> 
               m (Dm.Map FunctionInterface DataUsage)

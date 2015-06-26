@@ -853,9 +853,8 @@ convert_to_Minst x = case x of
     do { mp <- typeDefs
        ; fna <- convert_FunId fn
        ; let ert = A.splitCallReturnType t
-             erta = eitherRet mp ert
        ; apsa <- mapM convert_MetaParam aps                
-       ; return (Just $ specializeMinst $ I.Minst erta fna apsa)
+       ; return (Just $ specializeMinst $ I.Minst (I.CallSiteTypeRet $ dcast FLC ((tconvert mp (fst ert))::I.Utype)) fna apsa)
        }
   _ -> return Nothing 
 
@@ -863,57 +862,52 @@ convert_to_CallFunInterface :: A.TailCall -> A.CallSite -> MM (Bool, I.FunPtr, I
 convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) = 
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
-           erta = eitherRet mp ert
+     ; erta <- eitherRet ert aps
      ; fna <- convert_FunPtr fn
-     ; case aps of
-         hd:tl ->      
-           do { mfp <- specializeFirstParamAsRet hd
-              ; (mfp0, apsa) <- case mfp of
-                Just _ -> liftM (mfp,) (mapM convert_ActualParam  tl) 
-                Nothing -> liftM (mfp,) (mapM convert_ActualParam aps)
-              ; return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
-                                                 (fmap specializeRetAttr pa) erta mfp0 apsa fa)
-              }
-         _ -> do { return (fst ert == A.Tvoid, fna, I.CallFunInterface tc (maybe I.Ccc id cc) 
-                                                    (fmap specializeRetAttr pa) erta Nothing [] fa)
-                 }
+     ; apsa <- mapM convert_ActualParam aps
+     ; return (fst ert == A.Tvoid, fna, I.CallFunInterface { I.cfi_tail = tc 
+                                                           , I.cfi_signature = I.FunSignature (maybe I.Ccc id cc) 
+                                                                               (fmap specializeRetAttr pa) erta apsa 
+                                                           , I.cfi_funAttrs = fa
+                                                           })
      }
 
 convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr, I.InvokeFunInterface)
 convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) = 
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
-           erta = eitherRet mp ert
+     ; erta <- eitherRet ert aps
      ; fna <- convert_FunPtr fn
-     ; case aps of
-       hd:tl -> do { mfp <- specializeFirstParamAsRet hd
-                   ; apsa <- case mfp of
-                     Just fp -> mapM convert_ActualParam tl 
-                     Nothing -> mapM convert_ActualParam aps
-                   ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc) 
-                                                      (fmap specializeRetAttr pa) erta mfp apsa fa)
-                   }
-       _ -> do { return (fst ert == A.Tvoid, fna, I.InvokeFunInterface (maybe I.Ccc id cc)
-                                                  (fmap specializeRetAttr pa) erta Nothing [] fa)
-               }
+     ; apsa <- mapM convert_ActualParam aps
+     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface { I.ifi_signature = I.FunSignature (maybe I.Ccc id cc) 
+                                                                                 (fmap specializeRetAttr pa) erta apsa 
+                                                             , I.ifi_funAttrs = fa
+                                                             })
      }
-
 
 convert_to_CallAsmInterface :: A.InlineAsmExp -> MM (Bool, I.AsmCode, I.CallAsmInterface)
 convert_to_CallAsmInterface  (A.InlineAsmExp t dia b1 b2 qs1 qs2 as fa) =
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
-           erta = eitherRet mp ert
+     ; erta <- eitherRet ert as
      ; asa <- mapM convert_ActualParam as
      ; let rt::I.Utype = tconvert mp (fst ert)
      ; return (fst ert == A.Tvoid, I.AsmCode b2 qs1 qs2, I.CallAsmInterface erta dia b1 asa fa)
      }
 
     
-eitherRet :: MP -> (A.Type, Maybe (A.Type, A.AddrSpace)) -> I.CallSiteType
-eitherRet mp (rt, ft) = case ft of
-  Just (fta,as) -> I.CallSiteTypeFun (dcast FLC ((tconvert mp fta)::I.Utype)) (tconvert mp as)
-  Nothing -> I.CallSiteTypeRet $ dcast FLC ((tconvert mp rt)::I.Utype)
+eitherRet :: (A.Type, Maybe (A.Type, A.AddrSpace)) -> [A.ActualParam] -> MM (I.Type I.CodeFunB I.X)
+eitherRet (rt, ft) actualParams = 
+  do { mp <- typeDefs
+     ; case ft of
+       Just (fta,as) -> return $ dcast FLC ((tconvert mp fta)::I.Utype) 
+       Nothing -> let ts = fmap (\x -> case x of
+                                    A.ActualParamData t pa _ -> (t, pa)
+                                    A.ActualParamLabel t pa _ -> (ucast t, pa)
+                                    _ -> errorLoc FLC $ show x
+                                ) actualParams
+                  in composeTfunction rt ts Nothing
+     }
 
 convert_Clause :: A.Clause -> MM I.Clause
 convert_Clause x = case x of 
@@ -1210,7 +1204,7 @@ convert_Rhs (lhs, A.RhsCall b cs) =
                                    _ -> errorLoc FLC $ show ma
                                  }
     Just (Nothing, ml, [m,v]) -> do { ma <- convert_MetaParam m
-                                    ; (I.CallOperandData _ _ _ va) <- convert_ActualParam v
+                                    ; (I.FunOperandData _ _ _ va) <- convert_ActualParam v
                                     ; case ma of
                                       I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_write_register ml mc va) []
                                       _ -> errorLoc FLC $ show ma
@@ -1294,7 +1288,7 @@ convert_Rhs (lhs,rhs) =  errorLoc FLC $ "AstIrConversion:irrefutable error lhs:"
 
 
 
-specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe I.FirstOperandAsRet)
+specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe (I.FunOperand I.Value))
 specializeFirstParamAsRet x = case x of
   (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
@@ -1309,8 +1303,8 @@ specializeFirstParamAsRet x = case x of
        ; let (plist, bl) = stripOffPa pa preds
        ; case bl of 
          [Nothing, _, _] -> return Nothing
-         [Just _, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FirstOperandAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
-         [Just _, Nothing, Nothing] -> return $ Just $ I.FirstOperandAsRet (dcast FLC ta) plist Nothing va
+         [Just _, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
+         [Just _, Nothing, Nothing] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist Nothing va
          [Just _, Just (A.PaAlign n)] -> errorLoc FLC "byval cannot be used with sret"
        }
   (A.ActualParamLabel t pa v) ->
@@ -1323,23 +1317,17 @@ specializeFirstParamAsRet x = case x of
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
   
-convert_ActualParam :: A.ActualParam -> MM I.CallOperand
+convert_ActualParam :: A.ActualParam -> MM (I.FunOperand I.Value)
 convert_ActualParam x = case x of
   (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
-       ; let preds = [ (A.PaByVal==)
-                     ,\x -> case x of 
-                          A.PaAlign _ -> True
-                          _ -> False
-                     ]
-       ; let (plist, bl) = stripOffPa pa preds
+       ; let (plist, bl) = stripOffPa pa sRetByValAlignPreds
        ; case bl of 
-         [Nothing, Nothing] -> return $ I.CallOperandData (dcast FLC ta) plist Nothing va
-         [Nothing, Just (A.PaAlign n)] -> return $ I.CallOperandData (dcast FLC ta) plist (Just $ A.Alignment n) va
-         [Just _, Nothing] -> return $ I.CallOperandByVal (dcast FLC ta) pa Nothing va
-         [Just _, Just (A.PaAlign n)] -> return $ I.CallOperandByVal (dcast FLC ta) plist (Just $ A.Alignment n) va
+         [Nothing, Nothing, pn] -> return $ I.FunOperandData (dcast FLC ta) plist (mapPaAlign pn) va
+         [Nothing, Just _, pn] -> return $ I.FunOperandByVal (dcast FLC ta) plist (mapPaAlign pn) va
+         [Just _, Nothing, pn] -> return $ I.FunOperandAsRet (dcast FLC ta) plist (mapPaAlign pn) va
        }
   (A.ActualParamLabel t pa v) ->
     do { mp <- typeDefs
@@ -1353,13 +1341,18 @@ convert_ActualParam x = case x of
                [Nothing] -> Nothing
                [Just (A.PaAlign n)] -> Just $ A.Alignment n
        ; case ta of
-         I.UtypeLabelX lbl -> return $ I.CallOperandLabel lbl plist ma va
+         I.UtypeLabelX lbl -> return $ I.FunOperandLabel lbl plist ma (I.Val_const $ I.C_labelId va)
        }    
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
 isMetaParam :: A.ActualParam -> Bool
 isMetaParam x = case x of
   A.ActualParamMeta _ -> True
+  _ -> False
+  
+isFormalMetaParam :: A.FormalParam -> Bool
+isFormalMetaParam x = case x of
+  A.FormalParamMeta _ _ -> True
   _ -> False
 
 convert_MetaParam :: A.ActualParam -> MM I.MetaOperand 
@@ -1407,48 +1400,112 @@ convert_TypedConstOrNUll x = case x of
                                    ; return (I.TypedConst (I.T ti vi))
                                    }
   A.UntypedNull -> return I.UntypedNull
-  
-  
-convert_to_FunParamType :: A.FormalParam -> MM I.FunParamType
+
+
+convert_to_FunParamType :: A.FormalParam -> MM (I.FunOperand ())
 convert_to_FunParamType x = 
   do { mp <- typeDefs
      ; case x of
        (A.FormalParamData dt pa _) ->
-         let preds = [ (A.PaByVal==)
-                     ,\x -> case x of 
-                          A.PaAlign _ -> True
-                          _ -> False
-                     ]
-         in case stripOffPa pa preds of
+         case stripOffPa pa sRetByValAlignPreds of
            (palist, bl) -> case bl of
-             [Nothing, Nothing] -> return $ I.FunParamDataType (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing 
-             [Nothing, Just (A.PaAlign n)] -> return $ I.FunParamDataType (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n)
-             [Just _, Just (A.PaAlign n)] -> return $ I.FunParamByValType (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n)
-             [Just _, Nothing] -> return $ I.FunParamByValType (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing
-       (A.FormalParamMeta mk fp) -> return $ I.FunParamMetaType (tconvert mp mk) fp
+             [Nothing, Nothing, pa] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Just _, pa] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Just _, Nothing, pa] -> return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             _ -> errorLoc FLC $ show bl
+       (A.FormalParamMeta mk fp) -> errorLoc FLC $ show x
      }
 
 
+mapPaAlign pn = (fmap (\(A.PaAlign n) -> A.Alignment n) pn)
 
-convert_to_FunParamTypeList :: A.FormalParamList -> MM I.FunParamTypeList
-convert_to_FunParamTypeList (A.FormalParamList l ma fas) = 
+convert_to_FunParamTypeList :: [A.FormalParam] -> MM [I.FunOperand ()]
+convert_to_FunParamTypeList l = 
   do { mp <- typeDefs
      ; la <- mapM convert_to_FunParamType l
-     ; return $ I.FunParamTypeList la ma fas 
+     ; return la
      }
   
-convert_FunctionDeclareType :: A.FunctionPrototype -> (MM I.FunctionDeclare)
-convert_FunctionDeclareType  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
+composeTfunction :: A.Type -> [(A.Type, [A.ParamAttr])] -> Maybe A.VarArgParam -> MM (I.Type I.CodeFunB I.X)
+composeTfunction ret params mv = 
   do { mp <- typeDefs
-     ; let (f5a::I.Rtype) = dcast FLC ((tconvert mp f5)::I.Utype)
-     ; f13a <- maybeM convert_Prefix f13
-     ; f14a <- maybeM convert_Prologue f14
-     ; f7a <- convert_to_FunParamTypeList f7
-     ; return $ I.FunctionDeclare f0 f1 f2 f3 f4 f5a f6 f7a f8 f9 f10 f10a f11 f12 f13a f14a
+     ; ts <- mapM (\(dt, pa) -> 
+                    do { let (dt0::I.Utype) = tconvert mp dt
+                       ; let (plist, bl) = stripOffPa pa sRetByValAlignPreds
+                       ; case bl of
+                           [Nothing, Nothing, pn] -> case dt0 of
+                             I.UtypeLabelX lt -> return $ I.MtypeLabel lt (mapPaAlign pn)
+                             _ -> return $ I.MtypeData (dcast FLC dt0) (mapPaAlign pn)
+                           [Just _,  Nothing, pn] -> return $ I.MtypeAsRet (dcast FLC dt0) (mapPaAlign pn)
+                           [Nothing, Just _, pn] -> return $ I.MtypeByVal (dcast FLC dt0) (mapPaAlign pn)
+                           [_,_,_] -> errorLoc FLC $ show bl
+                       }
+                  ) params
+     ; let (ret0::I.Utype) = tconvert mp ret
+     ; return $ I.Tfunction (dcast FLC ret0, []) ts mv
      }
 
+sRetByValAlignPreds = [ (A.PaSRet==)
+                      , (A.PaByVal==)
+                      , \x -> case x of 
+                           A.PaAlign _ -> True
+                           _ -> False
+                      ]
+        
+  
+convert_FunctionDeclareType :: A.FunctionPrototype -> (MM I.FunctionDeclare)
+convert_FunctionDeclareType  (A.FunctionPrototype { A.fp_linkage = f0 
+                                                  , A.fp_visibility = f1 
+                                                  , A.fp_dllstorage = f2 
+                                                  , A.fp_callConv = f3 
+                                                  , A.fp_retAttrs = f4 
+                                                  , A.fp_retType = f5 
+                                                  , A.fp_fun_name = f6 
+                                                  , A.fp_param_list = f7@(A.FormalParamList fpl mv) 
+                                                  , A.fp_addr_naming = f8 
+                                                  , A.fp_fun_attrs = f9 
+                                                  , A.fp_section = f10 
+                                                  , A.fp_comdat = f10a 
+                                                  , A.fp_alignment = f11 
+                                                  , A.fp_gc = f12 
+                                                  , A.fp_prefix = f13 
+                                                  , A.fp_prologue = f14}) =
+  if not (any isFormalMetaParam fpl) then
+    do { f13a <- maybeM convert_Prefix f13
+       ; f14a <- maybeM convert_Prologue f14
+       ; f7a <- convert_to_FunParamTypeList fpl
+       ; ft <- composeTfunction f5 (fmap (\x -> case x of
+                                             A.FormalParamData dt pa _ -> (dt, pa)
+                                             _ -> errorLoc FLC $ show x
+                                         ) fpl) mv
+       ; return $ I.FunctionDeclareData { I.fd_linkage = f0 
+                                        , I.fd_visibility = f1 
+                                        , I.fd_dllstorage = f2 
+                                        , I.fd_signature = I.FunSignature (maybe I.Ccc id f3) (fmap specializeRetAttr f4) ft f7a 
+                                        , I.fd_fun_name = f6
+                                        , I.fd_addr_naming = f8 
+                                        , I.fd_fun_attrs = f9 
+                                        , I.fd_section = f10 
+                                        , I.fd_comdat = f10a 
+                                        , I.fd_alignment = f11
+                                        , I.fd_gc = f12
+                                        , I.fd_prefix = f13a 
+                                        , I.fd_prologue = f14a
+                                        }
+       }
+  else 
+    do { mp <- typeDefs
+       ; return $ I.FunctionDeclareMeta { I.fd_fun_name = f6
+                                        , I.fd_retType = dcast FLC ((tconvert mp f5)::I.Utype) -- undefined
+                                        , I.fd_metakinds = fmap (\x -> case x of
+                                                                    (A.FormalParamMeta m _) -> Left $ tconvert mp m
+                                                                    (A.FormalParamData dt _ _) -> Right $ (dcast FLC ((tconvert mp dt)::I.Utype))
+                                                                ) fpl
+                                        , I.fd_fun_attrs = f9 
+                                        }
+       }
 
-convert_to_FunParam :: A.FormalParam -> MM I.FunParam
+convert_to_FunParam :: A.FormalParam -> MM (I.FunOperand I.LocalId)
 convert_to_FunParam x = 
   do { mp <- typeDefs
      ; case x of
@@ -1460,29 +1517,40 @@ convert_to_FunParam x =
                      ]
              (palist, bl) = stripOffPa pa preds
          in case bl of
-             [Nothing, Nothing] -> return $ I.FunParamData (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
-             [Nothing, Just (A.PaAlign n)] -> return $ I.FunParamData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
-             [Just _, Nothing] -> return $ I.FunParamByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
-             [Just _, Just (A.PaAlign n)] -> return $ I.FunParamByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
+             [Nothing, Nothing] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
+             [Nothing, Just (A.PaAlign n)] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
+             [Just _, Nothing] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
+             [Just _, Just (A.PaAlign n)] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
              _ -> errorLoc FLC $ show bl
        (A.FormalParamData _ _ A.FimplicitParam) -> errorLoc FLC "implicit param should be normalized in AsmSimplification"
      }
-
-convert_to_FunParamList :: A.FormalParamList -> MM I.FunParamList
-convert_to_FunParamList (A.FormalParamList l ma fas) = 
-  do { mp <- typeDefs
-     ; la <- mapM convert_to_FunParam l
-     ; return $ I.FunParamList la ma fas 
-     }
   
 convert_FunctionInterface :: A.FunctionPrototype -> (MM I.FunctionInterface)
-convert_FunctionInterface  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f10a f11 f12 f13 f14) =
+convert_FunctionInterface  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7@(A.FormalParamList plist mv) f8 f9 f10 f10a f11 f12 f13 f14) =
   do { mp <- typeDefs
      ; let (f5a::I.Rtype) = dcast FLC ((tconvert mp f5)::I.Utype)
      ; f13a <- maybeM convert_Prefix f13
      ; f14a <- maybeM convert_Prologue f14
-     ; f7a <- convert_to_FunParamList f7
-     ; return $ I.FunctionInterface f0 f1 f2 f3 f4 f5a f6 f7a f8 f9 f10 f10a f11 f12 f13a f14a
+     ; f7a <- mapM convert_to_FunParam plist
+     ; ft <- composeTfunction f5 (fmap (\x -> case x of
+                                           A.FormalParamData dt pa _ -> (dt, pa)
+                                           _ -> errorLoc FLC $ show x
+                                       ) plist) mv
+     ; return $ I.FunctionInterface { I.fi_linkage = f0 
+                                    , I.fi_visibility = f1 
+                                    , I.fi_dllstorage = f2
+                                    , I.fi_signature = I.FunSignature (maybe I.Ccc id f3) 
+                                                       (fmap specializeRetAttr f4) ft f7a
+                                    , I.fi_fun_name = f6
+                                    , I.fi_addr_naming = f8 
+                                    , I.fi_fun_attrs = f9 
+                                    , I.fi_section = f10 
+                                    , I.fi_comdat = f10a 
+                                    , I.fi_alignment = f11 
+                                    , I.fi_gc = f12 
+                                    , I.fi_prefix = f13a 
+                                    , I.fi_prologue = f14a
+                                    }
      }
 
 convert_PhiInst :: A.PhiInst -> MM I.Pinst
@@ -1560,7 +1628,6 @@ convert_TerminatorInstWithDbg (A.TerminatorInstWithDbg term dbgs) =
 
 
 toSingleNodeGraph :: A.Block -> MM (H.Graph (I.Node a) H.C H.C)
--- toSingleNodeGraph b | trace ("toSingleNodeGraph " ++ toLlvm b) False = undefined
 toSingleNodeGraph (A.Block f  phi ms l) =
   do { f'  <- toFirst f
      ; phi' <- mapM toPhi phi

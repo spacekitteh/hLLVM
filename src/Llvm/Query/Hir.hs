@@ -38,7 +38,7 @@ data SingleConstAddr = SingleConstAddr { globalId :: Either (GlobalId, Label) Gl
                                        , reconstructor :: Const -> Const
                                        }
 
-getSingleConstAddr :: Const -> Maybe SingleConstAddr -- (GlobalId, Const -> Const)
+getSingleConstAddr :: Const -> Maybe SingleConstAddr
 getSingleConstAddr cnst = case cnst of
   C_u8 _ -> Nothing
   C_u16 _ -> Nothing

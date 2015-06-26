@@ -12,7 +12,7 @@ import qualified Data.Set as S
 
 {-
  Internalization converts a "metadata" value to a first class value that can be referred by LLVM code.
--}
+v-}
 
 class (Monad m, MonadState (M.Map (Dtype, Const) (DefAndRef a)) m) =>  LlvmGlobalGenMonad a m where
   newGlobalId :: m GlobalId
@@ -72,6 +72,6 @@ instance LlvmGlobalGenMonad a (StateT (M.Map (Dtype, Const) (DefAndRef a)) (Stat
                       ; return $ M.lookup k s
                       }
 
-runSimpleLlvmGlobalGen :: String -> Int -> (StateT (M.Map (Dtype, Const) (DefAndRef a)) (State (String, Int))) x -> 
+runSimpleLlvmGlobalGen :: String -> Int -> (StateT (M.Map (Dtype, Const) (DefAndRef a)) (State (String, Int))) x ->
                           (x, (M.Map (Dtype, Const) (DefAndRef a)))
 runSimpleLlvmGlobalGen prefix initCnt f = evalState (runStateT f M.empty) (prefix, initCnt)

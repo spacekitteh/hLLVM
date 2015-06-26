@@ -73,29 +73,29 @@ unspecializeRegisterIntrinsic cinst = case cinst of
 
 
 specializeCallSite :: Maybe LocalId -> FunPtr -> CallFunInterface -> Maybe Cinst
-specializeCallSite lhs fptr csi = case (fptr, csi) of
+specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   (FunId (GlobalIdAlphaNum "llvm.va_start"),
-   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v] []) | isNothing lhs -> 
+   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_va_start v
   (FunId (GlobalIdAlphaNum "llvm.va_end"),
-   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v] []) | isNothing lhs -> 
+   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_va_end v
   (FunId (GlobalIdAlphaNum "llvm.va_copy"),
-   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v1
-                                   ,CallOperandData t2 [] Nothing v2] []) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
+   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v1
+                         ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
   (FunId (GlobalIdAlphaNum nm), 
-   CallFunInterface TcNon Ccc [] _ Nothing
-   [CallOperandData t1 [] Nothing v1 -- dest
-   ,CallOperandData t2 [] Nothing v2 -- src or setValue
-   ,CallOperandData t3 [] Nothing v3 -- len
-   ,CallOperandData t4 [] Nothing v4 -- align
-   ,CallOperandData t5 [] Nothing v5 -- volatile
-   ] []) | isNothing lhs && (nm == "llvm.memcpy.p0i8.p0i8.i32" 
-                             || nm == "llvm.memcpy.p0i8.p0i8.i64"
-                             || nm == "llvm.memmove.p0i8.p0i8.i32"
-                             || nm == "llvm.memmove.p0i8.p0i8.i64"
-                             || nm == "llvm.memset.p0i8.i32" 
-                             || nm == "llvm.memset.p0i8.i64") -> 
+   FunSignature Ccc [] _ 
+   [FunOperandData t1 [] Nothing v1 -- dest
+   ,FunOperandData t2 [] Nothing v2 -- src or setValue
+   ,FunOperandData t3 [] Nothing v3 -- len
+   ,FunOperandData t4 [] Nothing v4 -- align
+   ,FunOperandData t5 [] Nothing v5 -- volatile
+   ]) | isNothing lhs && (nm == "llvm.memcpy.p0i8.p0i8.i32" 
+                          || nm == "llvm.memcpy.p0i8.p0i8.i64"
+                          || nm == "llvm.memmove.p0i8.p0i8.i32"
+                          || nm == "llvm.memmove.p0i8.p0i8.i64"
+                          || nm == "llvm.memset.p0i8.i32" 
+                          || nm == "llvm.memset.p0i8.i64") -> 
     let mod = case nm of
           "llvm.memcpy.p0i8.p0i8.i32" -> I_llvm_memcpy MemLenI32
                                          (T (dcast FLC t1) v1) (T (dcast FLC t2) v2) (T (dcast FLC t3) v3)
@@ -117,10 +117,10 @@ specializeCallSite lhs fptr csi = case (fptr, csi) of
                                     (T (dcast FLC t4) v4) (T (dcast FLC t5) v5)  
     in Just $ mod
   (FunId (GlobalIdAlphaNum "llvm.stacksave"),
-   CallFunInterface TcNon Ccc [] _ Nothing [] []) | isJust lhs -> 
+   FunSignature Ccc [] _ []) | isJust lhs -> 
     Just $ I_llvm_stacksave $ fromJust lhs
   (FunId (GlobalIdAlphaNum "llvm.stackrestore"),
-   CallFunInterface TcNon Ccc [] _ Nothing [CallOperandData t1 [] Nothing v] []) | isNothing lhs -> 
+   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_stackrestore (T (dcast FLC t1) v)
   _ -> Nothing
 
@@ -129,45 +129,63 @@ unspecializeIntrinsics :: Cinst -> Maybe Cinst
 unspecializeIntrinsics inst = case inst of
   I_llvm_va_start v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_start")) 
-    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) Nothing [tvToAp (T (ptr0 i8) v)] []) Nothing
+    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid, []) 
+                                                  [MtypeData (ucast $ ptr0 i8) Nothing] Nothing) [tvToAp (T (ptr0 i8) v)]) []) Nothing
   I_llvm_va_end v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_end"))
-    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) Nothing [tvToAp (T (ptr0 i8) v)] []) Nothing
+    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid, []) 
+                                                  [MtypeData (ucast $ ptr0 i8) Nothing] Nothing) [tvToAp (T (ptr0 i8) v)]) []) Nothing
   I_llvm_va_copy v1 v2 ->
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_copy"))
-    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
-     Nothing [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)] []) Nothing
+    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid, []) 
+                                                  [MtypeData (ucast $ ptr0 i8) Nothing
+                                                  ,MtypeData (ucast $ ptr0 i8) Nothing] Nothing) 
+                             [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)]) []) Nothing
   I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
-    let nm = case memLen of
-          MemLenI32 -> "llvm.memcpy.p0i8.p0i8.i32"
-          MemLenI64 -> "llvm.memcpy.p0i8.p0i8.i64"
+    let (nm, ltype) = case memLen of
+          MemLenI32 -> ("llvm.memcpy.p0i8.p0i8.i32", i32)
+          MemLenI64 -> ("llvm.memcpy.p0i8.p0i8.i64", i64)
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
-       (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
-        Nothing [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] []) Nothing
+       (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                     [MtypeData (ucast $ ptr0 i8) Nothing, MtypeData (ucast $ ptr0 i8) Nothing
+                                                     ,MtypeData (ucast ltype) Nothing, MtypeData (ucast i32) Nothing
+                                                     ,MtypeData (ucast i1) Nothing
+                                                     ] Nothing)
+                                [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
   I_llvm_memmove memLen tv1 tv2 tv3 tv4 tv5 -> 
-    let nm = case memLen of
-          MemLenI32 -> "llvm.memmove.p0i8.p0i8.i32"
-          MemLenI64 -> "llvm.memmove.p0i8.p0i8.i64"
+    let (nm, ltype) = case memLen of
+          MemLenI32 -> ("llvm.memmove.p0i8.p0i8.i32", i32)
+          MemLenI64 -> ("llvm.memmove.p0i8.p0i8.i64", i64)
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
-       (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
-        Nothing [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] []) Nothing
+       (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                     [MtypeData (ucast $ ptr0 i8) Nothing, MtypeData (ucast $ ptr0 i8) Nothing
+                                                     ,MtypeData (ucast ltype) Nothing, MtypeData (ucast i32) Nothing
+                                                     ,MtypeData (ucast i1) Nothing
+                                                     ] Nothing)
+                                [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
   I_llvm_memset memLen tv1 tv2 tv3 tv4 tv5 -> 
-    let nm = case memLen of
-          MemLenI32 -> "llvm.memset.p0i8.i32"
-          MemLenI64 -> "llvm.memset.p0i8.i64"
+    let (nm, ltype) = case memLen of
+          MemLenI32 -> ("llvm.memset.p0i8.i32", i32)
+          MemLenI64 -> ("llvm.memset.p0i8.i64", i64)
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
-       (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) 
-        Nothing [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] []) Nothing
+       (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                     [MtypeData (ucast $ ptr0 i8) Nothing
+                                                     ,MtypeData (ucast i8) Nothing 
+                                                     ,MtypeData (ucast ltype) Nothing 
+                                                     ,MtypeData (ucast i32) Nothing
+                                                     ,MtypeData (ucast i1) Nothing
+                                                     ] Nothing)
+                                [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
   I_llvm_stacksave v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stacksave")) 
-    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeScalarP $ ptr0 i8)) Nothing [] []) (Just v)
+    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeScalarP $ ptr0 i8,[]) [] Nothing) []) []) (Just v)
   I_llvm_stackrestore tv -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stackrestore")) 
-    (CallFunInterface TcNon Ccc [] (CallSiteTypeRet (RtypeVoidU Tvoid)) Nothing [tvToAp tv] []) Nothing
+    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) [MtypeData (ucast $ ptr0 i8) Nothing] Nothing) [tvToAp tv]) []) Nothing
   _ -> Nothing
     
-tvToAp :: Ucast t Dtype => T t Value -> CallOperand
-tvToAp (T t v) = CallOperandData (ucast t) [] Nothing v
+tvToAp :: Ucast t Dtype => T t Value -> FunOperand Value
+tvToAp (T t v) = FunOperandData (ucast t) [] Nothing v
                  
 specializeTlGlobal :: TlGlobal -> Maybe TlIntrinsic
 specializeTlGlobal tl = case tl of

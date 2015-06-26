@@ -12,7 +12,7 @@ module Llvm.Hir.Data.Type
        )
        where
 
-import Llvm.Asm.SharedEntity (Packing, FunAttr, ParamAttr, Alignment, Fparam, LocalId, ParamAttr,VarArgParam)
+import Llvm.Asm.SharedEntity (Packing, FunAttr, RetAttr, ParamAttr, Alignment, LocalId, VarArgParam)
 import Llvm.ErrorLoc
 import Data.Word (Word32)
 
@@ -67,7 +67,7 @@ data Type sto rep where {
   Topaque_array :: Word32 -> Type OpaqueB D -> Type OpaqueB D;
 
   Tpointer :: Etype -> AddrSpace -> Type ScalarB P;
-  Tfunction :: Rtype -> TypeParamList -> [FunAttr] -> Type CodeFunB X;
+  Tfunction :: (Rtype, [RetAttr]) -> [Mtype] -> Maybe VarArgParam -> Type CodeFunB X;
   {- reference types -}
 
   {- referee is Scalar -}
@@ -137,7 +137,7 @@ instance Show (Type s r) where
 
     Tstruct p ds -> "Tstruct " ++ show p ++ " " ++ show ds
     Tpointer e as -> "Tpointer " ++ show e ++ " " ++ show as
-    Tfunction rt tp fa -> "Tfunction " ++ show rt ++ " " ++ show tp ++ " " ++ show fa
+    Tfunction rt tp mv -> "Tfunction " ++ show rt ++ " " ++ show tp ++ " " ++ show mv
     {- Scalar -}
     TnameScalarI s -> "TnameScalarI " ++ show s
     TquoteNameScalarI s -> "TquoteNameScalarI " ++ show s
@@ -222,7 +222,7 @@ instance Eq (Type s r) where
 
 
     (Tpointer e as, Tpointer e1 as1) -> (e,as) == (e1,as1)
-    (Tfunction rt tp fa, Tfunction rt1 tp1 fa1) -> (rt,tp,fa) == (rt1,tp1,fa1)
+    (Tfunction rt tp mv, Tfunction rt1 tp1 mv1) -> (rt,tp,mv) == (rt1,tp1,mv1)
 
     {- Scalar -}
     (TnameScalarI s, TnameScalarI s1) -> s == s1
@@ -288,7 +288,6 @@ instance Ord (Type s r) where
     (TpLabel, TpLabel) -> error "Ord: comparing TpLabel"
     (Topaque, Topaque) -> error "Ord: comparing Topaque"
 
-
     (TvectorI n d, TvectorI n1 d1) -> compare (n,d) (n1,d1)
     (TvectorF n d, TvectorF n1 d1) -> compare (n,d) (n1,d1)
     (TvectorP n d, TvectorP n1 d1) -> compare (n,d) (n1,d1)
@@ -301,10 +300,9 @@ instance Ord (Type s r) where
     (Tfirst_class_name s, Tfirst_class_name s1) -> compare s s1
     (Tfirst_class_quoteName s, Tfirst_class_quoteName s1) -> compare s s1
     (Tfirst_class_no s, Tfirst_class_no s1) -> compare s s1
-
-
+    
     (Tpointer e as, Tpointer e1 as1) -> compare (e,as) (e1,as1)
-    (Tfunction rt tp fa, Tfunction rt1 tp1 fa1) -> compare (rt,tp,fa) (rt1, tp1, fa1)
+    (Tfunction rt tp mv, Tfunction rt1 tp1 mv1) -> compare (rt,tp,mv) (rt1, tp1, mv1)
 
     {- Scalar -}
     (TnameScalarI s, TnameScalarI s1) -> compare s s1
@@ -378,16 +376,16 @@ data Utype = UtypeScalarI (Type ScalarB I)
            deriving (Eq,Ord,Show)
 
 data Etype = EtypeScalarI (Type ScalarB I)
-            | EtypeScalarF (Type ScalarB F)
-            | EtypeScalarP (Type ScalarB P)
-            | EtypeVectorI (Type VectorB I)
-            | EtypeVectorF (Type VectorB F)
-            | EtypeVectorP (Type VectorB P)
-            | EtypeFirstClassD (Type FirstClassB D)
-            | EtypeRecordD (Type RecordB D)
-            | EtypeOpaqueD (Type OpaqueB D)
-            | EtypeFunX (Type CodeFunB X)
-            deriving (Eq, Ord, Show)
+           | EtypeScalarF (Type ScalarB F)
+           | EtypeScalarP (Type ScalarB P)
+           | EtypeVectorI (Type VectorB I)
+           | EtypeVectorF (Type VectorB F)
+           | EtypeVectorP (Type VectorB P)
+           | EtypeFirstClassD (Type FirstClassB D)
+           | EtypeRecordD (Type RecordB D)
+           | EtypeOpaqueD (Type OpaqueB D)
+           | EtypeFunX (Type CodeFunB X)
+           deriving (Eq, Ord, Show)
 
 {- this will be replicated in multiple nodes to reduce the depth of AST, a lower depth AST is
    more friendly for manual AST construction
@@ -401,6 +399,12 @@ data Rtype = RtypeScalarI (Type ScalarB I)
            | RtypeFirstClassD (Type FirstClassB D)
            | RtypeRecordD (Type RecordB D)
            | RtypeVoidU (Type NoB U)
+           deriving (Eq, Ord, Show)
+
+data Mtype = MtypeAsRet Dtype (Maybe Alignment)
+           | MtypeData Dtype (Maybe Alignment)
+           | MtypeByVal Dtype (Maybe Alignment)
+           | MtypeLabel (Type CodeLabelB X) (Maybe Alignment)
            deriving (Eq, Ord, Show)
 
 data Dtype = DtypeScalarI (Type ScalarB I)

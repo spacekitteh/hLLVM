@@ -110,8 +110,8 @@ pTypeParamList = do { ignore $ chartok '('
 pFormalParamList :: P FormalParamList
 pFormalParamList = do { ignore $ chartok '('
                       ; (l, f) <- args []
-                      ; funAttrs <- many pFunAttr
-                      ; return $ FormalParamList l f funAttrs
+                      -- ; funAttrs <- many pFunAttr
+                      ; return $ FormalParamList l f -- funAttrs
                       }
  where
    args :: [FormalParam] -> P ([FormalParam], Maybe VarArgParam)

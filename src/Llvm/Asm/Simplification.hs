@@ -114,9 +114,9 @@ rnDefFunctionPrototype fpt@(FunctionPrototype v0 v1 v2 v3 v4 v5 v6 fhParams v8 v
   
   
 rnDefFormalParamList :: FormalParamList -> MS FormalParamList  
-rnDefFormalParamList (FormalParamList fps b fa) = do { fps' <- mapM rnDefFormalParam fps
-                                                     ; return $ FormalParamList fps' b fa
-                                                     }
+rnDefFormalParamList (FormalParamList fps b {-fa-}) = do { fps' <- mapM rnDefFormalParam fps
+                                                         ; return $ FormalParamList fps' b -- fa
+                                                         }
                                                
 rnDefFormalParam :: FormalParam -> MS FormalParam
 rnDefFormalParam x = case x of

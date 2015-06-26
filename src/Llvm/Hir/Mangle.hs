@@ -35,6 +35,12 @@ instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
 
+instance Mangle Mtype where
+  mangle t = case t of
+    MtypeAsRet dt ma -> "sret"++mangle dt++mangle ma
+    MtypeByVal dt ma -> "byval"++mangle dt++mangle ma
+    MtypeData dt ma -> mangle dt++mangle ma
+
 instance Mangle Rtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
@@ -102,8 +108,16 @@ instance Mangle ParamAttr where
 instance Mangle RetAttr where
   mangle x = render $ printIr x
 
+instance Mangle a => Mangle (FunOperand a) where
+  mangle x = case x of
+    FunOperandData d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
+    FunOperandByVal d atts align a -> "byval" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
+    FunOperandLabel d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a    
+  
+{-
 instance Mangle CallOperand where
   mangle x = render $ printIr x
+-}
   
 instance Mangle (Type s r) where
   mangle x = case x of
@@ -129,7 +143,7 @@ instance Mangle (Type s r) where
 
     Tstruct p ds -> "s_" ++ mangle p ++ "_" ++ mangle ds
     Tpointer e as -> "ptr_" ++ mangle e ++ "_" ++ show as
-    Tfunction rt tp fa -> "fun_" ++ mangle rt ++ " " ++ mangle tp ++ " " ++ mangle fa
+    Tfunction (rt,atts) tp mv -> "fun_" ++ mangle rt ++ "_" ++ mangle tp ++ "_" ++ mangle mv
     {- Scalar -}
     TnameScalarI s -> show s
     TquoteNameScalarI s -> show s
@@ -180,11 +194,14 @@ instance Mangle (Type s r) where
     Tfirst_class_quoteName s -> show s
     Tfirst_class_no s -> show s
 
+{-
 instance Mangle CallFunInterface where       
-  mangle CallFunInterface{..} = mangle cfi_tail ++ mangle cfi_conv
+  mangle CallFunInterface{..} = mangle cfi_tail ++ mangle cfi_signature
+                                {-conv
                                 ++ mangle cfi_retAttrs ++ mangle cfi_type
-                                ++ mangle cfi_actualParams
+                                ++ mangle cfi_actualParams -}
                                 ++ mangle cfi_funAttrs
+-}
                              
 
 {-

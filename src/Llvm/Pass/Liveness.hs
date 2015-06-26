@@ -83,8 +83,10 @@ isDeclare (FunId gl) | (render $ printIr gl) == "@llvm.dbg.declare" = True
 isDeclare _ = False
 
 
-isDeadAP :: H.Fact H.O Live -> CallOperand -> Bool
+
+isDeadAP :: H.Fact H.O Live -> FunOperand a -> Bool
 isDeadAP = undefined
+
 {-
 isDeadAP live ap  = let u = filterOutGlobalId $ u1 $ uDofActualParam ap
                         dif = u `Ds.intersection` live

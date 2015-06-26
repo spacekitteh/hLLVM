@@ -432,23 +432,22 @@ instance IrPrint CallSiteType where
   printIr (CallSiteTypeRet e) = printIr e
   printIr (CallSiteTypeFun e as) = printIr (Tpointer (ucast e) as)
 
+instance (IrPrint a) => IrPrint (FunSignature a) where
+  printIr FunSignature { fs_callConv = cc
+                       , fs_retAttrs = attrs
+                       , fs_type = ty
+                       , fs_params = params
+                       } = commaSepList [printIr cc, printIr attrs, printIr ty, printIr params]
+    
 instance IrPrint CallFunInterface where
   printIr x = case x of
     CallFunInterface{..} -> commaSepList [printIr cfi_tail, 
-                                         printIr cfi_conv,
-                                         printIr cfi_retAttrs,
-                                         printIr cfi_type,
-                                         printIr cfi_firstParamAsRet,                                         
-                                         printIr cfi_actualParams, 
-                                         printIr cfi_funAttrs]
+                                          printIr cfi_signature,
+                                          printIr cfi_funAttrs]
 
 instance IrPrint InvokeFunInterface where
   printIr x = case x of
-    InvokeFunInterface{..} -> commaSepList [printIr ifi_conv,
-                                            printIr ifi_retAttrs,
-                                            printIr ifi_type,
-                                            printIr ifi_firstParamAsRet,                                            
-                                            printIr ifi_actualParams, 
+    InvokeFunInterface{..} -> commaSepList [printIr ifi_signature, 
                                             printIr ifi_funAttrs]
 
 instance IrPrint CallAsmInterface where
@@ -487,19 +486,17 @@ instance IrPrint (InsertValue Value) where
   printIr (InsertValue vect tv idx) = text "insertvalue" <+> 
                                       hsep (punctuate comma ((printIr vect):(printIr tv):(fmap integral idx)))
 
-instance IrPrint CallOperand where
+
+instance (IrPrint a) => IrPrint (FunOperand a) where
   printIr x = case x of
-    (CallOperandData t att1 align v) ->
+    (FunOperandAsRet t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
-    (CallOperandByVal t att1 align v) ->
+    (FunOperandData t att1 align v) ->
+      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+    (FunOperandByVal t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr (PaByVal:att1), printIr align, printIr v]      
-    (CallOperandLabel t att1 align v) ->
+    (FunOperandLabel t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
-
-instance IrPrint FirstOperandAsRet where
-  printIr (FirstOperandAsRet t att1 align v) =
-    hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
-
 
 instance IrPrint MetaOperand where
   printIr x = case x of
@@ -656,9 +653,12 @@ instance IrPrint Cinst where
     (I_select_VF cnd t f lhs) -> hsep [printIr lhs, equals, text "select_VF", printIr cnd, printIr t, printIr f]
     (I_select_VP cnd t f lhs) -> hsep [printIr lhs, equals, text "select_VP", printIr cnd, printIr t, printIr f]
 
-    I_llvm_memcpy md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
-    I_llvm_memmove md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memmove" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
-    I_llvm_memset md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memset" <+> printIr md <+> parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
+    I_llvm_memcpy md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memcpy" <+> printIr md <+> 
+                                            parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
+    I_llvm_memmove md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memmove" <+> printIr md <+> 
+                                             parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
+    I_llvm_memset md tv1 tv2 tv3 tv4 tv5 -> text "I_llvm_memset" <+> printIr md <+> 
+                                            parens (hsep [printIr tv1, printIr tv2, printIr tv3, printIr tv4, printIr tv5])
     I_llvm_read_register ml ma lhs -> hsep [printIr lhs, equals, text "llvm.read_register", printIr ml, printIr ma]
     I_llvm_write_register ml ma mv -> hsep [text "llvm.write_register", printIr ml, printIr ma, printIr mv]
     I_llvm_stacksave lhs -> hsep [printIr lhs, equals, text "llvm.stacksave"]
@@ -705,18 +705,18 @@ instance IrPrint Aliasee where
 
 
 instance IrPrint FunctionInterface where
-  printIr (FunctionInterface fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams
+  printIr (FunctionInterface fhLinkage fhVisibility fhDllStorageClass fhSig fhName 
            fhd fhAttr1 fhSection fhCmd fhAlign fhGc fhPrefix fhPrologue) =
-    hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhCCoonc, hsep $ fmap printIr fhAttr
-         , printIr fhRetType, printIr fhName, printIr fhParams, printIr fhd, hsep $ fmap printIr fhAttr1
+    hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhSig
+         , printIr fhName, printIr fhd, hsep $ fmap printIr fhAttr1
          , printIr fhSection, printIr fhCmd, printIr fhAlign, printIr fhGc, printIr fhPrefix, printIr fhPrologue]
 
 
 instance IrPrint FunctionDeclare where
-  printIr (FunctionDeclare fhLinkage fhVisibility fhDllStorageClass fhCCoonc fhAttr fhRetType fhName fhParams
+  printIr (FunctionDeclareData fhLinkage fhVisibility fhDllStorageClass fhSig fhName
            fhd fhAttr1 fhSection fhCmd fhAlign fhGc fhPrefix fhPrologue) =
-    hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhCCoonc, hsep $ fmap printIr fhAttr
-         , printIr fhRetType, printIr fhName, printIr fhParams, printIr fhd, hsep $ fmap printIr fhAttr1
+    hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhSig
+         , printIr fhName, printIr fhd, hsep $ fmap printIr fhAttr1
          , printIr fhSection, printIr fhCmd, printIr fhAlign, printIr fhGc, printIr fhPrefix, printIr fhPrologue]
 
 
@@ -797,7 +797,7 @@ instance IrPrint (Type s x) where
                           Unpacked -> (empty, empty)
                     in start <+> braces (hsep $ punctuate comma $ fmap printIr ts) <+> end
     Tpointer t addr -> printIr t <+> integral addr <+> text "*"
-    Tfunction t fp atts -> printIr t <+> printIr fp <+> (hsep $ punctuate comma $ fmap printIr atts)
+    Tfunction t fp mv -> printIr t <+> printIr fp <+> maybe empty printIr mv
     Topaque_struct b ts -> let (start, end) = case b of
                                  Packed -> (char '<', char '>')
                                  Unpacked -> (empty, empty)
@@ -806,41 +806,12 @@ instance IrPrint (Type s x) where
     TnameOpaqueD s -> char '%' <> text s
     TquoteNameOpaqueD s -> char '%' <> text s
     TnoOpaqueD s -> char '%' <> integral s
-
-instance IrPrint FunParamType where
-  printIr x = case x of
-    (FunParamDataType t att1 align) ->
-      (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align)
-    (FunParamByValType t att1 align) ->
-      (printIr t) <+> (hsep $ fmap printIr (PaByVal:att1)) <> (maybe empty ((comma <+>) . printIr) align)
-    (FunParamMetaType e lv) -> printIr e <+> printIr lv
-
-instance IrPrint FunParamTypeList where
-  printIr (FunParamTypeList params var atts) =
-    parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr var])) <+> (hsep $ fmap printIr atts)
-
-
-
-instance IrPrint FunParam where
-  printIr x = case x of
-    (FunParamData t att1 align x) ->
-      (printIr t) <+> (hsep $ fmap printIr att1) <> (maybe empty ((comma <+>) . printIr) align) <+> printIr x
-    (FunParamByVal t att1 align x) ->
-      (printIr t) <+> (hsep $ fmap printIr (PaByVal:att1)) <> (maybe empty ((comma <+>) . printIr) align) <+> printIr x
-      
       
 instance IrPrint MetaFunParam where      
   printIr (MetaFunParam e lv) = printIr e <+> printIr lv
 
-instance IrPrint FunParamList where
-  printIr (FunParamList params var atts) =
-    parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr var])) <+> (hsep $ fmap printIr atts)
-
-
 instance IrPrint TypeParamList where
   printIr (TypeParamList params b) = parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr b]))
-
-
 
 instance IrPrint Utype where
   printIr x = case x of
@@ -881,6 +852,11 @@ instance IrPrint Ftype where
     FtypeVectorP e -> printIr e
     FtypeFirstClassD e -> printIr e
 
+instance IrPrint Mtype where
+  printIr x = case x of
+    MtypeAsRet dt ma -> text "sret" <+> printIr dt <+> printIr ma
+    MtypeData dt ma -> printIr dt <+> printIr ma
+    MtypeByVal dt ma -> text "byval" <+> printIr dt <+> printIr ma
 
 instance IrPrint Dtype where
   printIr x = case x of

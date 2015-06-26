@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell,FlexibleInstances #-}
 
 #define FLC   (FileLoc $(srcLoc))
 {-
@@ -63,29 +63,35 @@ instance Uda Value where
   storeTo x = S.insert x S.empty
   loadFrom x = S.insert x S.empty
  
-instance Uda CallOperand where
-  use ap = case ap of
-    CallOperandData _ _ _ v -> use v
-    CallOperandByVal _ _ _ v -> use v
-    CallOperandLabel _ _ _ _ -> S.empty 
-  def _ = errorLoc FLC $ "cannot happen"
-  storeTo _ = errorLoc FLC $ "cannot happen"
-  loadFrom _ = errorLoc FLC $ "cannot happen"
-  
   
 instance Uda x => Uda [x] where  
   use l = S.unions (fmap use l)
   def l = S.unions (fmap def l)
   storeTo l = S.unions (fmap storeTo l)
   loadFrom l = S.unions (fmap loadFrom l)
+  
+instance (Uda a) => Uda (FunOperand a) where  
+  use x = case x of
+    FunOperandAsRet _ _ _ a -> use a    
+    FunOperandData _ _ _ a -> use a
+    FunOperandByVal _ _ _ a -> use a
+    FunOperandLabel _ _ _ l -> use l
+  storeTo x = case x of  
+    FunOperandAsRet _ _ _ a -> storeTo a
+    _ -> S.empty
 
+instance (Uda a) => Uda (FunSignature a) where
+  use FunSignature{..} = use fs_params
+  def FunSignature{..} = S.empty
+  storeTo FunSignature{..} = storeTo fs_params
+  loadFrom FunSignature{..} = S.empty
 
 instance Uda CallFunInterface where
-  use CallFunInterface{..} = use cfi_actualParams
+  use CallFunInterface{..} = use cfi_signature 
   def _ = S.empty
 
 instance Uda InvokeFunInterface where
-  use InvokeFunInterface{..} = use ifi_actualParams
+  use InvokeFunInterface{..} = use ifi_signature
   def _ = S.empty  
 
 instance Uda CallAsmInterface where
