@@ -461,31 +461,35 @@ instance Conversion I.FunPtr (Rm A.FunName) where
                                         }
 
 instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite)) where
-  convert  (fn, I.CallFunInterface { I.cfi_tail = tc, I.cfi_signature = sig, I.cfi_funAttrs = fa}) = 
+  convert  (fn, I.CallFunInterface { I.cfi_tail = tc, I.cfi_castType = castType, I.cfi_signature = sig, I.cfi_funAttrs = fa}) = 
     do { fna <- convert fn
        ; (cc, pa, ret, aps) <- convert sig
-       ; return (tc, A.CallSiteFun cc pa ret fna aps fa)
+       ; let funType = case castType of
+               Just t -> tconvert () t
+               Nothing -> ret
+       ; return (tc, A.CallSiteFun cc pa funType fna aps fa)
        }
     
 instance Conversion (I.FunPtr, I.InvokeFunInterface) (Rm A.CallSite) where
-  convert  (fn, I.InvokeFunInterface { I.ifi_signature = sig, I.ifi_funAttrs = fa}) =  
+  convert  (fn, I.InvokeFunInterface { I.ifi_castType = castType, I.ifi_signature = sig, I.ifi_funAttrs = fa}) =  
     do { fna <- convert fn
        ; (cc, pa, ret, aps) <- convert sig
-       ; return (A.CallSiteFun cc pa ret fna aps fa)
+       ; let funType = case castType of
+               Just t -> tconvert () t
+               Nothing -> ret
+       ; return (A.CallSiteFun cc pa funType fna aps fa)
        }
     
-instance Conversion (I.Type I.CodeFunB I.X) (Rm (A.Type, Maybe A.VarArgParam)) where    
-  convert t@(I.Tfunction (rt,_) pts ma) = return (tconvert () (ptr0 t), ma)
-                                          -- return $ tconvert () rt
+instance Conversion (I.Type I.CodeFunB I.X) (Rm (A.Type, [I.RetAttr], Maybe A.VarArgParam)) where    
+  convert t@(I.Tfunction (_,retAttrs) pts ma) = return (tconvert () (ptr0 t), retAttrs, ma)
                                           
-                                          
-getReturnType :: I.Type I.CodeFunB I.X -> Rm (A.Type, Maybe A.VarArgParam)                                          
-getReturnType t@(I.Tfunction (rt,_) _ ma) = return (tconvert () rt, ma)
+getReturnType :: I.Type I.CodeFunB I.X -> Rm (A.Type, [I.RetAttr], Maybe A.VarArgParam)
+getReturnType t@(I.Tfunction (rt,retAttrs) _ ma) = return (tconvert () rt, retAttrs, ma)
 
 instance Conversion (I.AsmCode, I.CallAsmInterface) (Rm A.InlineAsmExp) where
   convert (I.AsmCode dia s1 s2, I.CallAsmInterface t mse mas aps fa) = 
     do { apsa <- mapM convert aps
-       ; (ta,_) <- convert t
+       ; (ta,_,_) <- convert t
        ; return (A.InlineAsmExp ta mse mas dia s1 s2 apsa fa)
        }
 
@@ -1116,25 +1120,22 @@ instance Conversion (I.FunOperand I.LocalId) (Rm A.FormalParam) where
     I.FunOperandAsRet dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:pa)) (A.FexplicitParam fp)
   
 instance Conversion (I.FunSignature I.LocalId) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
-  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_retAttrs = attrs, I.fs_type = typ 
-                           , I.fs_params = paras } =
-    do { (ret, mv) <- getReturnType typ
+  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
+    do { (ret, attrs, mv) <- getReturnType typ
        ; paras0 <- mapM convert paras
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
        }
          
 instance Conversion (I.FunSignature ()) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
-  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_retAttrs = attrs, I.fs_type = typ 
-                           , I.fs_params = paras } =
-    do { (ret, mv) <- getReturnType typ
+  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
+    do { (ret, attrs, mv) <- getReturnType typ
        ; paras0 <- mapM convert paras
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
        }
 
 instance Conversion (I.FunSignature I.Value) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, [A.ActualParam])) where
-  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_retAttrs = attrs, I.fs_type = typ 
-                           , I.fs_params = paras } =
-    do { (ret, mv) <- convert typ
+  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
+    do { (ret, attrs, mv) <- convert typ
        ; paras0 <- mapM convert paras
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, paras0)
        }

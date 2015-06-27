@@ -26,10 +26,10 @@ class TypeConversion mp l1 l2 where
 
 instance TypeConversion () I.Mtype A.Type where
   tconvert mp t = case t of
-    I.MtypeAsRet d _ -> tconvert mp d
-    I.MtypeData d _ -> tconvert mp d
-    I.MtypeByVal d _ -> tconvert mp d
-    I.MtypeLabel d _ -> tconvert mp d
+    I.MtypeAsRet d -> tconvert mp d
+    I.MtypeData d -> tconvert mp d
+    I.MtypeByVal d -> tconvert mp d
+    I.MtypeLabel d -> tconvert mp d
     
 instance TypeConversion () I.Dtype A.Type where
   tconvert _ t = case t of
@@ -124,7 +124,7 @@ instance TypeConversion () [I.Mtype] [A.Type] where
 instance TypeConversion MP [A.Type] [I.Mtype] where
   tconvert mp l = 
     let (l1::[I.Utype]) = fmap (tconvert mp) l
-    in (fmap (\x -> I.MtypeData (dcast FLC x) Nothing) l1)
+    in fmap (\x -> I.MtypeData (dcast FLC x)) l1
 
 instance TypeConversion MP A.Type I.Utype where
   tconvert _ (A.Tprimitive et) = case et of 
@@ -199,8 +199,7 @@ instance TypeConversion MP A.Type I.Utype where
     Tk_Opaque -> ucast $ I.TnoOpaqueD s
   tconvert mp (A.Tfunction rt (A.TypeParamList tp mv) fa) = 
     let rt1 = dcast FLC ((tconvert mp rt)::I.Utype)
-    in I.UtypeFunX (I.Tfunction (rt1,[]) (tconvert mp tp) mv)
-                                    
+    in I.UtypeFunX (I.Tfunction (rt1,[]) (fmap (\x -> (x, Nothing)) $ tconvert mp tp) mv)
                                     
 instance TypeConversion MP A.AddrSpace I.AddrSpace where
   tconvert _ (A.AddrSpace n) = n
@@ -212,14 +211,14 @@ instance TypeConversion () I.AddrSpace A.AddrSpace where
   
 instance TypeConversion MP A.MetaKind I.MetaKind where
   tconvert mp x = case x of
-    A.Mtype e -> I.Mtype (tconvert mp e)
-    A.Mmetadata -> I.Mmetadata
+    A.Mtype e -> I.MKtype (tconvert mp e)
+    A.Mmetadata -> I.MKmetadata
 
   
 instance TypeConversion () I.MetaKind A.MetaKind where
   tconvert _ x = case x of
-    I.Mtype e -> A.Mtype (tconvert () e)
-    I.Mmetadata -> A.Mmetadata
+    I.MKtype e -> A.Mtype (tconvert () e)
+    I.MKmetadata -> A.Mmetadata
 
 
 instance TypeConversion () (I.Type s r) A.Type where
@@ -291,8 +290,8 @@ instance TypeConversion () (I.Type s r) A.Type where
     I.TnameOpaqueD s -> A.Tname s
     I.TquoteNameOpaqueD s -> A.TquoteName s
 
-    I.Tfunction (rt,_) tp ma -> A.Tfunction (tconvert () rt) 
-                                (A.TypeParamList (tconvert () tp) ma) []
+    I.Tfunction (rt,_) tp ma -> 
+      A.Tfunction (tconvert () rt) (A.TypeParamList (tconvert () $ fmap fst tp) ma) []
     I.TpNull -> A.Tprimitive A.TpNull
     I.TpLabel -> A.Tprimitive A.TpLabel
     I.Topaque -> A.Topaque

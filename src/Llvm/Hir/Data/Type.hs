@@ -67,7 +67,7 @@ data Type sto rep where {
   Topaque_array :: Word32 -> Type OpaqueB D -> Type OpaqueB D;
 
   Tpointer :: Etype -> AddrSpace -> Type ScalarB P;
-  Tfunction :: (Rtype, [RetAttr]) -> [Mtype] -> Maybe VarArgParam -> Type CodeFunB X;
+  Tfunction :: (Rtype, [RetAttr]) -> [(Mtype, Maybe Alignment)] -> Maybe VarArgParam -> Type CodeFunB X;
   {- reference types -}
 
   {- referee is Scalar -}
@@ -354,8 +354,8 @@ data TypeParamList = TypeParamList [Dtype] (Maybe VarArgParam) deriving (Eq,Ord,
 
 type AddrSpace = Word32
 
-data MetaKind = Mtype Utype
-              | Mmetadata
+data MetaKind = MKtype Utype
+              | MKmetadata
               deriving (Eq, Ord,Show)
 
 
@@ -401,10 +401,10 @@ data Rtype = RtypeScalarI (Type ScalarB I)
            | RtypeVoidU (Type NoB U)
            deriving (Eq, Ord, Show)
 
-data Mtype = MtypeAsRet Dtype (Maybe Alignment)
-           | MtypeData Dtype (Maybe Alignment)
-           | MtypeByVal Dtype (Maybe Alignment)
-           | MtypeLabel (Type CodeLabelB X) (Maybe Alignment)
+data Mtype = MtypeAsRet Dtype -- (Maybe Alignment)
+           | MtypeData Dtype -- (Maybe Alignment)
+           | MtypeByVal Dtype -- (Maybe Alignment)
+           | MtypeLabel (Type CodeLabelB X) -- (Maybe Alignment)
            deriving (Eq, Ord, Show)
 
 data Dtype = DtypeScalarI (Type ScalarB I)

@@ -862,12 +862,12 @@ convert_to_CallFunInterface :: A.TailCall -> A.CallSite -> MM (Bool, I.FunPtr, I
 convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) = 
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
-     ; erta <- eitherRet ert aps
+     ; erta <- eitherRet (fmap specializeRetAttr pa) ert aps
      ; fna <- convert_FunPtr fn
      ; apsa <- mapM convert_ActualParam aps
      ; return (fst ert == A.Tvoid, fna, I.CallFunInterface { I.cfi_tail = tc 
-                                                           , I.cfi_signature = I.FunSignature (maybe I.Ccc id cc) 
-                                                                               (fmap specializeRetAttr pa) erta apsa 
+                                                           , I.cfi_castType = fst erta
+                                                           , I.cfi_signature = I.FunSignature (maybe I.Ccc id cc) (snd erta) apsa 
                                                            , I.cfi_funAttrs = fa
                                                            })
      }
@@ -876,11 +876,12 @@ convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr, I.InvokeFunIn
 convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) = 
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
-     ; erta <- eitherRet ert aps
+     ; erta <- eitherRet (fmap specializeRetAttr pa) ert aps
      ; fna <- convert_FunPtr fn
      ; apsa <- mapM convert_ActualParam aps
-     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface { I.ifi_signature = I.FunSignature (maybe I.Ccc id cc) 
-                                                                                 (fmap specializeRetAttr pa) erta apsa 
+     ; return (fst ert == A.Tvoid, fna, I.InvokeFunInterface { I.ifi_castType = fst erta
+                                                             , I.ifi_signature = I.FunSignature (maybe I.Ccc id cc) 
+                                                                                 (snd erta) apsa 
                                                              , I.ifi_funAttrs = fa
                                                              })
      }
@@ -889,24 +890,27 @@ convert_to_CallAsmInterface :: A.InlineAsmExp -> MM (Bool, I.AsmCode, I.CallAsmI
 convert_to_CallAsmInterface  (A.InlineAsmExp t dia b1 b2 qs1 qs2 as fa) =
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
-     ; erta <- eitherRet ert as
+     ; erta <- eitherRet [] ert as
      ; asa <- mapM convert_ActualParam as
      ; let rt::I.Utype = tconvert mp (fst ert)
-     ; return (fst ert == A.Tvoid, I.AsmCode b2 qs1 qs2, I.CallAsmInterface erta dia b1 asa fa)
+     ; return (fst ert == A.Tvoid, I.AsmCode b2 qs1 qs2, I.CallAsmInterface (snd erta) dia b1 asa fa)
      }
 
     
-eitherRet :: (A.Type, Maybe (A.Type, A.AddrSpace)) -> [A.ActualParam] -> MM (I.Type I.CodeFunB I.X)
-eitherRet (rt, ft) actualParams = 
+eitherRet :: [I.RetAttr] -> (A.Type, Maybe (A.Type, A.AddrSpace)) -> [A.ActualParam] -> MM (Maybe (I.Type I.ScalarB I.P), I.Type I.CodeFunB I.X)
+eitherRet retAttrs (rt, ft) actualParams = 
+  let ts = fmap (\x -> case x of
+                    A.ActualParamData t pa _ -> (t, pa)
+                    A.ActualParamLabel t pa _ -> (ucast t, pa)
+                    _ -> errorLoc FLC $ show x
+                ) actualParams
+  in 
   do { mp <- typeDefs
+     ; funType <- composeTfunction (rt,retAttrs) ts Nothing
      ; case ft of
-       Just (fta,as) -> return $ dcast FLC ((tconvert mp fta)::I.Utype) 
-       Nothing -> let ts = fmap (\x -> case x of
-                                    A.ActualParamData t pa _ -> (t, pa)
-                                    A.ActualParamLabel t pa _ -> (ucast t, pa)
-                                    _ -> errorLoc FLC $ show x
-                                ) actualParams
-                  in composeTfunction rt ts Nothing
+       Just (fta,as) -> case (dcast FLC ((tconvert mp fta)::I.Utype))::I.Type I.CodeFunB I.X of
+         I.Tfunction (rt0,_) mts mv -> return (Just $ I.Tpointer (ucast $ I.Tfunction (rt0, retAttrs) mts mv) (tconvert mp as), funType)
+       Nothing -> return (Nothing, funType) 
      }
 
 convert_Clause :: A.Clause -> MM I.Clause
@@ -1426,23 +1430,23 @@ convert_to_FunParamTypeList l =
      ; return la
      }
   
-composeTfunction :: A.Type -> [(A.Type, [A.ParamAttr])] -> Maybe A.VarArgParam -> MM (I.Type I.CodeFunB I.X)
-composeTfunction ret params mv = 
+composeTfunction :: (A.Type, [A.RetAttr]) -> [(A.Type, [A.ParamAttr])] -> Maybe A.VarArgParam -> MM (I.Type I.CodeFunB I.X)
+composeTfunction (ret, retAttrs) params mv = 
   do { mp <- typeDefs
      ; ts <- mapM (\(dt, pa) -> 
                     do { let (dt0::I.Utype) = tconvert mp dt
                        ; let (plist, bl) = stripOffPa pa sRetByValAlignPreds
                        ; case bl of
                            [Nothing, Nothing, pn] -> case dt0 of
-                             I.UtypeLabelX lt -> return $ I.MtypeLabel lt (mapPaAlign pn)
-                             _ -> return $ I.MtypeData (dcast FLC dt0) (mapPaAlign pn)
-                           [Just _,  Nothing, pn] -> return $ I.MtypeAsRet (dcast FLC dt0) (mapPaAlign pn)
-                           [Nothing, Just _, pn] -> return $ I.MtypeByVal (dcast FLC dt0) (mapPaAlign pn)
+                             I.UtypeLabelX lt -> return (I.MtypeLabel lt, mapPaAlign pn)
+                             _ -> return (I.MtypeData (dcast FLC dt0), mapPaAlign pn)
+                           [Just _,  Nothing, pn] -> return (I.MtypeAsRet (dcast FLC dt0), mapPaAlign pn)
+                           [Nothing, Just _, pn] -> return (I.MtypeByVal (dcast FLC dt0), mapPaAlign pn)
                            [_,_,_] -> errorLoc FLC $ show bl
                        }
                   ) params
      ; let (ret0::I.Utype) = tconvert mp ret
-     ; return $ I.Tfunction (dcast FLC ret0, []) ts mv
+     ; return $ I.Tfunction (dcast FLC ret0, retAttrs) ts mv
      }
 
 sRetByValAlignPreds = [ (A.PaSRet==)
@@ -1474,14 +1478,15 @@ convert_FunctionDeclareType  (A.FunctionPrototype { A.fp_linkage = f0
     do { f13a <- maybeM convert_Prefix f13
        ; f14a <- maybeM convert_Prologue f14
        ; f7a <- convert_to_FunParamTypeList fpl
-       ; ft <- composeTfunction f5 (fmap (\x -> case x of
-                                             A.FormalParamData dt pa _ -> (dt, pa)
-                                             _ -> errorLoc FLC $ show x
-                                         ) fpl) mv
+       ; ft <- composeTfunction (f5, fmap specializeRetAttr f4) 
+               (fmap (\x -> case x of
+                         A.FormalParamData dt pa _ -> (dt, pa)
+                         _ -> errorLoc FLC $ show x
+                     ) fpl) mv
        ; return $ I.FunctionDeclareData { I.fd_linkage = f0 
                                         , I.fd_visibility = f1 
                                         , I.fd_dllstorage = f2 
-                                        , I.fd_signature = I.FunSignature (maybe I.Ccc id f3) (fmap specializeRetAttr f4) ft f7a 
+                                        , I.fd_signature = I.FunSignature (maybe I.Ccc id f3) ft f7a 
                                         , I.fd_fun_name = f6
                                         , I.fd_addr_naming = f8 
                                         , I.fd_fun_attrs = f9 
@@ -1532,15 +1537,15 @@ convert_FunctionInterface  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7@(A.Forma
      ; f13a <- maybeM convert_Prefix f13
      ; f14a <- maybeM convert_Prologue f14
      ; f7a <- mapM convert_to_FunParam plist
-     ; ft <- composeTfunction f5 (fmap (\x -> case x of
-                                           A.FormalParamData dt pa _ -> (dt, pa)
-                                           _ -> errorLoc FLC $ show x
-                                       ) plist) mv
+     ; ft <- composeTfunction (f5, fmap specializeRetAttr f4) 
+             (fmap (\x -> case x of
+                       A.FormalParamData dt pa _ -> (dt, pa)
+                       _ -> errorLoc FLC $ show x
+                   ) plist) mv
      ; return $ I.FunctionInterface { I.fi_linkage = f0 
                                     , I.fi_visibility = f1 
                                     , I.fi_dllstorage = f2
-                                    , I.fi_signature = I.FunSignature (maybe I.Ccc id f3) 
-                                                       (fmap specializeRetAttr f4) ft f7a
+                                    , I.fi_signature = I.FunSignature (maybe I.Ccc id f3) ft f7a
                                     , I.fi_fun_name = f6
                                     , I.fi_addr_naming = f8 
                                     , I.fi_fun_attrs = f9 

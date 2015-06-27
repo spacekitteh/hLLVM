@@ -27,6 +27,9 @@ instance (Mangle l, Mangle r) => Mangle (Either l r) where
   mangle e = case e of
     Left l -> mangle l
     Right r -> mangle r
+    
+instance (Mangle l, Mangle r) => Mangle (l, r) where  
+  mangle (l,r) = mangle l ++ mangle r
 
 instance Mangle Const where
   mangle c = replaceDq $ render $ printIr c
@@ -37,9 +40,10 @@ instance Mangle Dtype where
 
 instance Mangle Mtype where
   mangle t = case t of
-    MtypeAsRet dt ma -> "sret"++mangle dt++mangle ma
-    MtypeByVal dt ma -> "byval"++mangle dt++mangle ma
-    MtypeData dt ma -> mangle dt++mangle ma
+    MtypeAsRet dt -> "sret" ++ mangle dt
+    MtypeByVal dt -> "byval" ++ mangle dt
+    MtypeData dt -> mangle dt
+    MtypeLabel dt -> mangle dt
 
 instance Mangle Rtype where
   mangle t = let (t0::Utype) = ucast t 
@@ -112,7 +116,8 @@ instance Mangle a => Mangle (FunOperand a) where
   mangle x = case x of
     FunOperandData d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
     FunOperandByVal d atts align a -> "byval" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
-    FunOperandLabel d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a    
+    FunOperandAsRet d atts align a -> "sret" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a        
+    FunOperandLabel d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
   
 {-
 instance Mangle CallOperand where
@@ -194,6 +199,15 @@ instance Mangle (Type s r) where
     Tfirst_class_quoteName s -> show s
     Tfirst_class_no s -> show s
 
+instance Mangle () where
+  mangle () = ""
+  
+instance Mangle a => Mangle (FunSignature a) where
+  mangle FunSignature { fs_callConv = cc
+                      --, fs_retAttrs = attrs
+                      , fs_type = typ
+                      , fs_params = pas
+                      } = mangle cc ++ mangle typ ++ mangle pas
 {-
 instance Mangle CallFunInterface where       
   mangle CallFunInterface{..} = mangle cfi_tail ++ mangle cfi_signature

@@ -134,17 +134,23 @@ mkCheck te mp dt = [ Comment $ Cstring $ render $ printIr dt
 callLog :: [T Dtype Value] -> (Node a) O O
 callLog tvs = 
   let aps = fmap (\(T t v) -> FunOperandData t [] Nothing v) tvs
-      callSiteType = Tfunction (RtypeVoidU Tvoid, []) [MtypeData (ucast $ ptr0 i8) Nothing, MtypeData (ucast i32) Nothing
-                                                      , MtypeData (ucast i32) Nothing] Nothing
-  in Cnode (I_call_fun (FunId (GlobalIdAlphaNum "check_int2")) 
-            (CallFunInterface TcNon (FunSignature Ccc [] callSiteType aps) []) Nothing) []
+      callSiteType = Tfunction (RtypeVoidU Tvoid, []) [(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                      ,(MtypeData (ucast i32), Nothing)
+                                                      ,(MtypeData (ucast i32), Nothing)] Nothing
+  in Cnode (I_call_fun (FunId (GlobalIdAlphaNum "check_int2"))
+            CallFunInterface { cfi_tail = TcNon 
+                             , cfi_castType = Nothing
+                             , cfi_signature = FunSignature Ccc callSiteType aps 
+                             , cfi_funAttrs = [] 
+                             } Nothing) []
 
 visFunctions = [FunctionDeclareData { fd_linkage = Nothing
                                     , fd_visibility = Nothing
                                     , fd_dllstorage = Nothing
                                     , fd_signature = FunSignature { fs_callConv = Ccc
-                                                                  , fs_retAttrs = []
-                                                                  , fs_type = Tfunction (RtypeVoidU Tvoid,[]) [] Nothing
+                                                                  , fs_type = Tfunction (RtypeVoidU Tvoid,[]) [(MtypeData $ ucast $ ptr0 i8, Nothing)
+                                                                                                              ,(MtypeData $ ucast i32, Nothing)
+                                                                                                              ,(MtypeData $ ucast i32, Nothing)] Nothing
                                                                   , fs_params = [FunOperandData (ucast $ ptr0 i8) [] Nothing ()
                                                                                 ,FunOperandData (ucast i32) [] Nothing ()
                                                                                 ,FunOperandData (ucast i32) [] Nothing ()
@@ -171,7 +177,6 @@ defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph ins
                                    , fi_visibility = Nothing
                                    , fi_dllstorage = Nothing
                                    , fi_signature = FunSignature { fs_callConv = Ccc
-                                                                 , fs_retAttrs = []
                                                                  , fs_type = Tfunction (RtypeScalarI (TpI 32), []) [] Nothing
                                                                  , fs_params = []
                                                                  }

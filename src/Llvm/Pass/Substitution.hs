@@ -235,13 +235,16 @@ instance Substitutable FunctionInterface where
        }
 
 instance Substitutable FunctionDeclare where
-  substitute chg fp@FunctionDeclareData {..} =
-    fp { fd_fun_name = substitute chg fd_fun_name
-       , fd_signature = substitute chg fd_signature
-       , fd_comdat = substitute chg fd_comdat
-       , fd_prefix = substitute chg fd_prefix
-       , fd_prologue = substitute chg fd_prologue
-       }
+  substitute chg x = case x of
+    FunctionDeclareData {..} ->
+      x { fd_fun_name = substitute chg fd_fun_name
+        , fd_signature = substitute chg fd_signature
+        , fd_comdat = substitute chg fd_comdat
+        , fd_prefix = substitute chg fd_prefix
+        , fd_prologue = substitute chg fd_prologue
+        }
+    FunctionDeclareMeta {..} -> 
+      x { fd_fun_name = substitute chg fd_fun_name }
 
 instance Substitutable TlDeclare where
   substitute chg (TlDeclare fp) = TlDeclare (substitute chg fp)

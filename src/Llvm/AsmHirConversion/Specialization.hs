@@ -75,16 +75,16 @@ unspecializeRegisterIntrinsic cinst = case cinst of
 specializeCallSite :: Maybe LocalId -> FunPtr -> CallFunInterface -> Maybe Cinst
 specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   (FunId (GlobalIdAlphaNum "llvm.va_start"),
-   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_va_start v
   (FunId (GlobalIdAlphaNum "llvm.va_end"),
-   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_va_end v
   (FunId (GlobalIdAlphaNum "llvm.va_copy"),
-   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v1
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v1
                          ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
   (FunId (GlobalIdAlphaNum nm), 
-   FunSignature Ccc [] _ 
+   FunSignature Ccc _ 
    [FunOperandData t1 [] Nothing v1 -- dest
    ,FunOperandData t2 [] Nothing v2 -- src or setValue
    ,FunOperandData t3 [] Nothing v3 -- len
@@ -117,10 +117,10 @@ specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
                                     (T (dcast FLC t4) v4) (T (dcast FLC t5) v5)  
     in Just $ mod
   (FunId (GlobalIdAlphaNum "llvm.stacksave"),
-   FunSignature Ccc [] _ []) | isJust lhs -> 
+   FunSignature Ccc _ []) | isJust lhs -> 
     Just $ I_llvm_stacksave $ fromJust lhs
   (FunId (GlobalIdAlphaNum "llvm.stackrestore"),
-   FunSignature Ccc [] _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_stackrestore (T (dcast FLC t1) v)
   _ -> Nothing
 
@@ -129,59 +129,96 @@ unspecializeIntrinsics :: Cinst -> Maybe Cinst
 unspecializeIntrinsics inst = case inst of
   I_llvm_va_start v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_start")) 
-    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid, []) 
-                                                  [MtypeData (ucast $ ptr0 i8) Nothing] Nothing) [tvToAp (T (ptr0 i8) v)]) []) Nothing
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid, []) 
+                                                         [(MtypeData (ucast $ ptr0 i8), Nothing)] Nothing) [tvToAp (T (ptr0 i8) v)] 
+                     , cfi_funAttrs = [] 
+                     } Nothing
   I_llvm_va_end v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_end"))
-    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid, []) 
-                                                  [MtypeData (ucast $ ptr0 i8) Nothing] Nothing) [tvToAp (T (ptr0 i8) v)]) []) Nothing
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid, []) 
+                                                         [(MtypeData (ucast $ ptr0 i8), Nothing)] Nothing) [tvToAp (T (ptr0 i8) v)] 
+                     , cfi_funAttrs = [] 
+                     } Nothing
   I_llvm_va_copy v1 v2 ->
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_copy"))
-    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid, []) 
-                                                  [MtypeData (ucast $ ptr0 i8) Nothing
-                                                  ,MtypeData (ucast $ ptr0 i8) Nothing] Nothing) 
-                             [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)]) []) Nothing
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid, []) 
+                                                         [(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                         ,(MtypeData (ucast $ ptr0 i8), Nothing)] Nothing)
+                                       [tvToAp (T (ptr0 i8) v1), tvToAp (T (ptr0 i8) v2)] 
+                     , cfi_funAttrs = [] 
+                     } Nothing
   I_llvm_memcpy memLen tv1 tv2 tv3 tv4 tv5 -> 
     let (nm, ltype) = case memLen of
           MemLenI32 -> ("llvm.memcpy.p0i8.p0i8.i32", i32)
           MemLenI64 -> ("llvm.memcpy.p0i8.p0i8.i64", i64)
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
-       (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) 
-                                                     [MtypeData (ucast $ ptr0 i8) Nothing, MtypeData (ucast $ ptr0 i8) Nothing
-                                                     ,MtypeData (ucast ltype) Nothing, MtypeData (ucast i32) Nothing
-                                                     ,MtypeData (ucast i1) Nothing
-                                                     ] Nothing)
-                                [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
+       CallFunInterface { cfi_tail = TcNon 
+                        , cfi_castType = Nothing
+                        , cfi_signature = FunSignature Ccc  (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                             [(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                             ,(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                             ,(MtypeData (ucast ltype), Nothing)
+                                                             ,(MtypeData (ucast i32), Nothing)
+                                                             ,(MtypeData (ucast i1), Nothing)
+                                                             ] Nothing)
+                                          [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] 
+                        , cfi_funAttrs = [] 
+                        } Nothing
   I_llvm_memmove memLen tv1 tv2 tv3 tv4 tv5 -> 
     let (nm, ltype) = case memLen of
           MemLenI32 -> ("llvm.memmove.p0i8.p0i8.i32", i32)
           MemLenI64 -> ("llvm.memmove.p0i8.p0i8.i64", i64)
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
-       (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) 
-                                                     [MtypeData (ucast $ ptr0 i8) Nothing, MtypeData (ucast $ ptr0 i8) Nothing
-                                                     ,MtypeData (ucast ltype) Nothing, MtypeData (ucast i32) Nothing
-                                                     ,MtypeData (ucast i1) Nothing
-                                                     ] Nothing)
-                                [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
+       CallFunInterface { cfi_tail = TcNon 
+                        , cfi_castType = Nothing
+                        , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                            [(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                            ,(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                            ,(MtypeData (ucast ltype), Nothing)
+                                                            ,(MtypeData (ucast i32), Nothing)
+                                                            ,(MtypeData (ucast i1), Nothing)
+                                                            ] Nothing)
+                                          [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] 
+                        , cfi_funAttrs = [] 
+                        } Nothing
   I_llvm_memset memLen tv1 tv2 tv3 tv4 tv5 -> 
     let (nm, ltype) = case memLen of
           MemLenI32 -> ("llvm.memset.p0i8.i32", i32)
           MemLenI64 -> ("llvm.memset.p0i8.i64", i64)
     in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
-       (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) 
-                                                     [MtypeData (ucast $ ptr0 i8) Nothing
-                                                     ,MtypeData (ucast i8) Nothing 
-                                                     ,MtypeData (ucast ltype) Nothing 
-                                                     ,MtypeData (ucast i32) Nothing
-                                                     ,MtypeData (ucast i1) Nothing
-                                                     ] Nothing)
-                                [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5]) []) Nothing
+       CallFunInterface { cfi_tail = TcNon 
+                        , cfi_castType = Nothing
+                        , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                            [(MtypeData (ucast $ ptr0 i8), Nothing)
+                                                            ,(MtypeData (ucast i8), Nothing)
+                                                            ,(MtypeData (ucast ltype), Nothing)
+                                                            ,(MtypeData (ucast i32), Nothing)
+                                                            ,(MtypeData (ucast i1), Nothing)
+                                                            ] Nothing)
+                                                            [tvToAp tv1, tvToAp tv2, tvToAp tv3, tvToAp tv4, tvToAp tv5] 
+                        , cfi_funAttrs = []
+                        } Nothing
   I_llvm_stacksave v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stacksave")) 
-    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeScalarP $ ptr0 i8,[]) [] Nothing) []) []) (Just v)
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeScalarP $ ptr0 i8,[]) [] Nothing) [] 
+                     , cfi_funAttrs = [] 
+                     } (Just v)
   I_llvm_stackrestore tv -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stackrestore")) 
-    (CallFunInterface TcNon (FunSignature Ccc [] (Tfunction (RtypeVoidU Tvoid,[]) [MtypeData (ucast $ ptr0 i8) Nothing] Nothing) [tvToAp tv]) []) Nothing
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                         [(MtypeData (ucast $ ptr0 i8),Nothing)] Nothing) [tvToAp tv] 
+                     , cfi_funAttrs = [] 
+                     } Nothing
   _ -> Nothing
     
 tvToAp :: Ucast t Dtype => T t Value -> FunOperand Value
@@ -251,21 +288,21 @@ unspecializeMinst mi = case mi of
 
 specializeUnamedMd :: TlUnamedMd -> TlUnamedMd
 specializeUnamedMd x = case x of
-  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> 
+  (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> 
     TlUnamedMd_DW_file_type n mc
-  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786478"))
+  (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786478"))
                                                      , m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]))) ->
     TlUnamedMd_DW_subprogram n [m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]
-  (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786443")), m1,m2,m3,m4,m5,m6]))) ->
+  (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786443")), m1,m2,m3,m4,m5,m6]))) ->
     TlUnamedMd_DW_lexical_block n [m1,m2,m3,m4,m5,m6]
   _ -> x
 
 unspecializeUnamedMd :: TlUnamedMd -> TlUnamedMd  
 unspecializeUnamedMd x = case x of
   TlUnamedMd_DW_file_type n mc -> 
-    (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct [MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786473")), mc])))
+    (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786473")), mc])))
   TlUnamedMd_DW_subprogram n mcs -> 
-    (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct ([MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786478"))]++mcs))))
+    (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct ([MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786478"))]++mcs))))
   TlUnamedMd_DW_lexical_block n mcs -> 
-    (TlUnamedMd n (MetaKindedConst Mmetadata (McStruct ([MetaKindedConst (Mtype $ ucast i32) (McSimple (C_int "786443"))]++mcs))))    
+    (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct ([MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786443"))]++mcs))))    
   _ -> x

@@ -83,19 +83,31 @@ i_store loc = I_store { volatile = IsNot Volatile
                       , nontemporal = Nothing
                       }
 
-{-
 icallcmd :: GlobalId -> [(Dtype, Value)] -> Cinst
 icallcmd fname params = I_call_fun (FunId fname) 
-                        (CallFunInterface TcNon Ccc [] (CallSiteTypeRet $ RtypeVoidU Tvoid) 
-                         Nothing (fmap (\(dt,v) -> FunOperandData dt [] Nothing v) params) []) Nothing
+                        CallFunInterface { cfi_tail = TcNon 
+                                         , cfi_castType = Nothing
+                                         , cfi_signature = FunSignature { fs_callConv = Ccc 
+                                                                        , fs_type = Tfunction (RtypeVoidU Tvoid,[]) 
+                                                                                    (fmap (\x ->  (MtypeData $ fst x, Nothing)) params) Nothing
+                                                                        , fs_params = fmap (\(dt,v) -> FunOperandData dt [] Nothing v) params 
+                                                                        } 
+                                         , cfi_funAttrs = [] 
+                                         } Nothing
 
 icallfun :: GlobalId -> [(Dtype, Value)] -> Dtype -> LocalId -> Cinst
-icallfun fname params retType rid =
+icallfun fname params retType rid = 
+  let funType = Tfunction (ucast retType, []) (fmap (\x -> (MtypeData $ fst x, Nothing)) params) Nothing
+  in 
   I_call_fun (FunId fname) 
-  (CallFunInterface TcNon Ccc [] (CallSiteTypeRet $ ucast retType) 
-   Nothing (fmap (\(dt,v) -> FunOperandData dt [] Nothing v) params) []) (Just rid)
--}
-
+  CallFunInterface { cfi_tail = TcNon 
+                   , cfi_castType = Nothing
+                   , cfi_signature = FunSignature { fs_callConv = Ccc 
+                                                  , fs_type = funType
+                                                  , fs_params = fmap (\(dt,v) -> FunOperandData dt [] Nothing v) params 
+                                                  } 
+                   , cfi_funAttrs = []
+                   } (Just rid)
 
 llvm_sizeof :: Dtype -> Type ScalarB I -> Const
 llvm_sizeof s intType = let start = C_getelementptr (Is InBounds) (T (Tpointer (ucast s) 0) C_null) [toTC (0::Word32)]

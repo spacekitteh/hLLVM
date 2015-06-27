@@ -73,8 +73,7 @@ convert_to_FunctionDeclareType
 
 convert_to_FormalParamTypeList :: FunSignature LocalId -> FunSignature ()
 convert_to_FormalParamTypeList FunSignature{..} = 
-  FunSignature fs_callConv fs_retAttrs fs_type
-  (fmap convert_to_FormalParamType fs_params)
+  FunSignature fs_callConv fs_type (fmap convert_to_FormalParamType fs_params)
 
 
 convert_to_FormalParamType :: FunOperand LocalId -> FunOperand ()
@@ -131,7 +130,7 @@ globalCxtOfModule (Module tl) =
                       ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> 
                         (fi_fun_name, convert_to_FunctionDeclareType fp))
              $ filter (\x -> case x of
-                          ToplevelDeclare _ -> True
+                          ToplevelDeclare (TlDeclare FunctionDeclareData{..}) -> True
                           ToplevelDefine{..} -> True
                           _ -> False
                       ) tl
@@ -202,33 +201,33 @@ localIdSrcInfoMap mdMap set =
             (_,_) -> mp
         ) M.empty (S.toList set)
   where getLocalId m = case m of
-          MetaKindedConst Mmetadata (McStruct [MetaKindedConst (Mtype _) (McSsa lid)]) -> Just lid
+          MetaKindedConst MKmetadata (McStruct [MetaKindedConst (MKtype _) (McSsa lid)]) -> Just lid
           _ -> Nothing
         getMdRef m = case m of
-          MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode mf))) -> Just mf
+          MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode mf))) -> Just mf
           _ -> Nothing
         getFileRef num = case M.lookup num mdMap of
-          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> Just fref
+          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> Just fref
           _ -> Nothing
          
 getFileInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
 getFileInfo mdMap fref = case M.lookup fref mdMap of
-  Just (TlUnamedMd_DW_file_type _ (MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode ref))))) -> getFileName mdMap ref
+  Just (TlUnamedMd_DW_file_type _ (MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))))) -> getFileName mdMap ref
   Nothing -> errorLoc FLC $ show fref
 
 getFileInfoFromSubprog :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo             
 getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of
-  Just (TlUnamedMd_DW_subprogram _ [_,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
+  Just (TlUnamedMd_DW_subprogram _ [_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
     getFileInfo mdMap fref
-  Just (TlUnamedMd_DW_lexical_block _ [MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_]) ->
+  Just (TlUnamedMd_DW_lexical_block _ [MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_]) ->
     getFileName mdMap fref
   _ -> Nothing
 
 getSrcInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe SrcInfo
 getSrcInfo mdMap n = case M.lookup n mdMap of
-  Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [MetaKindedConst (Mtype _) (McSimple (C_int lin))
-                                                  ,MetaKindedConst (Mtype _) (McSimple (C_int col))
-                                                  ,MetaKindedConst Mmetadata (McMdRef (MdRefNode (MdNode subprog))),UnmetaKindedNull]))) -> 
+  Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [MetaKindedConst (MKtype _) (McSimple (C_int lin))
+                                                  ,MetaKindedConst (MKtype _) (McSimple (C_int col))
+                                                  ,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode subprog))),UnmetaKindedNull]))) -> 
     do { fileInfo <- getFileInfoFromSubprog mdMap subprog
        ; return $ SrcInfo fileInfo (Just $ PositionInfo (fromIntegral $ strToApInt lin) (fromIntegral $ strToApInt col))
        }
@@ -236,7 +235,7 @@ getSrcInfo mdMap n = case M.lookup n mdMap of
   
 getFileName :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
 getFileName mdMap ref = case M.lookup ref mdMap of
-  Just (TlUnamedMd _ (MetaKindedConst Mmetadata (McStruct [MetaKindedConst Mmetadata (McString (DqString file))
-                                                          ,MetaKindedConst Mmetadata (McString (DqString dir))]))) ->
+  Just (TlUnamedMd _ (MetaKindedConst MKmetadata (McStruct [MetaKindedConst MKmetadata (McString (DqString file))
+                                                           ,MetaKindedConst MKmetadata (McString (DqString dir))]))) ->
     Just $ FileInfo dir file 
   _ -> Nothing

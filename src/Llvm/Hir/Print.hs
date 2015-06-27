@@ -434,10 +434,10 @@ instance IrPrint CallSiteType where
 
 instance (IrPrint a) => IrPrint (FunSignature a) where
   printIr FunSignature { fs_callConv = cc
-                       , fs_retAttrs = attrs
+                       --, fs_retAttrs = attrs
                        , fs_type = ty
                        , fs_params = params
-                       } = commaSepList [printIr cc, printIr attrs, printIr ty, printIr params]
+                       } = commaSepList [printIr cc, printIr ty, printIr params]
     
 instance IrPrint CallFunInterface where
   printIr x = case x of
@@ -722,8 +722,8 @@ instance IrPrint FunctionDeclare where
 
 instance IrPrint MetaKind where
   printIr a = case a of
-    Mtype t -> printIr t
-    Mmetadata -> text "metadata"
+    MKtype t -> printIr t
+    MKmetadata -> text "metadata"
 
 instance IrPrint MetaKindedConst where
   printIr x = case x of
@@ -854,9 +854,10 @@ instance IrPrint Ftype where
 
 instance IrPrint Mtype where
   printIr x = case x of
-    MtypeAsRet dt ma -> text "sret" <+> printIr dt <+> printIr ma
-    MtypeData dt ma -> printIr dt <+> printIr ma
-    MtypeByVal dt ma -> text "byval" <+> printIr dt <+> printIr ma
+    MtypeAsRet dt -> text "sret" <+> printIr dt
+    MtypeData dt -> printIr dt
+    MtypeByVal dt -> text "byval" <+> printIr dt
+    MtypeLabel dt -> printIr dt
 
 instance IrPrint Dtype where
   printIr x = case x of

@@ -238,11 +238,13 @@ data CallSiteType = CallSiteTypeRet Rtype
                   deriving (Eq, Ord, Show)
 
 data CallFunInterface = CallFunInterface { cfi_tail :: TailCall
+                                         , cfi_castType :: Maybe (Type ScalarB P)
                                          , cfi_signature :: FunSignature Value
                                          , cfi_funAttrs :: [FunAttr]
                                          } deriving (Eq, Ord, Show)
 
-data InvokeFunInterface = InvokeFunInterface { ifi_signature :: FunSignature Value
+data InvokeFunInterface = InvokeFunInterface { ifi_castType :: Maybe (Type ScalarB P)
+                                             , ifi_signature :: FunSignature Value
                                              , ifi_funAttrs :: [FunAttr]
                                              } deriving (Eq, Ord, Show)
 
@@ -1095,7 +1097,7 @@ data TypedConstOrNull = TypedConst (T Dtype Const)
 
 
 data FunSignature a = FunSignature { fs_callConv ::  CallConv
-                                   , fs_retAttrs :: [RetAttr]
+                                     --, fs_retAttrs :: [RetAttr]
                                    , fs_type :: Type CodeFunB X
                                    , fs_params :: [FunOperand a]
                                    } deriving (Eq, Ord, Show)
