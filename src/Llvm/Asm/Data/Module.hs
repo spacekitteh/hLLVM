@@ -264,7 +264,7 @@ data Value = Val_local LocalId
 
 data Typed v = Typed Type v deriving (Eq, Ord, Show)
 
-data Aliasee = AliaseeTv (Typed Value)
+data Aliasee = Aliasee (Typed Const) 
              | AliaseeConversion (Conversion Const)
              | AliaseeGetElementPtr (GetElementPtr Const)
              deriving (Eq,Show)

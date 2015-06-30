@@ -190,20 +190,32 @@ pConstConversion = do { op <- pConvertOp
                       ; return $ Conversion op (extractTypedConst tc) t
                       }
                    
-
                    
+pAliasee :: P Aliasee
+pAliasee = 
+  choice [ liftM (\x -> case x of
+                     TypedConst v -> Aliasee v
+                     _ -> error $ show x
+                 ) pTypedConst
+         , liftM AliaseeConversion pConstConversion           
+         , liftM AliaseeGetElementPtr pConstGetElemPtr
+         ]
+                   
+
+
 pConstGetElemPtr :: P (GetElementPtr Const)
 pConstGetElemPtr = do { reserved "getelementptr"
                       ; ib <- option (IsNot InBounds) (reserved "inbounds" >> return (Is InBounds))
                       ; ignore (chartok '(')
                       ; (Typed t c) <- liftM extractTypedConst pTypedConst
-                      ; idx <- option [] (do { ignore comma
-                                            ; idx <- sepBy pTypedConst comma 
-                                            ; return $ fmap extractTypedConst idx
-                                            })
+                      ; idx <- option [] $ do { ignore comma
+                                              ; idx <- sepBy pTypedConst comma 
+                                              ; return $ fmap extractTypedConst idx
+                                              }
                       ; ignore (chartok ')')
                       ; return $ GetElementPtr ib (Pointer (Typed t c)) idx
                       }
+
 
 pMetaKindedConst :: P (MetaKindedConst)
 pMetaKindedConst = choice [ reserved "null" >> return UnmetaKindedNull

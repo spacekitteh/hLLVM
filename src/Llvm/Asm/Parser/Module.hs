@@ -46,11 +46,7 @@ pAlias lhs vis dll tlm na = do { link <- option Nothing (liftM Just pAliasLinkag
                                ; aliasee <- pAliasee
                                ; return $ ToplevelAlias (TlAlias lhs vis dll tlm na link aliasee)
                                }
-    where pAliasee = 
-            choice [ liftM AliaseeTv pTypedValue
-                   , liftM AliaseeConversion pConstConversion
-                   , liftM AliaseeGetElementPtr pConstGetElemPtr
-                   ]
+    
 
 
 pGlobal :: Maybe GlobalId -> Maybe Linkage -> Maybe Visibility -> Maybe DllStorageClass -> Maybe ThreadLocalStorage 

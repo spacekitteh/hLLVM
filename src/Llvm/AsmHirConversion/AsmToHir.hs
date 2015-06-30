@@ -304,8 +304,8 @@ convert_to_Conversion_V cvt  (A.Conversion op (A.Typed t u) dt) =
        }
 
 
-convert_to_GetElementPtr :: (u -> MM v) -> A.GetElementPtr u -> (MM (I.GetElementPtr I.ScalarB v))
-convert_to_GetElementPtr cvt (A.GetElementPtr b (A.Pointer (A.Typed t u)) us) = 
+convert_to_GetElementPtr :: (u -> MM v) -> (u -> MM idx) -> A.GetElementPtr u -> (MM (I.GetElementPtr I.ScalarB v idx))
+convert_to_GetElementPtr cvt cvidx (A.GetElementPtr b (A.Pointer (A.Typed t u)) us) = 
   do { mp <- typeDefs
      ; ua <- cvt u
      ; let (ta::I.Type I.ScalarB I.P) = dcast FLC ((tconvert mp t)::I.Utype)
@@ -314,14 +314,14 @@ convert_to_GetElementPtr cvt (A.GetElementPtr b (A.Pointer (A.Typed t u)) us) =
      }
   where
     convert_Tv_Tint (A.Typed t v) = do { mp <- typeDefs
-                                       ; va <- cvt v
+                                       ; va <- cvidx v
                                        ; let (ta::I.Type I.ScalarB I.I) = dcast FLC ((tconvert mp t)::I.Utype)
                                        ; return $ I.T ta va
                                        }
 
 
-convert_to_GetElementPtr_V :: (u -> MM v) -> A.GetElementPtr u -> (MM (I.GetElementPtr I.VectorB v))
-convert_to_GetElementPtr_V cvt (A.GetElementPtr b (A.Pointer (A.Typed t u)) us) = 
+convert_to_GetElementPtr_V :: (u -> MM v) -> (u -> MM idx) -> A.GetElementPtr u -> (MM (I.GetElementPtr I.VectorB v idx))
+convert_to_GetElementPtr_V cvt cvidx (A.GetElementPtr b (A.Pointer (A.Typed t u)) us) = 
   do { mp <- typeDefs
      ; ua <- cvt u
      ; let (ta::I.Type I.VectorB I.P) = dcast FLC ((tconvert mp t)::I.Utype)
@@ -330,7 +330,7 @@ convert_to_GetElementPtr_V cvt (A.GetElementPtr b (A.Pointer (A.Typed t u)) us) 
      }
   where
     convert_Tv_Tint (A.Typed te v) = do { mp <- typeDefs
-                                        ; va <- cvt v
+                                        ; va <- cvidx v
                                         ; let (ta::I.Utype) = tconvert mp te
                                         ; return $ I.T (dcast FLC ta) va
                                         }
@@ -732,11 +732,11 @@ convert_Const x =
     A.C_gep a -> 
       do { mp <- typeDefs
          ; if getElemPtrIsTvector mp a then 
-             do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr_V convert_Const a
+             do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr_V convert_Const convert_Const a
                 ; return $ I.C_getelementptr_V b t idx
                 }
            else 
-             do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr convert_Const a
+             do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr convert_Const convert_Const a
                 ; return $ I.C_getelementptr b t idx
                 }
          }
@@ -935,11 +935,11 @@ convert_Expr_CInst :: (Maybe A.LocalId, A.Expr) -> (MM I.Cinst)
 convert_Expr_CInst (Just lhs, A.ExprGetElementPtr c) = 
   do { mp <- typeDefs
      ; if getElemPtrIsTvector mp c then 
-         do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr_V convert_Value c
+         do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr_V convert_Value convert_Value c
             ; return $ I.I_getelementptr_V b t idx lhs
             }
        else 
-         do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr convert_Value c
+         do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr convert_Value convert_Value c
             ; return $ I.I_getelementptr b t idx lhs
             }
      }
@@ -1373,22 +1373,29 @@ convert_MetaParam x = case x of
   _ -> errorLoc FLC $ show x ++ " is passed to convert_MetaParam"
 
 
+convert_constToAliasee :: A.Const -> MM I.Aliasee
+convert_constToAliasee (A.C_simple (A.CpGlobalAddr v)) = return $ I.Aliasee v
+convert_constToAliasee (A.C_conv cvt@(A.Conversion op src dt)) = convert_Aliasee (A.AliaseeConversion cvt)
+convert_constToAliasee x = errorLoc FLC $ show x
+
+
 convert_Aliasee :: A.Aliasee -> (MM I.Aliasee)
-convert_Aliasee (A.AliaseeTv (A.Typed t v)) = do { mp <- typeDefs
-                                                 ; va <- convert_Value v
-                                                 ; let (ta::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
-                                                 ; return $ I.AliaseeTv (I.T ta va)
-                                                 }
-convert_Aliasee (A.AliaseeConversion c@(A.Conversion _ _ dt)) = 
-  do { mp <- typeDefs
-     ; if isTvector mp dt then Md.liftM I.AliaseeConversionV (convert_to_Conversion_V convert_Const c)
-       else Md.liftM I.AliaseeConversion (convert_to_Conversion convert_Const c)
-     }
-convert_Aliasee (A.AliaseeGetElementPtr a) = 
-  do { mp <- typeDefs
-     ; if getElemPtrIsTvector mp a then Md.liftM I.AliaseeGEPV (convert_to_GetElementPtr_V convert_Const a)
-       else Md.liftM I.AliaseeGEP (convert_to_GetElementPtr convert_Const a)
-     }
+convert_Aliasee ae = case ae of
+  A.Aliasee (A.Typed t c) -> do { mp <- typeDefs
+                                ; let (ta::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
+                                ; ca <- convert_constToAliasee c 
+                                ; return $ I.AliaseeTyped ta ca
+                                }
+  A.AliaseeConversion c@(A.Conversion _ _ dt) -> 
+    do { mp <- typeDefs
+       ; if isTvector mp dt then errorLoc FLC $ show dt
+         else Md.liftM I.AliaseeConversion (convert_to_Conversion convert_constToAliasee c)
+       }
+  A.AliaseeGetElementPtr a -> 
+    do { mp <- typeDefs
+       ; if getElemPtrIsTvector mp a then errorLoc FLC $ show ae
+         else Md.liftM I.AliaseeGEP (convert_to_GetElementPtr convert_constToAliasee convert_Const a)
+       }
 
 convert_Prefix :: A.Prefix -> (MM I.Prefix)
 convert_Prefix (A.Prefix n) = Md.liftM I.Prefix (convert_TypedConstOrNUll n)

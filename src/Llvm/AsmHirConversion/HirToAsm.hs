@@ -114,13 +114,13 @@ mkConversion (op, t1, u, dt1) = do { u1 <- convert u
                                    ; return $ A.C_conv $ A.Conversion op (A.Typed t1 u1) dt1                                   
                                    }
 
-instance (Conversion v1 (Rm v2)) => Conversion (I.GetElementPtr I.ScalarB v1) (Rm (A.GetElementPtr v2)) where
+instance (Conversion v1 (Rm v2), Conversion idx1 (Rm v2)) => Conversion (I.GetElementPtr I.ScalarB v1 idx1) (Rm (A.GetElementPtr v2)) where
   convert (I.GetElementPtr b u us) = do { ua <- convert u
                                         ; usa <- mapM convert us
                                         ; return $ A.GetElementPtr b (A.Pointer ua) usa
                                         }
           
-instance (Conversion v1 (Rm v2)) => Conversion (I.GetElementPtr I.VectorB v1) (Rm (A.GetElementPtr v2)) where
+instance (Conversion v1 (Rm v2), Conversion idx1 (Rm v2)) => Conversion (I.GetElementPtr I.VectorB v1 idx1) (Rm (A.GetElementPtr v2)) where
   convert (I.GetElementPtr b u us) = do { ua <- convert u
                                         ; usa <- mapM convert us
                                         ; return $ A.GetElementPtr b (A.Pointer ua) usa
@@ -1088,13 +1088,17 @@ instance Conversion I.MetaOperand (Rm A.ActualParam) where
                                        }
     I.MetaOperandMeta mc -> Md.liftM (A.ActualParamMeta) (convert mc)
 
+instance Conversion I.Aliasee (Rm A.Const) where
+  convert (I.Aliasee v) = return $ A.C_simple $ A.CpGlobalAddr v
+  convert (I.AliaseeConversion a) = Md.liftM A.C_conv (convert a)
+  convert (I.AliaseeGEP a) = Md.liftM A.C_gep (convert a)
 
-instance Conversion I.Aliasee (Rm A.Aliasee) where
-  convert (I.AliaseeTv tv) = Md.liftM A.AliaseeTv (convert tv)
-  convert (I.AliaseeConversion a) = Md.liftM A.AliaseeConversion (convert a)
-  convert (I.AliaseeConversionV a) = Md.liftM A.AliaseeConversion (convert a)  
-  convert (I.AliaseeGEP a) = Md.liftM A.AliaseeGetElementPtr (convert a)
-  convert (I.AliaseeGEPV a) = Md.liftM A.AliaseeGetElementPtr (convert a)
+
+convertAliasee :: I.Aliasee -> Rm A.Aliasee 
+convertAliasee ae = case ae of
+  I.AliaseeTyped t a -> convert a >>= \ax -> return $ A.Aliasee (A.Typed (tconvert () t) ax)
+  I.AliaseeConversion a ->  Md.liftM A.AliaseeConversion (convert a)
+  I.AliaseeGEP a -> Md.liftM A.AliaseeGetElementPtr (convert a)
 
 instance Conversion I.Prefix (Rm A.Prefix) where
   convert (I.Prefix n) = Md.liftM A.Prefix (convert n)
@@ -1291,7 +1295,7 @@ instance Conversion I.TlDataLayout (Rm A.TlDataLayout) where
   convert (I.TlDataLayout x) = return (A.TlDataLayout x)
 
 instance Conversion I.TlAlias (Rm A.TlAlias) where  
-  convert (I.TlAlias  g v dll tlm na l a) = convert a >>= return . (A.TlAlias g v dll tlm na l)
+  convert (I.TlAlias  g v dll tlm na l a) = convertAliasee a >>= return . (A.TlAlias g v dll tlm na l)
   
 instance Conversion I.TlUnamedMd (Rm A.TlUnamedMd) where  
   convert x = let (I.TlUnamedMd s tv) = unspecializeUnamedMd x

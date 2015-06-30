@@ -321,7 +321,7 @@ instance AsmPrint ComputingInstWithDbg where
     ComputingInstWithComment s -> char ';' <+> text s 
 
 instance AsmPrint Aliasee where
-  toLlvm (AliaseeTv tv ) = toLlvm tv
+  toLlvm (Aliasee tv) = toLlvm tv
   toLlvm (AliaseeConversion c) = toLlvm c
   toLlvm (AliaseeGetElementPtr a) = toLlvm a
 

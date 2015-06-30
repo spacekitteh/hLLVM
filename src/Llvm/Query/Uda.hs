@@ -35,7 +35,7 @@ instance Uda Const where
     _ -> S.empty
   def _ = S.empty
 
-instance Uda v => Uda (GetElementPtr s v) where
+instance (Uda v, Uda idx) => Uda (GetElementPtr s v idx) where
   use (GetElementPtr _ (T _ ptr) indices) = use ptr `S.union` (foldl (\p e -> S.union p (use e)) S.empty indices)
   def _ = S.empty
   

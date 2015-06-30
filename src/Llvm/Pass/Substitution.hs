@@ -55,7 +55,7 @@ instance Substitutable v => Substitutable (Select s r v) where
   substitute chg (Select cnd t f) =
     Select (substitute chg cnd) (substitute chg t) (substitute chg f)
 
-instance Substitutable v => Substitutable (GetElementPtr s v) where
+instance (Substitutable v, Substitutable idx) => Substitutable (GetElementPtr s v idx) where
   substitute chg (GetElementPtr b base indices) =
     GetElementPtr b (substitute chg base) (substitute chg indices)
 
@@ -883,11 +883,10 @@ instance Substitutable v => Substitutable (Conversion s v) where
 
 instance Substitutable Aliasee where
   substitute chg al = case al of
-    AliaseeTv x -> AliaseeTv (substitute chg x)
+    Aliasee x -> Aliasee (substitute chg x)
+    AliaseeTyped d x -> AliaseeTyped d (substitute chg x)    
     AliaseeConversion x -> AliaseeConversion (substitute chg x)
-    AliaseeConversionV x -> AliaseeConversionV (substitute chg x)
     AliaseeGEP x -> AliaseeGEP (substitute chg x)
-    AliaseeGEPV x -> AliaseeGEPV (substitute chg x)
 
 instance Substitutable TlNamedMd where
   substitute chg x = case x of

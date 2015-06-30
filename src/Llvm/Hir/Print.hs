@@ -186,7 +186,11 @@ printConversion x p = case x of
 instance IrPrint (Conversion s Const) where
   printIr x = printConversion x parens
 
-instance IrPrint (GetElementPtr s Const) where
+instance IrPrint (GetElementPtr s Const Const) where
+  printIr (GetElementPtr b base indices) =
+    hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
+
+instance IrPrint (GetElementPtr s Aliasee Const) where
   printIr (GetElementPtr b base indices) =
     hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
 
@@ -382,7 +386,7 @@ instance IrPrint MetaConst where
   printIr (McSsa s) = text $ show s
   printIr (McSimple sc) = printIr sc
 
-instance IrPrint (GetElementPtr s Value) where
+instance IrPrint (GetElementPtr s Value Value) where
   printIr (GetElementPtr ib tv tcs) =
     hsep [text "getelementptr", printIr ib, printIr tv, (commaSepList $ fmap printIr tcs)]
 
@@ -696,11 +700,12 @@ instance IrPrint Tinst where
   printIr T_unwind = text "unwind"
 
 instance IrPrint Aliasee where
-  printIr (AliaseeTv tv ) = printIr tv
-  printIr (AliaseeConversion c) = printIr c
-  printIr (AliaseeConversionV c) = printIr c
+  printIr (Aliasee tv ) = printIr tv
+  printIr (AliaseeTyped dt tv) = printIr dt <+> printIr tv
+  printIr (AliaseeConversion c) = printConversion c parens -- printIr c
+--  printIr (AliaseeConversionV c) = printIr c
   printIr (AliaseeGEP a) = printIr a
-  printIr (AliaseeGEPV a) = printIr a
+--  printIr (AliaseeGEPV a) = printIr a
 
 
 

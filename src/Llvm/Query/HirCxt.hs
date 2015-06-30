@@ -25,6 +25,7 @@ data FunCxt = FunCxt { funInterface :: FunctionInterface
 data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
                            , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
                            , functions :: M.Map Ci.GlobalId FunctionDeclare
+                           , alias :: M.Map Ci.GlobalId TlAlias
                            , attributes :: M.Map Word32 [FunAttr]
                            , unamedMetadata :: M.Map Word32 TlUnamedMd
                            } deriving (Eq, Ord, Show)
@@ -40,11 +41,12 @@ instance IrPrint TypeEnv where
                                    $+$ text "opaqueTypedefs:" <+> printIr otd
 
 instance IrPrint GlobalCxt where
-  printIr (GlobalCxt te gl fns atts um) = text "typeEnv:" <+> printIr te
-                                          $+$ text "globals:" <+> printIr gl
-                                          $+$ text "functions:" <+> printIr fns
-                                          $+$ text "attributes:" <+> printIr atts
-                                          $+$ text "unamedMetadata:" <+> printIr um
+  printIr (GlobalCxt te gl fns alias atts um) = text "typeEnv:" <+> printIr te
+                                                $+$ text "globals:" <+> printIr gl
+                                                $+$ text "functions:" <+> printIr fns
+                                                $+$ text "alias:" <+> printIr alias
+                                                $+$ text "attributes:" <+> printIr atts
+                                                $+$ text "unamedMetadata:" <+> printIr um
 
 instance IrPrint FunCxt where
   printIr (FunCxt fi dbgDeclares) = text "funInterface:" <+> printIr fi
@@ -96,7 +98,8 @@ funCxtOfTlDefine :: TlDefine a -> FunCxt
 funCxtOfTlDefine (TlDefine fi _ graph) = 
   let dbgs = H.foldGraphNodes fld graph S.empty
   in FunCxt { funInterface = fi
-            , dbgDeclares = dbgs }
+            , dbgDeclares = dbgs 
+            }
   where
     fld :: Node a e x -> S.Set (Minst, [Dbg]) -> S.Set (Minst, [Dbg])
     fld n = case n of
@@ -134,6 +137,11 @@ globalCxtOfModule (Module tl) =
                           ToplevelDefine{..} -> True
                           _ -> False
                       ) tl
+      alia = fmap (\(ToplevelAlias x) -> (tla_lhs x, x))
+             $ filter (\x -> case x of
+                          ToplevelAlias _ -> True
+                          _ -> False
+                      ) tl
       attrs = fmap (\(ToplevelAttribute (TlAttribute n l)) -> (n, l))
               $ filter (\x -> case x of
                            ToplevelAttribute _ -> True
@@ -156,6 +164,7 @@ globalCxtOfModule (Module tl) =
                                    }
                , globals = M.fromList glbs
                , functions = M.fromList funs
+               , alias = M.fromList alia
                , attributes = M.fromList attrs
                , unamedMetadata = M.fromList unameMeta
                }
@@ -212,8 +221,10 @@ localIdSrcInfoMap mdMap set =
          
 getFileInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
 getFileInfo mdMap fref = case M.lookup fref mdMap of
-  Just (TlUnamedMd_DW_file_type _ (MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))))) -> getFileName mdMap ref
-  Nothing -> errorLoc FLC $ show fref
+  Just (TlUnamedMd_DW_file_type _ x) -> case x of
+    MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))) -> getFileName mdMap ref
+    _ -> errorLoc FLC $ show x
+  y -> errorLoc FLC $ show y
 
 getFileInfoFromSubprog :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo             
 getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of

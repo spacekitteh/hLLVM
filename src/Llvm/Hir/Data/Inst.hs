@@ -41,8 +41,8 @@ data Conversion s v where {
   AddrSpaceCast :: T (Type s P) v -> Type s P -> Conversion s v;
   } deriving (Eq, Ord, Show)
 
-data GetElementPtr s v = GetElementPtr (IsOrIsNot InBounds) (T (Type s P) v) [T (Type s I) v]
-                       deriving (Eq,Ord,Show)
+data GetElementPtr s v idx = GetElementPtr (IsOrIsNot InBounds) (T (Type s P) v) [T (Type s I) idx]
+                           deriving (Eq,Ord,Show)
 
 data Select s r v = Select (Either (T (Type ScalarB I) v) (T (Type s I) v)) (T (Type s r) v) (T (Type s r) v)
                   deriving (Eq,Ord,Show)
@@ -1065,11 +1065,10 @@ data Value = Val_ssa LocalId
 
 data T t v = T t v deriving (Eq, Ord, Show)
 
-data Aliasee = AliaseeTv (T Dtype Value)
-             | AliaseeConversion (Conversion ScalarB Const)
-             | AliaseeConversionV (Conversion VectorB Const)
-             | AliaseeGEP (GetElementPtr ScalarB Const)
-             | AliaseeGEPV (GetElementPtr VectorB Const)
+data Aliasee = Aliasee GlobalId
+             | AliaseeTyped Dtype Aliasee
+             | AliaseeConversion (Conversion ScalarB Aliasee)
+             | AliaseeGEP (GetElementPtr ScalarB Aliasee Const)
              deriving (Eq, Ord, Show)
 
 data FunctionInterface = FunctionInterface { fi_linkage :: Maybe Linkage
@@ -1097,7 +1096,6 @@ data TypedConstOrNull = TypedConst (T Dtype Const)
 
 
 data FunSignature a = FunSignature { fs_callConv ::  CallConv
-                                     --, fs_retAttrs :: [RetAttr]
                                    , fs_type :: Type CodeFunB X
                                    , fs_params :: [FunOperand a]
                                    } deriving (Eq, Ord, Show)

@@ -424,7 +424,7 @@ getPointerCast dl (T ts v) td = castable dl (PtrToInt (T ts v) td)
 getBitCast :: Show v => DataLayoutInfo -> T Dtype v -> Dtype -> Conversion ScalarB v
 getBitCast dl (T t c) dt = castable dl (Bitcast (T t c) dt)
 
-getGetElementPtr :: T (Type ScalarB P) Const -> [T (Type ScalarB I) Const] -> IsOrIsNot InBounds -> GetElementPtr ScalarB Const
+getGetElementPtr :: T (Type ScalarB P) Const -> [T (Type ScalarB I) Const] -> IsOrIsNot InBounds -> GetElementPtr ScalarB Const Const
 getGetElementPtr (T t cv) indices isB = GetElementPtr isB (T t cv) indices
 
 
