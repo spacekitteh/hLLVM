@@ -33,4 +33,4 @@ script:
  - cabal build
  - cabal sdist
  - ./script/install ~/llvm_emp
- - ~/llvmsandbox/bin/lnt runtest nt --sandbox llvmsandbox --cc ~/llvm_emp/bin/clang-emp-hirverify --test-suite ~/test-suite-3.5.0.src
+ - ~/llvmsandbox/bin/lnt runtest nt --sandbox ~/testsandbox --cc ~/llvm_emp/bin/clang-emp-hirverify --test-suite ~/test-suite-3.5.0.src
