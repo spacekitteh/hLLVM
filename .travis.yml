@@ -13,11 +13,17 @@ before_install:
  - travis_retry sudo apt-get update
  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+ - travis_retry sudo apt-get install python-setuptools subversion
+ - travis_retry sudo easy_install virtualenv
 
 install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
+ - travis_retry virtualenv ~/llvmsandbox
+ - travis_retry svn co http://llvm.org/svn/llvm-project/lnt/trunk ~/lnt
+ - travis_retry ~/llvmsandbox/bin/python ~/lnt/setup.py develop
+ - travis_retry svn co http://llvm.org/svn/llvm-project/test-suite/trunk ~/llvm-test-suite
 
 script:
  - cabal install --only-dependencies 

@@ -2,29 +2,18 @@
 SCRIPT_PATH=$(dirname $(readlink -f $0))
 . $SCRIPT_PATH/enviroment.sh
 
-if [ "$#" -eq 0 ]; then
-    echo "usage: $0 <the c file> [include or link options]"
-    exit 1;
+ifile=$1
+bname=`basename ${ifile} .bc`
+dname=`dirname ${ifile}`
+if [ "${dname}" == "./" ]; then 
+  fname=${bname} 
+else 
+  fname=${dname}/${bname} 
 fi
 
+runCmd "${LLVM_DIS} ${ifile} -o ${fname}.ll"
+sizeofCheck ${fname}
+runCmd "${LLVM_TEST_CMD} ir2ast --input ${fname}.ll --output ${fname}.dts.ll"
 
-
-bname=`basename $1 .c`
-dname=`dirname $1`
-first_argument=$1
-shift
-other_arguments="$@"
-
-echocolortext ${yellow} "Compiling code with dynamic type safety checks"
-
-runCmd "rm -f $bname.bc"
-runCmd "$CLANG -g -emit-llvm -c $first_argument -o $bname.bc -I$RT_INCLUDE_PATH"
-runCmd "$LLVM_DIS $bname.bc -o $bname.ll"
-runCmd "$OPT -O1 -S $bname.ll -o $bname.O1.ll"
-runCmd "rm -f $bname.hir.ll"
-sizeofCheck $bname
-runCmd "$LLVM_TEST_CMD ir2ast --input $bname.ll --output $bname.hir.ll"
-runCmd "${SCRIPT_PATH}/strip.sh $bname.hir.ll"
-runCmd "$OPT -O1 -S $bname.hir.ll -o $bname.hir.O1.ll"
-runCmd "$LLC $bname.hir.ll -o $bname.hir.s"
-runCmd "$CLANG $bname.hir.s"
+echocolortext ${yellow} "Saving ${fname}.dts.ll as ${fname}.bc"
+runCmd "mv ${fname}.dts.ll -o $2"
