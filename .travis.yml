@@ -11,9 +11,9 @@ matrix:
 before_install:
  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
  - travis_retry sudo apt-get update
- - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
+ - travis_retry sudo apt-get install -y cabal-install-$CABALVER ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
- - travis_retry sudo apt-get install python-setuptools subversion
+ - travis_retry sudo apt-get install -y python-setuptools subversion
  - travis_retry sudo easy_install virtualenv
 
 install:
@@ -22,11 +22,15 @@ install:
  - travis_retry cabal update
  - travis_retry virtualenv ~/llvmsandbox
  - travis_retry svn co http://llvm.org/svn/llvm-project/lnt/trunk ~/lnt
- - travis_retry ~/llvmsandbox/bin/python ~/lnt/setup.py develop
- - travis_retry svn co http://llvm.org/svn/llvm-project/test-suite/trunk ~/llvm-test-suite
+ - travis_retry ~/llvmsandbox/bin/python ~/lnt/setup.py install
+ - travis_retry wget http://llvm.org/releases/3.5.0/test-suite-3.5.0.src.tar.xz
+ - travis_retry tar xvfJ test-suite-3.5.0.src.tar.xz ~/llvm-test-suite
+ - travis_retry git clone https://github.com/mlite/llvm_emp ~/llvm_emp
 
 script:
  - cabal install --only-dependencies 
- - cabal configure -v2 
+ - cabal configure -v2
  - cabal build
  - cabal sdist
+ - ./script/install ~/llvm_emp
+ - ~/llvmsandbox/bin/lnt runtest nt --sandbox llvmsandbox --cc ~/llvm_emp/bin/clang-emp-hirverify --test-suite ~/test-suite-3.5.0.src
