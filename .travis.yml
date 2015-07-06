@@ -13,7 +13,7 @@ before_install:
  - travis_retry sudo apt-get update
  - travis_retry sudo apt-get install -y cabal-install-$CABALVER ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
- - travis_retry sudo apt-get install -y python-setuptools subversion
+ - travis_retry sudo apt-get install -y python-setuptools subversion tcl8.5
  - travis_retry sudo easy_install virtualenv
 
 install:
@@ -23,8 +23,8 @@ install:
  - travis_retry virtualenv ~/llvmsandbox
  - travis_retry svn co http://llvm.org/svn/llvm-project/lnt/trunk ~/lnt
  - travis_retry ~/llvmsandbox/bin/python ~/lnt/setup.py install
- - travis_retry wget http://llvm.org/releases/3.5.0/test-suite-3.5.0.src.tar.xz
- - travis_retry tar xvfJ test-suite-3.5.0.src.tar.xz ~/llvm-test-suite
+ - travis_retry wget -O ~/test-suite.tar.xz http://llvm.org/releases/3.5.0/test-suite-3.5.0.src.tar.xz
+ - travis_retry tar xvfJ test-suite.tar.xz -C ~/
  - travis_retry git clone https://github.com/mlite/llvm_emp ~/llvm_emp
 
 script:
