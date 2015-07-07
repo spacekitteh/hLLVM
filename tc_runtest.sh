@@ -15,3 +15,5 @@ fi
 ${MYPATH}/scripts/install.sh ${LLVM_EMP}/debian7_32
 
 ~/llvmsandbox/bin/lnt runtest nt -j ${NJOBS} --sandbox ~/testsandbox --cc ${LLVM_EMP}/debian7_32/bin/clang-emp-hirverify --cxx ${LLVM_EMP}/debian7_32/bin/clang++-emp-hirverify --test-suite ~/test-suite-3.5.0.src
+
+${MYPATH}/scripts/genhpcreport.sh llvm-test.tix ~/testsandbox

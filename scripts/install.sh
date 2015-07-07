@@ -1,6 +1,6 @@
 #!/bin/bash
-SCRIPT_HOME=$(dirname $(readlink -f $0))
-source ${SCRIPT_HOME}/enviroment.sh
+MYPATH=$(dirname $(readlink -f $0))
+source ${MYPATH}/enviroment.sh
 
 if [ "$#" -ne 1 ]; then
     echo "usage: $0 <the folder bin/clang is located>"
@@ -15,8 +15,9 @@ if [ ! -f ${dest}/bin/clang ]; then
     exit 1;
 fi
 
-runCmd "cp -a ${SCRIPT_HOME}/../dist ${dest}"
-runCmd "cp ${SCRIPT_HOME}/enviroment.sh ${dest}/bin"
-runCmd "cp ${SCRIPT_HOME}/hirverify.sh ${dest}/bin"
-runCmd "cp ${SCRIPT_HOME}/clang-emp-hirverify ${dest}/bin"
-runCmd "cp ${SCRIPT_HOME}/clang++-emp-hirverify ${dest}/bin"
+runCmd "cp -a ${MYPATH}/../dist ${dest}"
+runCmd "${MYPATH}/cleantix.sh"
+runCmd "cp ${MYPATH}/enviroment.sh ${dest}/bin"
+runCmd "cp ${MYPATH}/hirverify.sh ${dest}/bin"
+runCmd "cp ${MYPATH}/clang-emp-hirverify ${dest}/bin"
+runCmd "cp ${MYPATH}/clang++-emp-hirverify ${dest}/bin"
