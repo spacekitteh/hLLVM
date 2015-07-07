@@ -8,6 +8,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 ifile=$1
+ofile=$2
 bname=`basename ${ifile} .bc`
 dname=`dirname ${ifile}`
 if [ "${dname}" == "./" ]; then 
@@ -16,8 +17,6 @@ else
   fname=${dname}/${bname} 
 fi
 
-runCmd "${LLVM_DIS} ${ifile} -o ${fname}.ll"
-runCmd "${LLVM_TEST_CMD} ir2ast --input ${fname}.ll --output ${fname}.dts.ll"
-
-echocolortext ${yellow} "Saving ${fname}.dts.ll as ${fname}.bc"
-runCmd "mv ${fname}.dts.ll $2"
+${LLVM_DIS} ${ifile} -o ${fname}.ll
+${LLVM_TEST_CMD} ir2ast --input ${fname}.ll --output ${fname}.dts.ll
+mv ${fname}.dts.ll ${ofile}

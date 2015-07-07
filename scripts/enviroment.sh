@@ -1,19 +1,18 @@
 #!/bin/bash
 
 THIS_FILE_PATH=$(dirname $(readlink -f $0))
+bold=`tput -T xterm bold`
+red=`tput -T xterm setaf 1`
+green=`tput -T xterm setaf 2`
+yellow=`tput -T xterm setaf 3`
+blue=`tput -T xterm setaf 4`
+magenta=`tput -T xterm setaf 5`
+cyan=`tput -T xterm setaf 6`
+white=`tput -T xterm setaf 7`
+smul=`tput -T xterm smul`
+rmul=`tput -T xterm rmul`
 
-bold=`tput bold`
-red=`tput setaf 1`
-green=`tput setaf 2`
-yellow=`tput setaf 3`
-blue=`tput setaf 4`
-magenta=`tput setaf 5`
-cyan=`tput setaf 6`
-white=`tput setaf 7`
-smul=`tput smul`
-rmul=`tput rmul`
-
-reset=`tput sgr0`
+reset=`tput -T xterm sgr0`
 
 CLANG=clang
 LLVM_DIS=llvm-dis

@@ -7,11 +7,16 @@ if [ "$#" -ne 1 ]; then
     exit 1;
 fi
 
-runCmd "cp -a ${SCRIPT_HOME}/../dist $1"
-runCmd "cp ${SCRIPT_HOME}/enviroment.sh $1/bin"
-runCmd "cp ${SCRIPT_HOME}/hirverify.sh $1/bin"
-runCmd "cp ${SCRIPT_HOME}/clang-emp-hirverify $1/bin"
+dest=$1
 
+if [ ! -f ${dest}/bin/clang ]; then
+    echo "Cannot find ${dest}/bin/clang."
+    echo "${dest} is not a Clang/LLVM installation folder."
+    exit 1;
+fi
 
-
-
+runCmd "cp -a ${SCRIPT_HOME}/../dist ${dest}"
+runCmd "cp ${SCRIPT_HOME}/enviroment.sh ${dest}/bin"
+runCmd "cp ${SCRIPT_HOME}/hirverify.sh ${dest}/bin"
+runCmd "cp ${SCRIPT_HOME}/clang-emp-hirverify ${dest}/bin"
+runCmd "cp ${SCRIPT_HOME}/clang++-emp-hirverify ${dest}/bin"
