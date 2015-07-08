@@ -1,3 +1,4 @@
 #!/bin/bash
 MYPATH=$(dirname $(readlink -f $0))
+export LLVM_BIN_PATH=${MYPATH}
 ${MYPATH}/clang -mexternal_module_pass_exe=hirverify.sh $@

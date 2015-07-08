@@ -1,6 +1,6 @@
 #!/bin/bash
-SCRIPT_PATH=$(dirname $(readlink -f $0))
-. $SCRIPT_PATH/enviroment.sh
+MYPATH=$(dirname $(readlink -f $0))
+. $MYPATH/enviroment.sh
 
 if [ "$#" -ne 2 ]; then
     echo "usage: $0 <inputBitcodeFile> <outputAsmTextFile>"
@@ -13,7 +13,7 @@ sizeofCheck ()
     dname=`dirname $1`
     $LLVM_TEST_CMD sizeofverification --input $bname.ll --output $bname.sizeof.ll
     $LLC $bname.sizeof.ll -o $bname.sizeof.s
-    $GCC $bname.sizeof.s ${SCRIPT_PATH}/check_int.c -o $bname.sizeof
+    $GCC $bname.sizeof.s ${MYPATH}/check_int.c -o $bname.sizeof
      
     if [ "$dname" == "." ]; then
 	./${bname}.sizeof
