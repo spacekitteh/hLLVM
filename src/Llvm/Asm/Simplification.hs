@@ -41,7 +41,9 @@ explicitLbPrefix :: String
 explicitLbPrefix = "_expl_L"
 
 ------------------------------------------------------------------------
--- iteration 1
+-- iteration 1 
+-- 1. rename all implicit label and variable defs as explict defs
+-- 2. keep the mapping and return it for iter2
 ------------------------------------------------------------------------
 iter1 :: [Toplevel] -> ([Toplevel], M.Map GlobalId LabelNumbers)
 iter1 l = let sl = explicitizeGlobalDefinition l
@@ -482,6 +484,8 @@ rnPrologue _ = return Nothing
 
 ------------------------------------------------------------------------
 -- iteration 2
+-- use the implicit label/varible defs to explicit label/variable defs mapping to
+-- rename all implicit label/variable uses as explicit label/variable uses
 ------------------------------------------------------------------------
 type RD a = R.Reader (GlobalId, (M.Map GlobalId LabelNumbers)) a
 
@@ -493,8 +497,8 @@ iter2 m tl = fmap (rnToplevel2 m) tl
   
 rnToplevel2 :: M.Map GlobalId LabelNumbers -> Toplevel -> Toplevel
 rnToplevel2 m (ToplevelGlobal (TlGlobal v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 const v12 v13 v14)) = 
-  R.runReader (do { x <- maybe (return Nothing) (\x -> R.liftM Just (rnConst2 x)) const
-                  ; return (ToplevelGlobal (TlGlobal v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 const v12 v13 v14))
+  R.runReader (do { renamedConst <- maybe (return Nothing) (\x -> R.liftM Just (rnConst2 x)) const
+                  ; return (ToplevelGlobal (TlGlobal v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 renamedConst v12 v13 v14))
                   }) (GlobalIdNum 0, m)
 rnToplevel2 m (ToplevelDefine (TlDefine fp@(FunctionPrototype _ _ _ _ _ _ fhName _ _ _ _ _ _ _ _ _) bs)) = 
   let (fp2, bs2) = R.runReader (do { fp' <- rnDefFunctionPrototype2 fp
@@ -628,6 +632,7 @@ rnDefFunctionPrototype2 fpt = return fpt
 
 
 rnConst2 :: Const -> RD Const
+-- rnConst2 c | trace ("rnConst2 " ++ (show c)) False = undefined
 rnConst2 (C_complex x) = S.liftM C_complex (rnComplexConstant2 x)
 rnConst2 (C_labelId l) = do { rd <- R.ask
                             ; S.liftM C_labelId (rnLabelId2 (fst rd) l)
