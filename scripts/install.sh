@@ -16,6 +16,7 @@ if [ ! -f ${dest}/bin/clang ]; then
 fi
 
 runCmd "cp -a ${MYPATH}/../dist ${dest}"
+runCmd "cp ${MYPATH}/check_int.c ${dest}/bin"
 runCmd "cp ${MYPATH}/enviroment.sh ${dest}/bin"
 runCmd "cp ${MYPATH}/hirverify.sh ${dest}/bin"
 runCmd "cp ${MYPATH}/clang-emp-hirverify ${dest}/bin"
