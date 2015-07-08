@@ -67,3 +67,10 @@ runCmd ()
 	exitWithError "failed to run:${cmd}"
     fi
 }
+
+getRandomFileName()
+{
+    local random=`echo $RANDOM`
+    local tmpfile="/tmp/$(basename $0).$$.list"
+    echo "${tmpfile}"
+}

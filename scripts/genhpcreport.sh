@@ -8,8 +8,7 @@ fi
 
 tixname=$1
 shift
-random=`echo $RANDOM`
-tmpfile="/tmp/$(basename $0).$$.list"
+tmpfile=$(getRandomFileName) #"/tmp/$(basename $0).$$.list"
 for d in $@; do
     find $d -name ${tixname} > ${tmpfile}
 done
