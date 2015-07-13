@@ -17,8 +17,8 @@ pType =
        }
  where
    array    = brackets (avbody Tarray)
-   vector   = angles (avbody Tvector)
-   avbody f = do { n <- lexeme unsignedInt
+   vector   = angles (avbody (\n t -> Tvector (fromIntegral n) t))
+   avbody f = do { n <- lexeme word64
                  ; ignore $ chartok 'x'
                  ; t <- pType
                  ; return (f n t)

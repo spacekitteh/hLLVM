@@ -127,7 +127,7 @@ mkCheck te mp dt = [ Comment $ Cstring $ render $ printIr dt
                    , Comment $ Cstring $ "TypeStoreSize:" ++ show (getTypeStoreSize te dt)
                    , Comment $ Cstring $ "Alignment:" ++ show (getTypeAlignment te dt AlignAbi) 
                    , callLog [T (ucast $ ptr0 i8) (ucast $ fromJust $ Dm.lookup dt mp),
-                              ucast (T i32 (llvm_sizeof dt i32)), ucast $ toTC (sizeof te dt)]
+                              ucast (T i64 (llvm_sizeof dt i64)), ucast $ toTC (sizeof te dt)]
                    ]
 
 
@@ -135,8 +135,8 @@ callLog :: [T Dtype Value] -> (Node a) O O
 callLog tvs = 
   let aps = fmap (\(T t v) -> FunOperandData t [] Nothing v) tvs
       callSiteType = Tfunction (RtypeVoidU Tvoid, []) [(MtypeData (ucast $ ptr0 i8), Nothing)
-                                                      ,(MtypeData (ucast i32), Nothing)
-                                                      ,(MtypeData (ucast i32), Nothing)] Nothing
+                                                      ,(MtypeData (ucast i64), Nothing)
+                                                      ,(MtypeData (ucast i64), Nothing)] Nothing
   in Cnode (I_call_fun (FunId (GlobalIdAlphaNum "check_int2"))
             CallFunInterface { cfi_tail = TcNon 
                              , cfi_castType = Nothing
@@ -149,11 +149,11 @@ visFunctions = [FunctionDeclareData { fd_linkage = Nothing
                                     , fd_dllstorage = Nothing
                                     , fd_signature = FunSignature { fs_callConv = Ccc
                                                                   , fs_type = Tfunction (RtypeVoidU Tvoid,[]) [(MtypeData $ ucast $ ptr0 i8, Nothing)
-                                                                                                              ,(MtypeData $ ucast i32, Nothing)
-                                                                                                              ,(MtypeData $ ucast i32, Nothing)] Nothing
+                                                                                                              ,(MtypeData $ ucast i64, Nothing)
+                                                                                                              ,(MtypeData $ ucast i64, Nothing)] Nothing
                                                                   , fs_params = [FunOperandData (ucast $ ptr0 i8) [] Nothing ()
-                                                                                ,FunOperandData (ucast i32) [] Nothing ()
-                                                                                ,FunOperandData (ucast i32) [] Nothing ()
+                                                                                ,FunOperandData (ucast i64) [] Nothing ()
+                                                                                ,FunOperandData (ucast i64) [] Nothing ()
                                                                                 ] 
                                                                   }
                                     , fd_fun_name = GlobalIdAlphaNum "check_int2"

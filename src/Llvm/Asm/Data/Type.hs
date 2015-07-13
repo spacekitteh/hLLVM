@@ -5,10 +5,10 @@ module Llvm.Asm.Data.Type
        where
 
 import Llvm.Asm.Data.AtomicEntity hiding (AddrSpace(..))
-import Data.Word (Word32)
+import Data.Word (Word8, Word32, Word64)
 
 data TypePrimitive = TpI Word32
-                   | TpF Word32 
+                   | TpF Word32
                    | TpV Word32 
                    | TpHalf | TpFloat | TpDouble | TpFp128 | TpX86Fp80 | TpPpcFp128 
                    | TpX86Mmx 
@@ -26,7 +26,7 @@ data Type = Tprimitive TypePrimitive
           | Tname String
           | TquoteName String
           | Tno Word32
-          | Tarray Word32 Type
+          | Tarray Word64 Type
           | Tvector Word32 Type
           | Tstruct Packing [Type]
           | Tpointer Type AddrSpace
@@ -43,7 +43,7 @@ data FormalParam = FormalParamData Type [ParamAttr] Fparam
                  | FormalParamMeta MetaKind Fparam
                  deriving (Eq,Ord,Show)
 
-data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) {-[FunAttr]-} deriving (Eq,Ord,Show)
+data FormalParamList = FormalParamList [FormalParam] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 
 data TypeParamList = TypeParamList [Type] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 

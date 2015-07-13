@@ -36,13 +36,6 @@ instance Ucast l l where
 instance Dcast l l where  
   dcast _ = id
   
-{- horizontal casting -}
-  {- does not make sense
-class Hcast l1 l2 where 
-  hcast :: FileLoc -> l1 -> l2
--}
-
-
 {- A datum that can be casted to a constant -}
 class Cvalue x where
   toConst :: x -> Const
@@ -55,6 +48,9 @@ instance Cvalue Int64 where
 
 instance Cvalue Word32 where  
   toConst = C_u32
+
+instance Cvalue Word64 where  
+  toConst = C_u64
 
 {- A data that can be casted to a value -}
 class Rvalue x where
@@ -75,6 +71,9 @@ instance Rvalue Int32 where
 instance Rvalue Word32 where
   toRvalue = Val_const . C_u32
 
+instance Rvalue Word64 where
+  toRvalue = Val_const . C_u64
+
 
 {- Typed Integer Constant, Typed Integer Constants are often used in
  indexing memory elements. 
@@ -84,6 +83,9 @@ class TC x where
 
 instance TC Word32 where
   toTC x = T (TpI 32) (toConst x)
+
+instance TC Word64 where
+  toTC x = T (TpI 64) (toConst x)
 
 instance TC Int32 where
   toTC x = T (TpI 32) (toConst x)

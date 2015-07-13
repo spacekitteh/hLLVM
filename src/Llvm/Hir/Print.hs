@@ -50,6 +50,8 @@ instance IrPrint a => IrPrint (Maybe a) where
   printIr (Just x) = printIr x
   printIr Nothing = empty
 
+instance IrPrint Word64 where
+  printIr n = integer $ fromIntegral n
 
 instance IrPrint TlTriple where
   printIr (TlTriple s) = hsep [text "target", text "triple", equals, printIr s]
@@ -438,7 +440,6 @@ instance IrPrint CallSiteType where
 
 instance (IrPrint a) => IrPrint (FunSignature a) where
   printIr FunSignature { fs_callConv = cc
-                       --, fs_retAttrs = attrs
                        , fs_type = ty
                        , fs_params = params
                        } = commaSepList [printIr cc, printIr ty, printIr params]
@@ -702,11 +703,8 @@ instance IrPrint Tinst where
 instance IrPrint Aliasee where
   printIr (Aliasee tv ) = printIr tv
   printIr (AliaseeTyped dt tv) = printIr dt <+> printIr tv
-  printIr (AliaseeConversion c) = printConversion c parens -- printIr c
---  printIr (AliaseeConversionV c) = printIr c
+  printIr (AliaseeConversion c) = printConversion c parens
   printIr (AliaseeGEP a) = printIr a
---  printIr (AliaseeGEPV a) = printIr a
-
 
 
 instance IrPrint FunctionInterface where

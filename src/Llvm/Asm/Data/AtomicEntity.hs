@@ -1,6 +1,6 @@
 module Llvm.Asm.Data.AtomicEntity where
 import qualified Data.Map as M
-import Data.Word(Word32)
+import Data.Word(Word8, Word32)
 
 -- | Double Quoted String
 data DqString = DqString String deriving (Eq, Ord, Show)
@@ -105,7 +105,7 @@ data ParamAttr = PaZeroExt
                | PaDereferenceable Word32
                | PaReadOnly
                | PaReadNone
-               | PaAlign Word32
+               | PaAlign Word8
                deriving (Eq,Ord,Show)
 
 data RetAttr = RetAttrZeroExt
@@ -173,7 +173,7 @@ selectionKindMap = M.fromList [(Any, "any"), (ExactMatch, "exactmatch"), (Larges
 
 data Section = Section DqString deriving (Eq,Ord,Show)
 
-data Alignment = Alignment Word32 deriving (Eq,Ord,Show)
+data Alignment = Alignment Word8 deriving (Eq,Ord,Show)
 type MaybeAlignment = Maybe Alignment
 
 data Gc = Gc DqString deriving (Eq,Ord,Show)

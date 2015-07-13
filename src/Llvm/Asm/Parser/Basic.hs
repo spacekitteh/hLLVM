@@ -15,7 +15,7 @@ import Text.Parsec.Perm
 import Data.Char
 import Data.Functor.Identity (Identity)
 import qualified Data.Map as M
-import Data.Word (Word32)
+import Data.Word (Word32, Word64)
 
 -- dummy state
 -- data DummyState = DummyState
@@ -25,7 +25,7 @@ type DummyState = ()
 type P a = Parsec String DummyState a
 
 initState :: DummyState
-initState = () -- DummyState 
+initState = ()
 
 lexer :: T.GenTokenParser String u Data.Functor.Identity.Identity
 lexer = T.makeTokenParser 
@@ -84,6 +84,10 @@ integer = T.integer lexer
 
 unsignedInt :: P Word32
 unsignedInt = liftM fromIntegral integer
+
+word64 :: P Word64
+word64 = liftM fromIntegral integer
+
 
 decimal :: P Integer
 decimal = lexeme (T.decimal lexer)
@@ -154,7 +158,7 @@ pAlphaNum = do { h <- satisfy startChar
                }
 
 pLocalId :: P LocalId
-pLocalId = do { x <- lexeme (char '%' >> choice [ liftM LocalIdNum unsignedInt -- decimal
+pLocalId = do { x <- lexeme (char '%' >> choice [ liftM LocalIdNum unsignedInt
                                                 , try $ liftM (LocalIdAlphaNum) pAlphaNum
                                                 , try $ liftM (LocalIdAlphaNum) (lexeme (between (char '"') (char '"') pAlphaNum))
                                                 , liftM (LocalIdDqString) pQuoteStr
@@ -163,14 +167,14 @@ pLocalId = do { x <- lexeme (char '%' >> choice [ liftM LocalIdNum unsignedInt -
               }
 
 pGlobalId :: P GlobalId
-pGlobalId = lexeme (char '@' >> choice [ liftM GlobalIdNum unsignedInt -- decimal
-                                       , try $ liftM (GlobalIdAlphaNum) pAlphaNum -- (many1 (satisfy idChar))
+pGlobalId = lexeme (char '@' >> choice [ liftM GlobalIdNum unsignedInt 
+                                       , try $ liftM (GlobalIdAlphaNum) pAlphaNum
                                        , try $ liftM GlobalIdAlphaNum (lexeme (between (char '"') (char '"') pAlphaNum))
                                        , liftM GlobalIdDqString pQuoteStr
                                        ])
 
 pDollarId :: P DollarId
-pDollarId = lexeme (char '$' >> choice [ liftM DollarIdNum unsignedInt -- decimal
+pDollarId = lexeme (char '$' >> choice [ liftM DollarIdNum unsignedInt
                                        , try $ liftM (DollarIdAlphaNum) pId 
                                        , try $ liftM DollarIdAlphaNum (lexeme (between (char '"') (char '"') pId))
                                        , liftM (DollarIdDqString) pQuoteStr
@@ -280,10 +284,10 @@ pParamAttr = choice [ reserved "zeroext" >> return PaZeroExt
                     , reserved "nest" >> return PaNest
                     , reserved "returned" >> return PaReturned
                     , reserved "nonnull" >> return PaNonNull
-                    , reserved "dereferenceable" >> liftM PaDereferenceable (parens unsignedInt) -- decimal)
+                    , reserved "dereferenceable" >> liftM PaDereferenceable (parens unsignedInt)
                     , reserved "readonly" >> return PaReadOnly
                     , reserved "readnone" >> return PaReadNone
-                    , reserved "align" >> liftM PaAlign unsignedInt -- decimal
+                    , reserved "align" >> liftM (PaAlign . fromIntegral) unsignedInt
                     ]
 
 pConvertOp :: P ConvertOp
@@ -402,7 +406,7 @@ pCallFunAttr = choice [ reserved "noreturn" >> return CfaNoreturn
                       ]
                
 pFunAttr :: P FunAttr
-pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens unsignedInt) -- decimal)
+pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens unsignedInt)
                    , reserved "alwaysinline" >> return FaAlwaysInline
                    , reserved "builtin" >> return FaBuiltin
                    , reserved "cold" >> return FaCold
@@ -430,8 +434,9 @@ pFunAttr =  choice [ reserved "alignstack" >> liftM FaAlignStack (parens unsigne
                    , reserved "sspreq" >> return FaSspReq
                    , reserved "sspstrong" >> return FaSspStrong
                    , reserved "uwtable" >> return FaUwTable
-                   , reserved "align" >> liftM FaAlign unsignedInt -- integer
-                   , liftM DqString pQuoteStr >>= \s1 -> opt (symbol "=" >> liftM DqString pQuoteStr) >>= \s2 -> return (FaPair s1 s2)
+                   , reserved "align" >> liftM FaAlign unsignedInt
+                   , liftM DqString pQuoteStr >>= 
+                     \s1 -> opt (symbol "=" >> liftM DqString pQuoteStr) >>= \s2 -> return (FaPair s1 s2)
                    ]
 
 pCarry :: P TrapFlag
@@ -439,19 +444,19 @@ pCarry = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList trapFlagMap
 
 
 pAlign :: P Alignment
-pAlign = reserved "align" >> liftM Alignment unsignedInt -- decimal
+pAlign = reserved "align" >> liftM (Alignment . fromIntegral) unsignedInt
 
 pComdat :: P Comdat
 pComdat = reserved "comdat" >> liftM Comdat (opt pDollarId)
 
 pNontemporal :: P Nontemporal
-pNontemporal =  char '!' >> reserved "nontemporal" >> char '!' >> liftM Nontemporal unsignedInt -- decimal 
+pNontemporal =  char '!' >> reserved "nontemporal" >> char '!' >> liftM Nontemporal unsignedInt
 
 pInvariantLoad :: P InvariantLoad
-pInvariantLoad = char '!' >> reserved "invariant.load" >> char '!' >> liftM InvariantLoad unsignedInt -- decimal
+pInvariantLoad = char '!' >> reserved "invariant.load" >> char '!' >> liftM InvariantLoad unsignedInt
 
 pNonnull :: P Nonnull
-pNonnull = char '!' >> reserved "nonnull" >> char '!' >> liftM Nonnull unsignedInt -- decimal
+pNonnull = char '!' >> reserved "nonnull" >> char '!' >> liftM Nonnull unsignedInt
 
 pSection :: P Section
 pSection =  reserved "section" >> liftM (Section . DqString) pQuoteStr
@@ -473,13 +478,13 @@ pFenceOrder =  choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList atomi
 pAtomicOp :: P AtomicOp
 pAtomicOp = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList atomicOpMap
 
-pFunAttrCollection :: P [FunAttr] -- Collection          
-pFunAttrCollection = many $ choice [ char '#' >> liftM FaGroup unsignedInt -- decimal
+pFunAttrCollection :: P [FunAttr]
+pFunAttrCollection = many $ choice [ char '#' >> liftM FaGroup unsignedInt
                                    , pFunAttr
                                    ]
                      
 pCallFunAttrCollection :: P [CallFunAttr]                     
-pCallFunAttrCollection = many $ choice [ char '#' >> liftM CfaGroup unsignedInt -- decimal
+pCallFunAttrCollection = many $ choice [ char '#' >> liftM CfaGroup unsignedInt
                                        , pCallFunAttr
                                        ]
 

@@ -94,7 +94,7 @@ data Const where {
   C_vector :: [TypedConstOrNull] -> Const;
   C_vectorN :: Word32 -> TypedConstOrNull -> Const;
   C_array :: [TypedConstOrNull] -> Const;
-  C_arrayN :: Word32 -> TypedConstOrNull -> Const;
+  C_arrayN :: Word64 -> TypedConstOrNull -> Const;
   C_labelId :: Label -> Const;
   C_block :: GlobalId -> Label -> Const;
 

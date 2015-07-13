@@ -75,9 +75,15 @@ instance Mangle ScalarType where
     ScalarTypeF x -> mangle x
     ScalarTypeP x -> mangle x
 
-instance Mangle Word32 where
+instance Mangle Word8 where
   mangle x = show x
   
+instance Mangle Word32 where
+  mangle x = show x
+
+instance Mangle Word64 where
+  mangle x = show x
+
 instance Mangle TailCall where
   mangle x = render $ printIr x
   

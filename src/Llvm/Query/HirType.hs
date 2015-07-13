@@ -19,7 +19,7 @@ import Llvm.Hir.Cast
 import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Debug.Trace
-import Data.Word
+import Data.Word (Word8, Word64)
 import Data.DoubleWord (Word96)
 import Data.Bits(Bits(..), (.&.), (.|.), shiftR)
 
@@ -52,12 +52,12 @@ ptrAlignment DataLayoutInfo{..} ma at =
   (uncurry lookupOr (normalizeAddrSpace ma) pointers)
 
 
-eightBits :: Word96
+eightBits :: Word8
 eightBits = 8
 
-data SizeInByte = SizeInByte Word96 deriving (Eq, Ord, Show)
-data OffsetInByte = OffsetInByte Word96 deriving (Eq, Ord, Show)
-data AlignInByte = AlignInByte Word96 deriving (Eq, Ord, Show)
+data SizeInByte = SizeInByte Word64 deriving (Eq, Ord, Show)
+data OffsetInByte = OffsetInByte Word64 deriving (Eq, Ord, Show)
+data AlignInByte = AlignInByte Word8 deriving (Eq, Ord, Show)
 
 fromSizeInBit :: SizeInBit -> SizeInByte
 fromSizeInBit (SizeInBit n) = SizeInByte $ fromIntegral (n `div` (fromIntegral eightBits))
@@ -66,12 +66,10 @@ toSizeInBit :: SizeInByte -> SizeInBit
 toSizeInBit (SizeInByte n) = SizeInBit ((fromIntegral n) * (fromIntegral eightBits))
 
 fromAlignInBit :: AlignInBit -> AlignInByte
-fromAlignInBit (AlignInBit n) = AlignInByte (n `div` eightBits)
-
+fromAlignInBit (AlignInBit n) = AlignInByte $ fromIntegral (n `div` (fromIntegral eightBits))
 
 fromAlignInByte :: AlignInByte -> AlignInBit
-fromAlignInByte (AlignInByte n) = AlignInBit (n * eightBits)
-
+fromAlignInByte (AlignInByte n) = AlignInBit $ fromIntegral (n * eightBits)
 
 getTypeAlignment :: TypeEnv -> Dtype -> AlignType -> AlignInByte
 getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
@@ -142,10 +140,10 @@ getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
     bestMatchVectorAlignment :: Word96 -> Type ScalarB x -> AlignInBit
     bestMatchVectorAlignment n e = 
       let (SizeInByte s) = getTypeAllocSize te (dcast FLC e)
-          align = s * n
+          align = (fromIntegral s) * n
       in if align .&. (align -1) == 0 
-         then fromAlignInByte $ AlignInByte align
-         else fromAlignInByte $ AlignInByte $ nextPowerOf2 align
+         then fromAlignInByte $ AlignInByte (fromIntegral align)
+         else fromAlignInByte $ AlignInByte (fromIntegral (nextPowerOf2 align))
 
 
 nextPowerOf2 :: (Num a, Bits a) => a -> a
@@ -198,7 +196,8 @@ getTypeStoreSize te ty = let (SizeInBit tyBits) = getTypeSizeInBits te ty
                          in fromSizeInBit (SizeInBit (tyBits + 7))
 
 getTypeAllocSize :: TypeEnv -> Dtype -> SizeInByte
-getTypeAllocSize te ty = roundUpAlignment (getTypeStoreSize te ty) (getTypeAlignment te ty AlignAbi)
+getTypeAllocSize te ty = let SizeInByte tys = getTypeStoreSize te ty
+                         in SizeInByte $ roundUpAlignment tys (getTypeAlignment te ty AlignAbi)
 
 getTypeAllocSizeInBits :: TypeEnv -> Dtype -> SizeInBit
 getTypeAllocSizeInBits te ty = toSizeInBit (getTypeAllocSize te ty)
@@ -209,15 +208,15 @@ data StructLayout = StructLayout { structSize :: SizeInByte
                                  , memberOffsets :: [OffsetInByte]
                                  } deriving (Eq, Ord, Show)
 
-roundUpAlignment :: SizeInByte -> AlignInByte -> SizeInByte
-roundUpAlignment (SizeInByte val) (AlignInByte align) = SizeInByte $ (val + ((fromIntegral align) -1)) B..&. (B.complement ((fromIntegral align) - 1))
+roundUpAlignment :: Word64 -> AlignInByte -> Word64
+roundUpAlignment val (AlignInByte align) = (val + ((fromIntegral align) -1)) B..&. (B.complement ((fromIntegral align) - 1))
 
-nextDataFieldOffset :: SizeInByte -> AlignInByte -> SizeInByte
-nextDataFieldOffset curSize@(SizeInByte curSizeByte) tyAlign@(AlignInByte tyAlignByte) = 
+nextDataFieldOffset :: SizeInByte -> AlignInByte -> OffsetInByte
+nextDataFieldOffset (SizeInByte curSizeByte) tyAlign@(AlignInByte tyAlignByte) = 
   if curSizeByte B..&. ((fromIntegral tyAlignByte) -1) /= 0 then
-    roundUpAlignment curSize tyAlign
+    OffsetInByte $ roundUpAlignment curSizeByte tyAlign
   else 
-    curSize
+    OffsetInByte curSizeByte
 
 getStructLayout :: TypeEnv -> (Packing, [Dtype]) -> StructLayout
 getStructLayout te@TypeEnv{..} (pk, tys) = 
@@ -226,15 +225,17 @@ getStructLayout te@TypeEnv{..} (pk, tys) =
                 let tyAlign@(AlignInByte tyAlignByte) = case pk of
                       Packed -> AlignInByte 1
                       Unpacked -> getTypeAlignment te ty AlignAbi
-                    (SizeInByte nextOffsetByte) = nextDataFieldOffset curSize tyAlign
+                    (OffsetInByte nextOffsetByte) = nextDataFieldOffset curSize tyAlign
                     (SizeInByte tySize) = getTypeAllocSize te ty
-                in (SizeInByte $ nextOffsetByte + tySize, (OffsetInByte nextOffsetByte):offsets, AlignInByte $ max tyAlignByte structAlignment0)
+                in (SizeInByte $ nextOffsetByte + tySize, (OffsetInByte nextOffsetByte):offsets
+                   , AlignInByte $ max tyAlignByte structAlignment0)
               ) (SizeInByte 0, [], AlignInByte 1) tys
-  in StructLayout { structSize = nextDataFieldOffset totalSize alignment 
-                  , structAlignment = alignment
-                  , numElements = toInteger $ length tys
-                  , memberOffsets = reverse offsets
-                  }
+  in let OffsetInByte finalOffset = nextDataFieldOffset totalSize alignment
+     in StructLayout { structSize = SizeInByte finalOffset
+                     , structAlignment = alignment
+                     , numElements = toInteger $ length tys
+                     , memberOffsets = reverse offsets
+                     }
 
 getPointerSize :: DataLayoutInfo -> Maybe AddrSpace -> SizeInByte
 getPointerSize dl mas = fromSizeInBit (ptrSizeInBit dl mas)
@@ -690,15 +691,14 @@ instance TypeOf Const Dtype where
     _ -> errorLoc FLC $ show x
 
 class SizeOf a where
-  sizeof :: TypeEnv -> a -> Word32
+  sizeof :: TypeEnv -> a -> Word64
 
 instance SizeOf Dtype where
   sizeof te dt = let (SizeInByte s) = getTypeAllocSize te dt
                  in fromIntegral s
-                    
-                    
+
 class DataSizeOf a where
-  dataSizeOf :: TypeEnv -> a -> Word32
+  dataSizeOf :: TypeEnv -> a -> Word64
   
 instance DataSizeOf Dtype where
   dataSizeOf te dt = let (SizeInByte s) = getTypeStoreSize te dt

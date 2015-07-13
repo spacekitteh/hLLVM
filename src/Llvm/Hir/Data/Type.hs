@@ -14,7 +14,7 @@ module Llvm.Hir.Data.Type
 
 import Llvm.Asm.SharedEntity (Packing, FunAttr, RetAttr, ParamAttr, Alignment, LocalId, VarArgParam)
 import Llvm.ErrorLoc
-import Data.Word (Word32)
+import Data.Word (Word32, Word64)
 
 #define FLC   (FileLoc $(srcLoc))
 
@@ -54,17 +54,17 @@ data Type sto rep where {
   Topaque :: Type OpaqueB D;
 
   {- first class aggregate types -}
-  Tfirst_class_array :: Word32 -> ScalarType -> Type FirstClassB D;
+  Tfirst_class_array :: Word64 -> ScalarType -> Type FirstClassB D;
   Tfirst_class_struct :: Packing -> [ScalarType] -> Type FirstClassB D;
   Tfirst_class_name :: String -> Type FirstClassB D;
   Tfirst_class_quoteName :: String -> Type FirstClassB D;
   Tfirst_class_no :: Word32 -> Type FirstClassB D;
 
-  Tarray :: Word32 -> Dtype -> Type RecordB D;
+  Tarray :: Word64 -> Dtype -> Type RecordB D;
   Tstruct :: Packing -> [Dtype] -> Type RecordB D;
 
   Topaque_struct :: Packing -> [Either Dtype (Type OpaqueB D)] -> Type OpaqueB D;
-  Topaque_array :: Word32 -> Type OpaqueB D -> Type OpaqueB D;
+  Topaque_array :: Word64 -> Type OpaqueB D -> Type OpaqueB D;
 
   Tpointer :: Etype -> AddrSpace -> Type ScalarB P;
   Tfunction :: (Rtype, [RetAttr]) -> [(Mtype, Maybe Alignment)] -> Maybe VarArgParam -> Type CodeFunB X;

@@ -1,3 +1,5 @@
 - hoopl will remove all unresearchable code, however, blockaddress might refer to some removed code labels. We need to write a pass to update all blockaddress that still refer to removed code labels to undef
 
 - constant folding
+
+- use type class to specify arch
