@@ -20,6 +20,7 @@ import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
 import Debug.Trace
 import Data.Word
+import Data.DoubleWord (Word96)
 import Data.Bits(Bits(..), (.&.), (.|.), shiftR)
 
 
@@ -51,18 +52,18 @@ ptrAlignment DataLayoutInfo{..} ma at =
   (uncurry lookupOr (normalizeAddrSpace ma) pointers)
 
 
-eightBits :: Word32
+eightBits :: Word96
 eightBits = 8
 
-data SizeInByte = SizeInByte Word32 deriving (Eq, Ord, Show)
-data OffsetInByte = OffsetInByte Word32 deriving (Eq, Ord, Show)
-data AlignInByte = AlignInByte Word32 deriving (Eq, Ord, Show)
+data SizeInByte = SizeInByte Word96 deriving (Eq, Ord, Show)
+data OffsetInByte = OffsetInByte Word96 deriving (Eq, Ord, Show)
+data AlignInByte = AlignInByte Word96 deriving (Eq, Ord, Show)
 
 fromSizeInBit :: SizeInBit -> SizeInByte
-fromSizeInBit (SizeInBit n) = SizeInByte (n `div` eightBits)
+fromSizeInBit (SizeInBit n) = SizeInByte $ fromIntegral (n `div` (fromIntegral eightBits))
 
 toSizeInBit :: SizeInByte -> SizeInBit
-toSizeInBit (SizeInByte n) = SizeInBit (n * eightBits)
+toSizeInBit (SizeInByte n) = SizeInBit ((fromIntegral n) * (fromIntegral eightBits))
 
 fromAlignInBit :: AlignInBit -> AlignInByte
 fromAlignInBit (AlignInBit n) = AlignInByte (n `div` eightBits)
@@ -93,18 +94,18 @@ getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
     getVectorAlignment vt = case M.lookup (getTypeSizeInBits te (dcast FLC vt)) (vectors dataLayout) of
       Just (aa, pa) -> selectAlignment at aa pa
       Nothing -> case vt of
-        TvectorI n e -> bestMatchVectorAlignment n e
-        TvectorF n e -> bestMatchVectorAlignment n e
-        TvectorP n e -> bestMatchVectorAlignment n e    
+        TvectorI n e -> bestMatchVectorAlignment (fromIntegral n) e
+        TvectorF n e -> bestMatchVectorAlignment (fromIntegral n) e
+        TvectorP n e -> bestMatchVectorAlignment (fromIntegral n) e
         _ -> errorLoc FLC $ show vt
     getTpAlignment :: Type ScalarB x -> AlignInBit
     getTpAlignment tp = case tp of
-      TpI n -> case lookupOr (SizeInBit n) (bestMatchSizeInBit n) (ints dataLayout) of
+      TpI n -> case lookupOr (SizeInBit $ fromIntegral n) (bestMatchSizeInBit $ fromIntegral n) (ints dataLayout) of
         Just (aa, pa) -> selectAlignment at aa pa
         Nothing -> errorLoc FLC $ show tp
-      TpF n -> case M.lookup (SizeInBit n) (floats dataLayout) of
+      TpF n -> case M.lookup (SizeInBit $ fromIntegral n) (floats dataLayout) of
         Just (aa, pa) -> selectAlignment at aa pa
-        Nothing -> AlignInBit n
+        Nothing -> AlignInBit $ fromIntegral n
       TpV n -> errorLoc FLC $ show tp 
       TpHalf -> AlignInBit 16 
       TpFloat -> let b = getTypeSizeInBits te (ucast tp)
@@ -129,7 +130,7 @@ getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
                       Nothing -> errorLoc FLC $ show tp
       TpX86Mmx -> errorLoc FLC $ show tp
       
-    bestMatchSizeInBit :: Word32 -> SizeInBit
+    bestMatchSizeInBit :: Word96 -> SizeInBit
     bestMatchSizeInBit n = 
       SizeInBit $ foldl (\p s -> 
                           if p == 0 then s {- get the first one -}
@@ -138,7 +139,7 @@ getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of
                                     then s {- when both p and s are bigger than n, get the smallest one that is bigger than n -}
                                     else p
                         ) 0 $ fmap (\(SizeInBit x) -> x) (M.keys (ints dataLayout))
-    bestMatchVectorAlignment :: Word32 -> Type ScalarB x -> AlignInBit
+    bestMatchVectorAlignment :: Word96 -> Type ScalarB x -> AlignInBit
     bestMatchVectorAlignment n e = 
       let (SizeInByte s) = getTypeAllocSize te (dcast FLC e)
           align = s * n
@@ -161,7 +162,7 @@ getTypeSizeInBits :: TypeEnv -> Dtype -> SizeInBit
 getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
   DtypeRecordD t -> case t of
     Tarray i et -> let SizeInBit n = getTypeAllocSizeInBits te et
-                   in SizeInBit (i * n)
+                   in SizeInBit ((fromIntegral i) * n)
     Tstruct pk ts -> let sl = getStructLayout te (pk, ts)
                      in toSizeInBit $ structSize sl
     TnameRecordD n -> case getTypeByTname n typedefs of
@@ -170,10 +171,10 @@ getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
     _ -> errorLoc FLC (show t)
   DtypeScalarP (Tpointer t a) -> ptrSizeInBit dataLayout (Just a)
   DtypeScalarI t -> case t of
-    TpI n -> SizeInBit n
-    TpV n -> SizeInBit n
+    TpI n -> SizeInBit $ fromIntegral n
+    TpV n -> SizeInBit $ fromIntegral n
   DtypeScalarF t -> case t of  
-    TpF n -> SizeInBit n
+    TpF n -> SizeInBit $ fromIntegral n
     TpHalf -> SizeInBit 16
     TpFloat -> SizeInBit 32
     TpDouble -> SizeInBit 64
@@ -182,13 +183,13 @@ getTypeSizeInBits te@TypeEnv{..} dt = case getTypeDef te dt of
     TpPpcFp128 -> SizeInBit 128
   DtypeVectorI t -> case t of  
     TvectorI n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
-                     in (SizeInBit (s * n))
+                     in (SizeInBit (s * (fromIntegral n)))
   DtypeVectorF t -> case t of  
     TvectorF n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
-                     in (SizeInBit (s * n))
+                     in (SizeInBit (s * (fromIntegral n)))
   DtypeVectorP t -> case t of  
     TvectorP n et -> let (SizeInBit s) = getTypeSizeInBits te (ucast et)
-                     in (SizeInBit (s * n))                        
+                     in (SizeInBit (s * (fromIntegral n)))
   _ -> errorLoc FLC (show dt)
       
 
@@ -209,11 +210,11 @@ data StructLayout = StructLayout { structSize :: SizeInByte
                                  } deriving (Eq, Ord, Show)
 
 roundUpAlignment :: SizeInByte -> AlignInByte -> SizeInByte
-roundUpAlignment (SizeInByte val) (AlignInByte align) = SizeInByte $ (val + (align -1)) B..&. (B.complement (align - 1))
+roundUpAlignment (SizeInByte val) (AlignInByte align) = SizeInByte $ (val + ((fromIntegral align) -1)) B..&. (B.complement ((fromIntegral align) - 1))
 
 nextDataFieldOffset :: SizeInByte -> AlignInByte -> SizeInByte
 nextDataFieldOffset curSize@(SizeInByte curSizeByte) tyAlign@(AlignInByte tyAlignByte) = 
-  if curSizeByte B..&. (tyAlignByte -1) /= 0 then
+  if curSizeByte B..&. ((fromIntegral tyAlignByte) -1) /= 0 then
     roundUpAlignment curSize tyAlign
   else 
     curSize
@@ -247,8 +248,8 @@ getScalarTypeSizeInBits :: TypeEnv -> ScalarType -> SizeInBit
 getScalarTypeSizeInBits te x = 
   case x of
     ScalarTypeI e -> case e of
-      TpI n -> SizeInBit n
-      TpV n -> SizeInBit n
+      TpI n -> SizeInBit $ fromIntegral n
+      TpV n -> SizeInBit $ fromIntegral n
       TpX86Mmx -> SizeInBit 64
       TnameScalarI _ -> let td = getTypeDef te (ucast x)
                         in getScalarTypeSizeInBits te (dcast FLC td)
@@ -257,7 +258,7 @@ getScalarTypeSizeInBits te x =
       TnoScalarI _ -> let td = getTypeDef te (ucast x)
                       in getScalarTypeSizeInBits te (dcast FLC td)
     ScalarTypeF e -> case e of
-      TpF n -> SizeInBit n
+      TpF n -> SizeInBit $ fromIntegral n
       TpHalf -> SizeInBit 16
       TpFloat -> SizeInBit 32
       TpDouble -> SizeInBit 64
@@ -430,7 +431,7 @@ getGetElementPtr (T t cv) indices isB = GetElementPtr isB (T t cv) indices
 
 getIntStoreTypeForPointer :: DataLayoutInfo -> Dtype
 getIntStoreTypeForPointer dl =  let (SizeInBit sizeInBits) = ptrSizeInBit dl Nothing
-                                in DtypeScalarI $ TpI sizeInBits
+                                in DtypeScalarI $ TpI (fromIntegral sizeInBits)
 
 class TypeOf a t | a -> t where  
   typeof :: TypeEnv -> a -> Maybe t
@@ -696,9 +697,9 @@ instance SizeOf Dtype where
                  in fromIntegral s
                     
                     
-class DataSizeOf a where                    
+class DataSizeOf a where
   dataSizeOf :: TypeEnv -> a -> Word32
   
-instance DataSizeOf Dtype where                    
+instance DataSizeOf Dtype where
   dataSizeOf te dt = let (SizeInByte s) = getTypeStoreSize te dt
                      in fromIntegral s

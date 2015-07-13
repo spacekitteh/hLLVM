@@ -14,14 +14,14 @@ pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                                            ; return (DlLittleS n aa pa)
                                            })
                      , char 'p' >> do { as <- option (LayoutAddrSpaceUnspecified) (liftM LayoutAddrSpace unsignedInt)
-                                      ; s <- colon >> liftM SizeInBit unsignedInt
-                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit) unsignedInt
+                                      ; s <- colon >> liftM (SizeInBit . fromIntegral) unsignedInt
+                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit . fromIntegral) unsignedInt
                                       ; pa <- prefAlign
                                       ; return (DlP as s aa pa) 
                                       }
                      , dlIVF
-                     , char 'a' >> do { s <- opt (liftM SizeInBit unsignedInt)
-                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit) unsignedInt
+                     , char 'a' >> do { s <- opt (liftM (SizeInBit . fromIntegral) unsignedInt)
+                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit . fromIntegral) unsignedInt
                                       ; pa <- prefAlign
                                       ; return (DlA s aa pa)
                                       }
@@ -31,18 +31,18 @@ pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                                                               , char 'w' >> return ManglingW
                                                               ])
                      , char 'n' >> do { ls <- sepBy1 unsignedInt colon
-                                      ; return (DlN (fmap SizeInBit ls))
+                                      ; return (DlN (fmap (SizeInBit . fromIntegral) ls))
                                       }
                      , try (symbol "S0" >> return (DlS StackAlignUnspecified))
-                     , char 'S' >> liftM ((DlS . StackAlign . AlignInBit)) unsignedInt
+                     , char 'S' >> liftM ((DlS . StackAlign . AlignInBit . fromIntegral)) unsignedInt
                      ]
-  where prefAlign = option Nothing (colon >> liftM (Just . PrefAlign . AlignInBit) unsignedInt)
+  where prefAlign = option Nothing (colon >> liftM (Just . PrefAlign . AlignInBit . fromIntegral) unsignedInt)
         dlIVF = do { df <- choice [ char 'i' >> return DlI
                                   , char 'v' >> return DlV
                                   , char 'f' >> return DlF
                                   ]
-                   ; s <- liftM SizeInBit unsignedInt
-                   ; abi <- colon >> liftM (AbiAlign . AlignInBit) unsignedInt
+                   ; s <- liftM (SizeInBit . fromIntegral) unsignedInt
+                   ; abi <- colon >> liftM (AbiAlign . AlignInBit . fromIntegral) unsignedInt
                    ; pa <- prefAlign
                    ; return (df s abi pa)
                    }

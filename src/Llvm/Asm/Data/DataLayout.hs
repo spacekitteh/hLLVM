@@ -1,7 +1,8 @@
 module Llvm.Asm.Data.DataLayout where
 
 import qualified Data.Map as M
-import Data.Word
+import Data.DoubleWord
+import Data.Word (Word32)
 
 data Endianness = LittleEndian
                 | BigEndian deriving (Eq, Ord, Show)
@@ -12,8 +13,8 @@ data LayoutAddrSpace = LayoutAddrSpace Word32
 data StackAlign = StackAlign AlignInBit
                 | StackAlignUnspecified deriving (Eq, Ord, Show)
 
-data SizeInBit = SizeInBit Word32 deriving (Eq, Ord, Show)
-data AlignInBit = AlignInBit Word32 deriving (Eq, Ord, Show)
+data SizeInBit = SizeInBit Word96 deriving (Eq, Ord, Show)
+data AlignInBit = AlignInBit Word96 deriving (Eq, Ord, Show)
 
 data AbiAlign = AbiAlign AlignInBit deriving (Eq, Ord, Show)
 
