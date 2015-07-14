@@ -772,7 +772,8 @@ instance Substitutable CallAsmInterface where
 instance Substitutable a => Substitutable (FunOperand a) where
   substitute chg c = case c of
     FunOperandData dt pa ma v -> FunOperandData dt pa ma (substitute chg v)
-    FunOperandByVal dt pa ma v -> FunOperandByVal dt pa ma (substitute chg v)    
+    FunOperandExt e dt pa ma v -> FunOperandExt e dt pa ma (substitute chg v)
+    FunOperandByVal dt pa ma v -> FunOperandByVal dt pa ma (substitute chg v)
     FunOperandLabel t pa ma v -> FunOperandLabel t pa ma (substitute chg v)
     FunOperandAsRet dt pa ma v -> FunOperandAsRet dt pa ma (substitute chg v)
 

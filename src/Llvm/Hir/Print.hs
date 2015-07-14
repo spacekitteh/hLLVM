@@ -495,11 +495,13 @@ instance IrPrint (InsertValue Value) where
 instance (IrPrint a) => IrPrint (FunOperand a) where
   printIr x = case x of
     (FunOperandAsRet t att1 align v) ->
-      hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+      hsep [printIr t, text "asret", hsep $ fmap printIr att1, printIr align, printIr v]
     (FunOperandData t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
+    (FunOperandExt e t att1 align v) ->
+      hsep [printIr e, printIr t, hsep $ fmap printIr att1, printIr align, printIr v]      
     (FunOperandByVal t att1 align v) ->
-      hsep [printIr t, hsep $ fmap printIr (PaByVal:att1), printIr align, printIr v]      
+      hsep [printIr t, text "byval", hsep $ fmap printIr att1, printIr align, printIr v]      
     (FunOperandLabel t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
 
@@ -855,9 +857,15 @@ instance IrPrint Ftype where
     FtypeVectorP e -> printIr e
     FtypeFirstClassD e -> printIr e
 
+instance IrPrint Ext where
+  printIr x = case x of
+    Sign -> text "signext"
+    Zero -> text "zeroext"
+    
 instance IrPrint Mtype where
   printIr x = case x of
     MtypeAsRet dt -> text "sret" <+> printIr dt
+    MtypeExt e dt -> printIr e <+> printIr dt
     MtypeData dt -> printIr dt
     MtypeByVal dt -> text "byval" <+> printIr dt
     MtypeLabel dt -> printIr dt
@@ -906,6 +914,19 @@ instance IrPrint Prefix where
 
 instance IrPrint Prologue where
   printIr (Prologue n) = text "prologue" <+> printIr n
+
+instance IrPrint PAttr where
+  printIr  x = case x of
+    PInReg -> text "inreg"
+    PInAlloca -> text "inalloca"
+    PNoAlias -> text "noalias"
+    PNoCapture -> text "nocapture"
+    PNest -> text "nest"
+    PReturned -> text "returned"
+    PNonNull -> text "nonnull"
+    PDereferenceable n -> text "deferenceable" <+> (integer $ fromIntegral n)
+    PReadOnly -> text "readonly"
+    PReadNone -> text "readnone"
 
 
 instance IrPrint IcmpOp where

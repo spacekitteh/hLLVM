@@ -1066,26 +1066,43 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
 
 instance Conversion (I.FunOperand I.Value) (Rm A.ActualParam) where
   convert x = case x of
-    I.FunOperandData t pa ma v -> do { va <- convert v 
-                                     ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa) va
-                                     }
-    I.FunOperandByVal t pa ma v -> do { va <- convert v 
-                                      ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaByVal:pa)) va
-                                      }                                      
+    I.FunOperandData t pa ma v -> 
+      do { va <- convert v 
+         ; return $ A.ActualParamData (tconvert () t) 
+           (appendAlignment ma (fmap unspecializePAttr pa)) va
+         }
+    I.FunOperandByVal t pa ma v -> 
+      do { va <- convert v 
+         ; return $ A.ActualParamData (tconvert () t) 
+           (appendAlignment ma (A.PaByVal:(fmap unspecializePAttr pa))) va
+         }                                      
     I.FunOperandLabel t pa ma (I.Val_const (I.C_labelId v)) -> 
       do { va <- convert_to_PercentLabel v 
-         ; return $ A.ActualParamLabel (tconvert () t) (appendAlignment ma pa) va
+         ; return $ A.ActualParamLabel (tconvert () t) 
+           (appendAlignment ma (fmap unspecializePAttr pa)) va
          }
     I.FunOperandAsRet t pa1 ma v ->
       do { va <- convert v
-         ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma (A.PaSRet:pa1)) va
+         ; return $ A.ActualParamData (tconvert () t) 
+           (appendAlignment ma (A.PaSRet:(fmap unspecializePAttr pa1))) va
+         }      
+    I.FunOperandExt I.Sign t pa1 ma v ->
+      do { va <- convert v
+         ; return $ A.ActualParamData (tconvert () t) 
+           (appendAlignment ma (A.PaSignExt:(fmap unspecializePAttr pa1))) va
+         }
+    I.FunOperandExt I.Zero t pa1 ma v ->
+      do { va <- convert v
+         ; return $ A.ActualParamData (tconvert () t) 
+           (appendAlignment ma (A.PaZeroExt:(fmap unspecializePAttr pa1))) va
          }      
 
 instance Conversion I.MetaOperand (Rm A.ActualParam) where
   convert x = case x of
-    I.MetaOperandData t pa1 ma v -> do { va <- convert v
-                                       ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa1) va
-                                       }
+    I.MetaOperandData t pa1 ma v -> 
+      do { va <- convert v
+         ; return $ A.ActualParamData (tconvert () t) (appendAlignment ma pa1) va
+         }
     I.MetaOperandMeta mc -> Md.liftM (A.ActualParamMeta) (convert mc)
 
 instance Conversion I.Aliasee (Rm A.Const) where
@@ -1113,15 +1130,29 @@ instance Conversion I.TypedConstOrNull (Rm A.TypedConstOrNull) where
 
 instance Conversion (I.FunOperand ()) (Rm A.FormalParam) where
   convert x = case x of
-    I.FunOperandData dt pa ma _ -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FimplicitParam)
-    I.FunOperandByVal dt pa ma _ -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FimplicitParam)
-    I.FunOperandAsRet dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:pa)) A.FimplicitParam
+    I.FunOperandData dt pa ma _ -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (fmap unspecializePAttr pa)) (A.FimplicitParam)
+    I.FunOperandByVal dt pa ma _ -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:(fmap unspecializePAttr pa))) (A.FimplicitParam)
+    I.FunOperandAsRet dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:(fmap unspecializePAttr pa))) A.FimplicitParam
+    I.FunOperandExt I.Sign dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSignExt:(fmap unspecializePAttr pa))) A.FimplicitParam
+    I.FunOperandExt I.Zero dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaZeroExt:(fmap unspecializePAttr pa))) A.FimplicitParam
 
 instance Conversion (I.FunOperand I.LocalId) (Rm A.FormalParam) where
   convert x = case x of
-    I.FunOperandData dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma pa) (A.FexplicitParam fp)
-    I.FunOperandByVal dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:pa)) (A.FexplicitParam fp)
-    I.FunOperandAsRet dt pa ma fp -> return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:pa)) (A.FexplicitParam fp)
+    I.FunOperandData dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (fmap unspecializePAttr pa)) (A.FexplicitParam fp)
+    I.FunOperandByVal dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaByVal:(fmap unspecializePAttr pa))) (A.FexplicitParam fp)
+    I.FunOperandAsRet dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSRet:(fmap unspecializePAttr pa))) (A.FexplicitParam fp)
+    I.FunOperandExt I.Sign dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaSignExt:(fmap unspecializePAttr pa))) (A.FexplicitParam fp)
+    I.FunOperandExt I.Zero dt pa ma fp -> 
+      return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaZeroExt:(fmap unspecializePAttr pa))) (A.FexplicitParam fp)
   
 instance Conversion (I.FunSignature I.LocalId) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
   convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =

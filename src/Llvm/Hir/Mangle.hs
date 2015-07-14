@@ -38,10 +38,16 @@ instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
 
+instance Mangle Ext where
+  mangle e = case e of
+    Sign -> "s"
+    Zero -> "z"
+    
 instance Mangle Mtype where
   mangle t = case t of
     MtypeAsRet dt -> "sret" ++ mangle dt
     MtypeByVal dt -> "byval" ++ mangle dt
+    MtypeExt e dt -> mangle e ++ mangle dt
     MtypeData dt -> mangle dt
     MtypeLabel dt -> mangle dt
 
@@ -115,12 +121,17 @@ instance Mangle FunAttr where
 instance Mangle ParamAttr where
   mangle x = render $ printIr x
   
+instance Mangle PAttr where
+  mangle x = render $ printIr x
+
+
 instance Mangle RetAttr where
   mangle x = render $ printIr x
 
 instance Mangle a => Mangle (FunOperand a) where
   mangle x = case x of
     FunOperandData d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
+    FunOperandExt e d atts align a -> mangle e ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
     FunOperandByVal d atts align a -> "byval" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
     FunOperandAsRet d atts align a -> "sret" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a        
     FunOperandLabel d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
@@ -210,7 +221,6 @@ instance Mangle () where
   
 instance Mangle a => Mangle (FunSignature a) where
   mangle FunSignature { fs_callConv = cc
-                      --, fs_retAttrs = attrs
                       , fs_type = typ
                       , fs_params = pas
                       } = mangle cc ++ mangle typ ++ mangle pas

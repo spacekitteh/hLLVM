@@ -74,6 +74,7 @@ instance (Uda a) => Uda (FunOperand a) where
   use x = case x of
     FunOperandAsRet _ _ _ a -> use a    
     FunOperandData _ _ _ a -> use a
+    FunOperandExt _  _ _ _ a -> use a    
     FunOperandByVal _ _ _ a -> use a
     FunOperandLabel _ _ _ l -> use l
   storeTo x = case x of  

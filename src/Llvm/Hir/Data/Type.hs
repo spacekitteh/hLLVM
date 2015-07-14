@@ -12,7 +12,7 @@ module Llvm.Hir.Data.Type
        )
        where
 
-import Llvm.Asm.SharedEntity (Packing, FunAttr, RetAttr, ParamAttr, Alignment, LocalId, VarArgParam)
+import Llvm.Asm.SharedEntity (Packing, FunAttr, RetAttr, {-ParamAttr,-} Alignment, LocalId, VarArgParam)
 import Llvm.ErrorLoc
 import Data.Word (Word32, Word64)
 
@@ -401,11 +401,14 @@ data Rtype = RtypeScalarI (Type ScalarB I)
            | RtypeVoidU (Type NoB U)
            deriving (Eq, Ord, Show)
 
-data Mtype = MtypeAsRet Dtype -- (Maybe Alignment)
-           | MtypeData Dtype -- (Maybe Alignment)
-           | MtypeByVal Dtype -- (Maybe Alignment)
-           | MtypeLabel (Type CodeLabelB X) -- (Maybe Alignment)
+data Mtype = MtypeAsRet Dtype
+           | MtypeData Dtype
+           | MtypeByVal Dtype             
+           | MtypeExt Ext Dtype
+           | MtypeLabel (Type CodeLabelB X)
            deriving (Eq, Ord, Show)
+
+data Ext = Sign | Zero deriving (Eq, Ord, Show)
 
 data Dtype = DtypeScalarI (Type ScalarB I)
            | DtypeScalarF (Type ScalarB F)

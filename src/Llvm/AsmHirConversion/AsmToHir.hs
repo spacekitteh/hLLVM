@@ -35,6 +35,19 @@ funName = ask >>= return . funname
 withFunName :: A.GlobalId -> MM a -> MM a
 withFunName g f = withReaderT (\(ReaderData x _) -> ReaderData x g) f
 
+
+stripOffPa :: [A.ParamAttr] -> [A.ParamAttr -> Bool] -> 
+              ([I.PAttr], [Maybe A.ParamAttr])
+stripOffPa palist preds = 
+  let (l,r) = foldl (\(pl, bl) pa -> let pl0 = filter (\x -> not $ pa x) pl
+                                         out = filter pa pl
+                                     in case out of
+                                       [x] -> (pl0, bl++[Just x])
+                                       [] -> (pl0, bl++[Nothing])
+                    ) (palist,[]) preds
+  in (fmap specializePAttr l, r)
+
+
 {- Ast to Ir conversion -}
 -- the real differences between Ast and Ir
 -- 1. Ir uses Unique values as labels while Ast can use any strings as labels
@@ -1298,18 +1311,12 @@ specializeFirstParamAsRet x = case x of
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
-       ; let preds = [ (A.PaSRet==)
-                     , (A.PaByVal==)
-                     ,\x -> case x of 
-                          A.PaAlign _ -> True
-                          _ -> False
-                     ]
-       ; let (plist, bl) = stripOffPa pa preds
+       ; let (plist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
        ; case bl of 
-         [Nothing, _, _] -> return Nothing
-         [Just _, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
-         [Just _, Nothing, Nothing] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist Nothing va
-         [Just _, Just (A.PaAlign n)] -> errorLoc FLC "byval cannot be used with sret"
+         [Nothing, _, Nothing, Nothing, _] -> return Nothing
+         [Just _, Nothing, Nothing, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
+         [Just _, Nothing, Nothing, Nothing, Nothing] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist Nothing va
+         [Just _, Just _, _, _, Just (A.PaAlign n)] -> errorLoc FLC "byval cannot be used with sret"
        }
   (A.ActualParamLabel t pa v) ->
     do { mp <- typeDefs
@@ -1320,18 +1327,20 @@ specializeFirstParamAsRet x = case x of
        }   
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
-  
+
 convert_ActualParam :: A.ActualParam -> MM (I.FunOperand I.Value)
 convert_ActualParam x = case x of
   (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
        ; let (ta::I.Utype) = tconvert mp t
        ; va <- convert_Value v
-       ; let (plist, bl) = stripOffPa pa sRetByValAlignPreds
+       ; let (plist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
        ; case bl of 
-         [Nothing, Nothing, pn] -> return $ I.FunOperandData (dcast FLC ta) plist (mapPaAlign pn) va
-         [Nothing, Just _, pn] -> return $ I.FunOperandByVal (dcast FLC ta) plist (mapPaAlign pn) va
-         [Just _, Nothing, pn] -> return $ I.FunOperandAsRet (dcast FLC ta) plist (mapPaAlign pn) va
+         [Just _, Nothing, Nothing, Nothing, pn] -> return $ I.FunOperandAsRet (dcast FLC ta) plist (mapPaAlign pn) va
+         [Nothing, Just _, Nothing, Nothing, pn] -> return $ I.FunOperandByVal (dcast FLC ta) plist (mapPaAlign pn) va
+         [Nothing, Nothing, Just _ , Nothing, pn] -> return $ I.FunOperandExt I.Sign (dcast FLC ta) plist (mapPaAlign pn) va
+         [Nothing, Nothing, Nothing, Just _ , pn] -> return $ I.FunOperandExt I.Zero (dcast FLC ta) plist (mapPaAlign pn) va
+         [Nothing, Nothing, Nothing, Nothing, pn] -> return $ I.FunOperandData (dcast FLC ta) plist (mapPaAlign pn) va
        }
   (A.ActualParamLabel t pa v) ->
     do { mp <- typeDefs
@@ -1418,11 +1427,13 @@ convert_to_FunParamType x =
   do { mp <- typeDefs
      ; case x of
        (A.FormalParamData dt pa _) ->
-         case stripOffPa pa sRetByValAlignPreds of
+         case stripOffPa pa sRetByValSignExtZeroExtAlignPreds of
            (palist, bl) -> case bl of
-             [Nothing, Nothing, pa] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
-             [Nothing, Just _, pa] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
-             [Just _, Nothing, pa] -> return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Just _,  Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Just _,  Nothing, Nothing, pa] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Nothing, Just _,  Nothing, pa] -> return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Nothing, Nothing, Just _,  pa] -> return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
              _ -> errorLoc FLC $ show bl
        (A.FormalParamMeta mk fp) -> errorLoc FLC $ show x
      }
@@ -1442,26 +1453,30 @@ composeTfunction (ret, retAttrs) params mv =
   do { mp <- typeDefs
      ; ts <- mapM (\(dt, pa) -> 
                     do { let (dt0::I.Utype) = tconvert mp dt
-                       ; let (plist, bl) = stripOffPa pa sRetByValAlignPreds
+                       ; let (plist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
                        ; case bl of
-                           [Nothing, Nothing, pn] -> case dt0 of
-                             I.UtypeLabelX lt -> return (I.MtypeLabel lt, mapPaAlign pn)
-                             _ -> return (I.MtypeData (dcast FLC dt0), mapPaAlign pn)
-                           [Just _,  Nothing, pn] -> return (I.MtypeAsRet (dcast FLC dt0), mapPaAlign pn)
-                           [Nothing, Just _, pn] -> return (I.MtypeByVal (dcast FLC dt0), mapPaAlign pn)
-                           [_,_,_] -> errorLoc FLC $ show bl
+                            [Just _,  Nothing, Nothing, Nothing, pn] -> return (I.MtypeAsRet (dcast FLC dt0), mapPaAlign pn)
+                            [Nothing, Just _,  Nothing, Nothing, pn] -> return (I.MtypeByVal (dcast FLC dt0), mapPaAlign pn)
+                            [Nothing, Nothing, Just _,  Nothing, pn] -> return (I.MtypeExt I.Sign (dcast FLC dt0), mapPaAlign pn)
+                            [Nothing, Nothing, Nothing, Just _, pn] -> return (I.MtypeExt I.Zero (dcast FLC dt0), mapPaAlign pn)
+                            [Nothing, Nothing, Nothing, Nothing, pn] -> case dt0 of
+                              I.UtypeLabelX lt -> return (I.MtypeLabel lt, mapPaAlign pn)
+                              _ -> return (I.MtypeData (dcast FLC dt0), mapPaAlign pn)
+                            _ -> errorLoc FLC $ show bl
                        }
                   ) params
      ; let (ret0::I.Utype) = tconvert mp ret
      ; return $ I.Tfunction (dcast FLC ret0, retAttrs) ts mv
      }
 
-sRetByValAlignPreds = [ (A.PaSRet==)
-                      , (A.PaByVal==)
-                      , \x -> case x of 
-                           A.PaAlign _ -> True
-                           _ -> False
-                      ]
+sRetByValSignExtZeroExtAlignPreds = [ (A.PaSRet==)
+                                    , (A.PaByVal==)
+                                    , (A.PaSignExt==)
+                                    , (A.PaZeroExt==)
+                                    , \x -> case x of 
+                                         A.PaAlign _ -> True
+                                         _ -> False
+                                    ]
         
   
 convert_FunctionDeclareType :: A.FunctionPrototype -> (MM I.FunctionDeclare)
@@ -1522,18 +1537,14 @@ convert_to_FunParam x =
   do { mp <- typeDefs
      ; case x of
        (A.FormalParamData dt pa (A.FexplicitParam fp)) ->
-         let preds = [ (A.PaByVal==)
-                     ,\x -> case x of 
-                          A.PaAlign _ -> True
-                          _ -> False
-                     ]
-             (palist, bl) = stripOffPa pa preds
+         let (palist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
          in case bl of
-             [Nothing, Nothing] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
-             [Nothing, Just (A.PaAlign n)] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
-             [Just _, Nothing] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist Nothing fp
-             [Just _, Just (A.PaAlign n)] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (Just $ A.Alignment n) fp
-             _ -> errorLoc FLC $ show bl
+           [Just _,  Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Just _,  Nothing, Nothing, pa] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Nothing,  Just _,  Nothing, pa] -> return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Nothing, Nothing, Just _,  pa] -> return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           _ -> errorLoc FLC $ show bl
        (A.FormalParamData _ _ A.FimplicitParam) -> errorLoc FLC "implicit param should be normalized in AsmSimplification"
      }
   

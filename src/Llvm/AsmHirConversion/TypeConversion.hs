@@ -30,6 +30,7 @@ instance TypeConversion () I.Mtype A.Type where
     I.MtypeData d -> tconvert mp d
     I.MtypeByVal d -> tconvert mp d
     I.MtypeLabel d -> tconvert mp d
+    I.MtypeExt _ d -> tconvert mp d
     
 instance TypeConversion () I.Dtype A.Type where
   tconvert _ t = case t of
@@ -66,16 +67,6 @@ appendAlignment :: Maybe A.Alignment -> [A.ParamAttr] -> [A.ParamAttr]
 appendAlignment Nothing l = l
 appendAlignment (Just (A.Alignment n)) l = l ++ [A.PaAlign n]
 
-
-stripOffPa :: [A.ParamAttr] -> [A.ParamAttr -> Bool] -> 
-              ([A.ParamAttr], [Maybe A.ParamAttr])
-stripOffPa palist pas = 
-  foldl (\(pl, bl) pa -> let pl0 = filter (\x -> not $ pa x) pl
-                             out = filter pa pl
-                         in case out of
-                           [x] -> (pl0, bl++[Just x])
-                           [] -> (pl0, bl++[Nothing])
-        ) (palist,[]) pas
 
 
 instance TypeConversion () I.Rtype A.Type where  

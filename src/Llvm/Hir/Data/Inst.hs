@@ -1094,15 +1094,27 @@ data Prologue = Prologue TypedConstOrNull deriving (Eq, Ord, Show)
 data TypedConstOrNull = TypedConst (T Dtype Const)
                       | UntypedNull deriving (Eq, Ord, Show)
 
-
 data FunSignature a = FunSignature { fs_callConv ::  CallConv
                                    , fs_type :: Type CodeFunB X
                                    , fs_params :: [FunOperand a]
                                    } deriving (Eq, Ord, Show)
 
-
-data FunOperand a = FunOperandData Dtype [ParamAttr] (Maybe Alignment) a
-                  | FunOperandAsRet Dtype [ParamAttr] (Maybe Alignment) a
-                  | FunOperandByVal Dtype [ParamAttr] (Maybe Alignment) a
-                  | FunOperandLabel (Type CodeLabelB X) [ParamAttr] (Maybe Alignment) a
+data FunOperand a = FunOperandData Dtype [PAttr] (Maybe Alignment) a
+                  | FunOperandExt Ext Dtype [PAttr] (Maybe Alignment) a
+                  | FunOperandAsRet Dtype [PAttr] (Maybe Alignment) a
+                  | FunOperandByVal Dtype [PAttr] (Maybe Alignment) a
+                  | FunOperandLabel (Type CodeLabelB X) [PAttr] (Maybe Alignment) a
                   deriving (Eq,Ord,Show)
+                           
+data PAttr = PInReg
+            | PInAlloca
+            | PNoAlias
+            | PNoCapture
+            | PNest
+            | PReturned
+            | PNonNull
+            | PDereferenceable Word32
+            | PReadOnly
+            | PReadNone
+            deriving (Eq,Ord,Show)
+                           

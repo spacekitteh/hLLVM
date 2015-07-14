@@ -14,7 +14,7 @@ data StackAlign = StackAlign AlignInBit
                 | StackAlignUnspecified deriving (Eq, Ord, Show)
 
 data SizeInBit = SizeInBit Word96 deriving (Eq, Ord, Show)
-data AlignInBit = AlignInBit Word16 deriving (Eq, Ord, Show)
+data AlignInBit = AlignInBit Word32 deriving (Eq, Ord, Show)
 
 data AbiAlign = AbiAlign AlignInBit deriving (Eq, Ord, Show)
 

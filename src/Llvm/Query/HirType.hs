@@ -57,7 +57,7 @@ eightBits = 8
 
 data SizeInByte = SizeInByte Word64 deriving (Eq, Ord, Show)
 data OffsetInByte = OffsetInByte Word64 deriving (Eq, Ord, Show)
-data AlignInByte = AlignInByte Word8 deriving (Eq, Ord, Show)
+data AlignInByte = AlignInByte Word32 deriving (Eq, Ord, Show)
 
 fromSizeInBit :: SizeInBit -> SizeInByte
 fromSizeInBit (SizeInBit n) = SizeInByte $ fromIntegral (n `div` (fromIntegral eightBits))
@@ -69,7 +69,7 @@ fromAlignInBit :: AlignInBit -> AlignInByte
 fromAlignInBit (AlignInBit n) = AlignInByte $ fromIntegral (n `div` (fromIntegral eightBits))
 
 fromAlignInByte :: AlignInByte -> AlignInBit
-fromAlignInByte (AlignInByte n) = AlignInBit $ fromIntegral (n * eightBits)
+fromAlignInByte (AlignInByte n) = AlignInBit $ fromIntegral (n * (fromIntegral eightBits))
 
 getTypeAlignment :: TypeEnv -> Dtype -> AlignType -> AlignInByte
 getTypeAlignment te@TypeEnv{..} t at = case getTypeDef te t of

@@ -11,6 +11,34 @@ import Data.Maybe
 
 #define FLC  (FileLoc $(srcLoc))
 
+specializePAttr :: ParamAttr -> PAttr
+specializePAttr x = case x of
+  PaInReg -> PInReg
+  PaInAlloca -> PInAlloca
+  PaNoAlias -> PNoAlias
+  PaNoCapture -> PNoCapture
+  PaNest -> PNest
+  PaReturned -> PReturned
+  PaNonNull -> PNonNull
+  PaDereferenceable n -> PDereferenceable n
+  PaReadOnly -> PReadOnly
+  PaReadNone -> PReadNone
+  _ -> errorLoc FLC $ show x
+
+
+unspecializePAttr :: PAttr -> ParamAttr
+unspecializePAttr x = case x of
+  PInReg -> PaInReg
+  PInAlloca -> PaInAlloca
+  PNoAlias -> PaNoAlias
+  PNoCapture -> PaNoCapture
+  PNest -> PaNest
+  PReturned -> PaReturned
+  PNonNull -> PaNonNull
+  PDereferenceable n -> PaDereferenceable n
+  PReadOnly -> PaReadOnly
+  PReadNone -> PaReadNone
+
 
 specializeRetAttr :: ParamAttr -> RetAttr    
 specializeRetAttr x = case x of
