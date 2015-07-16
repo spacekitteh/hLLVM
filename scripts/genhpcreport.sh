@@ -1,5 +1,6 @@
 #!/bin/bash -x
 MYPATH=$(dirname $(readlink -f $0))
+. ${MYPATH}/enviroment.sh
 
 if [ "$#" -lt 2 ]; then
     echo "usage : $0 <a tix file name> <folder1> <folder2> ..."
