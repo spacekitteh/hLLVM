@@ -63,9 +63,9 @@ instance TypeConversion () (Either I.Rtype (I.Type I.CodeFunB I.X)) A.Type where
   tconvert _ (Left e) = tconvert () e
   tconvert _ (Right e) = tconvert () (I.Tpointer (ucast e) 0)
 
-appendAlignment :: Maybe A.Alignment -> [A.ParamAttr] -> [A.ParamAttr]
+appendAlignment :: Maybe A.AlignInByte -> [A.ParamAttr] -> [A.ParamAttr]
 appendAlignment Nothing l = l
-appendAlignment (Just (A.Alignment n)) l = l ++ [A.PaAlign n]
+appendAlignment (Just (A.AlignInByte n)) l = l ++ [A.PaAlign n]
 
 
 

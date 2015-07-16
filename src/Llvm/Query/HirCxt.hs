@@ -12,9 +12,7 @@ import qualified Compiler.Hoopl as H
 import Llvm.Query.Conversion (strToApInt)
 import Llvm.ErrorLoc
 
-data TypeEnv = TypeEnv { dataLayout :: DataLayoutInfo
-                       , targetTriple :: Ci.TargetTriple
-                       , typedefs :: M.Map Ci.LocalId Ci.Dtype
+data TypeEnv = TypeEnv {typedefs :: M.Map Ci.LocalId Ci.Dtype
                        , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
@@ -35,10 +33,8 @@ data IrCxt = IrCxt { globalCxt :: GlobalCxt
                    } deriving (Eq, Ord, Show)
 
 instance IrPrint TypeEnv where
-  printIr (TypeEnv dl tt td otd) = text "datalayout:" <+> printIr dl
-                                   $+$ text "triple:" <+> printIr tt
-                                   $+$ text "typedefs:" <+> printIr td
-                                   $+$ text "opaqueTypedefs:" <+> printIr otd
+  printIr (TypeEnv td otd) = text "typedefs:" <+> printIr td
+                             $+$ text "opaqueTypedefs:" <+> printIr otd
 
 instance IrPrint GlobalCxt where
   printIr (GlobalCxt te gl fns alias atts um) = text "typeEnv:" <+> printIr te
@@ -109,15 +105,7 @@ funCxtOfTlDefine (TlDefine fi _ graph) =
       
 globalCxtOfModule :: Module a -> GlobalCxt
 globalCxtOfModule (Module tl) =
-  let [ToplevelDataLayout (TlDataLayout dl)] = filter (\x -> case x of
-                                                          ToplevelDataLayout _ -> True
-                                                          _ -> False
-                                                      ) tl
-      [ToplevelTriple (TlTriple tt)] = filter (\x -> case x of
-                                                  ToplevelTriple _ -> True
-                                                  _ -> False
-                                              ) tl
-      tdefs = fmap (\(ToplevelTypeDef td) -> case td of
+  let tdefs = fmap (\(ToplevelTypeDef td) -> case td of
                        TlDatTypeDef lhs def -> (lhs, def))
               $ filter (\x -> case x of
                            ToplevelTypeDef (TlDatTypeDef _ _) -> True
@@ -157,9 +145,7 @@ globalCxtOfModule (Module tl) =
                                ToplevelUnamedMd _ -> True
                                _ -> False
                            ) tl
-  in GlobalCxt { typeEnv = TypeEnv { dataLayout = getDataLayoutInfo dl
-                                   , targetTriple = tt
-                                   , typedefs = M.fromList tdefs
+  in GlobalCxt { typeEnv = TypeEnv { typedefs = M.fromList tdefs
                                    , opaqueTypeDefs = M.empty
                                    }
                , globals = M.fromList glbs

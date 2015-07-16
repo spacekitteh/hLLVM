@@ -14,11 +14,12 @@ import Llvm.Hir.Cast
 import Llvm.Hir.Internalization
 import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
-import Llvm.Query.HirType
+import Llvm.Query.Type
 import Llvm.Hir.Print
 import Control.Monad (liftM,foldM, mapM)
+import Llvm.Hir.DataLayoutMetrics
 
-{- 
+{-
 
 This pass inserts code to printout the operands and results of store
 and and load instructions at runtime. It should be the last pass
@@ -29,10 +30,11 @@ nodes of other shapes if the needs arise.
 
 -}
 
-data VisualPlugin a = VisualPlugin { 
+data VisualPlugin dlm a = VisualPlugin { 
+  dataLayoutMetrics :: dlm
   -- the prefix added before each visualization string, this might be 
   -- needed to avoid naming collision. 
-  visPrefix :: Maybe String
+  , visPrefix :: Maybe String
   -- the functions whose instructions should be visualized. 
   -- If the set does not exist, all functions are visualized
   , includedFunctions :: Maybe (Ds.Set GlobalId) 
@@ -41,9 +43,10 @@ data VisualPlugin a = VisualPlugin {
   , visNodeOO :: TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]
   }
 
-sampleVisualPlugin :: VisualPlugin a
-sampleVisualPlugin = 
-  VisualPlugin { visPrefix = Just ".visual_"
+sampleVisualPlugin :: DataLayoutMetrics dlm => dlm -> VisualPlugin dlm a
+sampleVisualPlugin dlm = 
+  VisualPlugin { dataLayoutMetrics = dlm
+               , visPrefix = Just ".visual_"
                , includedFunctions = Nothing
                , visFunctions = []
                , captureCinsts = \comp f -> case comp of
@@ -96,13 +99,13 @@ bwdScan collectString =
                , H.bp_rewrite = H.noBwdRewrite
                }
 
-scanDefine :: (CheckpointMonad m, FuelMonad m) => VisualPlugin a -> TlDefine a -> m Visualized
+scanDefine :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m) => VisualPlugin dlm a -> TlDefine a -> m Visualized
 scanDefine visualPlugin (TlDefine fn entry graph) = 
   do { (_, a, b) <- H.analyzeAndRewriteBwd (bwdScan (captureCinsts visualPlugin)) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyVisualized (H.lookupFact entry a))
      }
   
-scanModule :: (CheckpointMonad m, FuelMonad m) => VisualPlugin a -> Module a -> m (Ds.Set String)
+scanModule :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m) => VisualPlugin dlm a -> Module a -> m (Ds.Set String)
 scanModule visPlugin (Module l) = 
   foldM (\p x -> case x of
             ToplevelDefine def@(TlDefine fn _ _) ->
@@ -155,7 +158,8 @@ rwDefine rwNodeOO te gmp (TlDefine fn entry graph) =
   let graph0 = mapGraphBlocks (rwBlock rwNodeOO te gmp) graph
   in TlDefine fn entry graph0
 
-rwModule :: VisualPlugin a -> Module a -> Ds.Set String -> Module a
+{- this is more correct, because we inherit the DataLayoutMetrics of the input module in the output module -}
+rwModule :: DataLayoutMetrics dlm => VisualPlugin dlm a -> Module a -> Ds.Set String -> Module a
 rwModule visPlugin m@(Module l) duM = 
   let (globals, duC) = stringnize duM
       irCxt = irCxtOfModule m
@@ -177,7 +181,7 @@ stringnize mp =
                                    }) (Ds.toList mp))
   in (Dm.elems $ Dm.map llvmDef tpl, Dm.fromList kvs)
 
-visualize :: VisualPlugin a -> Module a -> Module a
+visualize :: DataLayoutMetrics dlm => VisualPlugin dlm a -> Module a -> Module a
 visualize visPlugin m = 
   let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel ((scanModule visPlugin m)::H.SimpleFuelMonad (Ds.Set String))
   in rwModule visPlugin m mp

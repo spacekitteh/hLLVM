@@ -51,7 +51,7 @@ instance Internalization String where
                                                                          , tlg_const = Just $ C_str str
                                                                          , tlg_section = Nothing
                                                                          , tlg_comdat = Nothing
-                                                                         , tlg_alignment = Just (Alignment 1)
+                                                                         , tlg_alignment = Just (AlignInByte 1)
                                                                          }
                                                , llvmRef = T (ptr0 i8) $ C_getelementptr (Is InBounds)
                                                            (T (ucast $ Tpointer (ucast strType) 0) (C_globalAddr lhs))

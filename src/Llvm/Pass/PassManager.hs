@@ -2,7 +2,6 @@ module Llvm.Pass.PassManager where
 
 import Llvm.Hir.Data
 import Llvm.Pass.Mem2Reg
--- import Llvm.Pass.PrepareRw
 import Llvm.Pass.Liveness
 import qualified Data.Set as Ds
 import Llvm.Pass.Optimizer

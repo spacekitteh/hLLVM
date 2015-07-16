@@ -15,15 +15,12 @@ pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                                            })
                      , char 'p' >> do { as <- option (LayoutAddrSpaceUnspecified) (liftM LayoutAddrSpace unsignedInt)
                                       ; s <- colon >> liftM (SizeInBit . fromIntegral) unsignedInt
-                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit . fromIntegral) unsignedInt
-                                      ; pa <- prefAlign
-                                      ; return (DlP as s aa pa) 
+                                      ; am <- colon >> alignMetrics
+                                      ; return (DlP as s am)
                                       }
                      , dlIVF
-                     , char 'a' >> do { s <- opt (liftM (SizeInBit . fromIntegral) unsignedInt)
-                                      ; aa <- colon >> liftM (AbiAlign . AlignInBit . fromIntegral) unsignedInt
-                                      ; pa <- prefAlign
-                                      ; return (DlA s aa pa)
+                     , char 'a' >> do { am <- colon >> alignMetrics
+                                      ; return (DlA am)
                                       }
                      , char 'm' >> colon >> liftM DlM (choice [ char 'e' >> return ManglingE
                                                               , char 'm' >> return ManglingM
@@ -36,15 +33,17 @@ pLayoutSpec = choice [ char 'e' >> return (DlE LittleEndian)
                      , try (symbol "S0" >> return (DlS StackAlignUnspecified))
                      , char 'S' >> liftM ((DlS . StackAlign . AlignInBit . fromIntegral)) unsignedInt
                      ]
-  where prefAlign = option Nothing (colon >> liftM (Just . PrefAlign . AlignInBit . fromIntegral) unsignedInt)
+  where alignMetrics = do { aa <- liftM (AlignInBit . fromIntegral) unsignedInt
+                          ; pa <- option Nothing (colon >> liftM (Just . AlignInBit . fromIntegral) unsignedInt)
+                          ; return (AlignMetrics aa pa)
+                          }
         dlIVF = do { df <- choice [ char 'i' >> return DlI
                                   , char 'v' >> return DlV
                                   , char 'f' >> return DlF
                                   ]
                    ; s <- liftM (SizeInBit . fromIntegral) unsignedInt
-                   ; abi <- colon >> liftM (AbiAlign . AlignInBit . fromIntegral) unsignedInt
-                   ; pa <- prefAlign
-                   ; return (df s abi pa)
+                   ; am <- colon >> alignMetrics
+                   ; return (df s am)
                    }
               
 pDataLayout :: P DataLayout

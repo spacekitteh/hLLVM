@@ -12,7 +12,7 @@ module Llvm.Hir.Data.Type
        )
        where
 
-import Llvm.Asm.SharedEntity (Packing, FunAttr, RetAttr, {-ParamAttr,-} Alignment, LocalId, VarArgParam)
+import Llvm.Asm.SharedEntity (Packing, FunAttr, RetAttr, AlignInByte, LocalId, VarArgParam)
 import Llvm.ErrorLoc
 import Data.Word (Word32, Word64)
 
@@ -67,7 +67,7 @@ data Type sto rep where {
   Topaque_array :: Word64 -> Type OpaqueB D -> Type OpaqueB D;
 
   Tpointer :: Etype -> AddrSpace -> Type ScalarB P;
-  Tfunction :: (Rtype, [RetAttr]) -> [(Mtype, Maybe Alignment)] -> Maybe VarArgParam -> Type CodeFunB X;
+  Tfunction :: (Rtype, [RetAttr]) -> [(Mtype, Maybe AlignInByte)] -> Maybe VarArgParam -> Type CodeFunB X;
   {- reference types -}
 
   {- referee is Scalar -}

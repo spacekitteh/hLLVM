@@ -482,7 +482,7 @@ instance AsmPrint DqString where
 instance AsmPrint Section where
   toLlvm = P.print
 
-instance AsmPrint Alignment where
+instance AsmPrint AlignInByte where
   toLlvm = P.print
 
 instance AsmPrint Gc where
@@ -581,10 +581,7 @@ instance AsmPrint StackAlign where
 instance AsmPrint Mangling where
   toLlvm = P.print
     
-instance AsmPrint AbiAlign where    
-  toLlvm = P.print
-
-instance AsmPrint PrefAlign where
+instance AsmPrint AlignMetrics where
   toLlvm = P.print
   
 instance AsmPrint LayoutSpec where  

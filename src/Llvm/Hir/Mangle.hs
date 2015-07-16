@@ -96,8 +96,8 @@ instance Mangle TailCall where
 instance Mangle CallConv where
   mangle x = render $ printIr x
   
-instance Mangle Alignment where
-  mangle x = show x
+instance Mangle AlignInByte where
+  mangle (AlignInByte x) = "a:" ++ show x
   
 instance Mangle CallSiteType where
   mangle x = case x of
@@ -224,20 +224,3 @@ instance Mangle a => Mangle (FunSignature a) where
                       , fs_type = typ
                       , fs_params = pas
                       } = mangle cc ++ mangle typ ++ mangle pas
-{-
-instance Mangle CallFunInterface where       
-  mangle CallFunInterface{..} = mangle cfi_tail ++ mangle cfi_signature
-                                {-conv
-                                ++ mangle cfi_retAttrs ++ mangle cfi_type
-                                ++ mangle cfi_actualParams -}
-                                ++ mangle cfi_funAttrs
--}
-                             
-
-{-
-instance Mangle CallAsmInfo where                            
-  mangle CallAsmInfo{..} = mangle cfi_tail ++ mangle cfi_conv
-                           ++ mangle cfi_retAttrs ++ mangle cfi_type
-                           ++ mangle cfi_actualParams
-                           ++ mangle cfi_funAttrs
--}

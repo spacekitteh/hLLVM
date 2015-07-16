@@ -13,9 +13,7 @@ import qualified Compiler.Hoopl as H
 import Data.Word (Word32)
 
 {- An intermediate representation that is suitable for Hoopl -}
-data Toplevel a = ToplevelTriple TlTriple
-                | ToplevelDataLayout TlDataLayout
-                | ToplevelAlias TlAlias
+data Toplevel a = ToplevelAlias TlAlias
                 | ToplevelUnamedMd TlUnamedMd
                 | ToplevelNamedMd TlNamedMd
                 | ToplevelDeclare TlDeclare
@@ -46,10 +44,6 @@ data TlIntrinsic = TlIntrinsic_llvm_used { tli_type :: Type RecordB D
                                                  , tli_section :: Maybe Section
                                                  } 
                                            
-data TlTriple = TlTriple Ci.TargetTriple deriving (Eq)
-
-data TlDataLayout = TlDataLayout Ci.DataLayout deriving (Eq)
-
 data TlAlias = TlAlias { tla_lhs :: Ci.GlobalId
                        , tla_visibility :: Maybe Ci.Visibility
                        , tla_dllstorage :: Maybe Ci.DllStorageClass
@@ -78,7 +72,7 @@ data FunctionDeclare = FunctionDeclareData { fd_linkage :: Maybe Linkage
                                            , fd_fun_attrs :: [FunAttr]
                                            , fd_section :: Maybe Section
                                            , fd_comdat :: Maybe Comdat
-                                           , fd_alignment :: Maybe Alignment
+                                           , fd_alignment :: Maybe AlignInByte -- Alignment
                                            , fd_gc :: Maybe Gc
                                            , fd_prefix :: Maybe Prefix
                                            , fd_prologue :: Maybe Prologue
@@ -110,7 +104,7 @@ data TlGlobal = TlGlobalDtype { tlg_lhs :: Ci.GlobalId
                               , tlg_const :: (Maybe Ci.Const)
                               , tlg_section :: (Maybe Ci.Section)
                               , tlg_comdat :: (Maybe Ci.Comdat)
-                              , tlg_alignment :: (Maybe Ci.Alignment)
+                              , tlg_alignment :: (Maybe Ci.AlignInByte)
                               }
               | TlGlobalOpaque { tlg_lhs :: Ci.GlobalId
                                , tlg_linkage :: (Maybe Ci.Linkage)
@@ -125,7 +119,7 @@ data TlGlobal = TlGlobalDtype { tlg_lhs :: Ci.GlobalId
                                , tlg_const :: (Maybe Ci.Const)
                                , tlg_section :: (Maybe Ci.Section)
                                , tlg_comdat :: (Maybe Ci.Comdat)
-                               , tlg_alignment :: (Maybe Ci.Alignment)
+                               , tlg_alignment :: (Maybe Ci.AlignInByte)
                                } deriving (Eq, Ord, Show)
 
 data TlTypeDef = TlDatTypeDef Ci.LocalId Ci.Dtype
@@ -142,9 +136,9 @@ data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Ord, Show)
 
 data TlComdat = TlComdat Ci.DollarId Ci.SelectionKind deriving (Eq, Ord, Show)
 
-data Module a = Module [Toplevel a] 
+data Module a = Module [Toplevel a]
 
-  
+data SpecializedModule dlm a = SpecializedModule dlm (Module a)  
   
 data Node a e x where
   -- | Lnode represents the name of a basic block

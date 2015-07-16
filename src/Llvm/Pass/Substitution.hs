@@ -13,7 +13,7 @@ import Prelude hiding (succ)
 import qualified Compiler.Hoopl as H
 
 import Llvm.Hir.Data
-import Llvm.Query.HirType
+import Llvm.Query.Type
 import Llvm.Util.Monadic (maybeM)
 import Debug.Trace
 import Control.Monad
@@ -805,8 +805,6 @@ instance Substitutable TlIntrinsic where
 
 instance Substitutable a => Substitutable (Toplevel a) where
   substitute chg@Changer{..} tpl = case tpl of
-    ToplevelTriple _ -> tpl
-    ToplevelDataLayout _ -> tpl
     ToplevelAlias x -> ToplevelAlias (substitute chg x)
     ToplevelUnamedMd x -> ToplevelUnamedMd (substitute chg x)
     ToplevelNamedMd x -> ToplevelNamedMd (substitute chg x)

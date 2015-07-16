@@ -17,9 +17,6 @@ import Data.Functor.Identity (Identity)
 import qualified Data.Map as M
 import Data.Word (Word32, Word64)
 
--- dummy state
--- data DummyState = DummyState
-
 type DummyState = ()
 
 type P a = Parsec String DummyState a
@@ -443,8 +440,8 @@ pCarry :: P TrapFlag
 pCarry = choice $ fmap (\(x,y) -> reserved y >> return x) $ M.toList trapFlagMap
 
 
-pAlign :: P Alignment
-pAlign = reserved "align" >> liftM (Alignment . fromIntegral) unsignedInt
+pAlign :: P AlignInByte
+pAlign = reserved "align" >> liftM (AlignInByte . fromIntegral) unsignedInt
 
 pComdat :: P Comdat
 pComdat = reserved "comdat" >> liftM Comdat (opt pDollarId)

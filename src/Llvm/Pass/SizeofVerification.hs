@@ -14,11 +14,11 @@ import Llvm.Hir.Cast
 import Llvm.Hir.Internalization
 import Llvm.Query.HirCxt
 import Llvm.Query.Conversion
-import Llvm.Query.HirType
+import Llvm.Query.Type
 import Llvm.Hir.Print
 import Control.Monad (liftM,foldM)
 import Llvm.Query.HirCxt
-
+import Llvm.Hir.DataLayoutMetrics
 
 {- 
 This pass composes a standalone main function to check if hLLVM's type query 
@@ -94,41 +94,33 @@ stringize mp =
   in (Dm.elems $ Dm.map llvmDef tpls, Dm.fromList kvs)
      
 
-mkVerificationModule :: Ord a => Module a -> Module a
-mkVerificationModule m@(Module l) = 
+mkVerificationModule :: (DataLayoutMetrics dlm, Ord a) => SpecializedModule dlm a -> SpecializedModule dlm a
+mkVerificationModule (SpecializedModule dlm m@(Module l)) = 
   let IrCxt{..} = irCxtOfModule m
       vis = H.runSimpleUniqueMonad $ H.runWithFuel H.infiniteFuel ((scanModule m):: H.SimpleFuelMonad Visualized)
       (globals, duC) = stringize vis
-      dataLayoutAndTriple = getDataLayoutAndTriple m
-      insts = fmap (mkCheck (typeEnv globalCxt) duC)
+      typeDefs = filter (\x -> case x of
+                            ToplevelTypeDef _ -> True
+                            _ -> False) l
+      insts = fmap (mkCheck dlm (typeEnv globalCxt) duC)
               $ (filter (\x -> case x  of
                             DtypeScalarP _ -> False {- pointer type is boring -}
                             _ -> True
                         )
                 ) (Ds.toList vis)
-  in Module (dataLayoutAndTriple  
-             ++ globals
-             ++ (fmap (ToplevelDeclare . TlDeclare) visFunctions)
-             ++ [ToplevelDefine $ defineMain $ concat insts])
+  in SpecializedModule dlm (Module (typeDefs ++ globals
+                                    ++ (fmap (ToplevelDeclare . TlDeclare) visFunctions)
+                                    ++ [ToplevelDefine $ defineMain $ concat insts]))
 
-
-getDataLayoutAndTriple :: Module a -> [Toplevel a]
-getDataLayoutAndTriple (Module l) = filter (\x -> case x of
-                                               ToplevelTriple _ -> True
-                                               ToplevelDataLayout _ -> True
-                                               ToplevelTypeDef _ -> True
-                                               _ -> False) l
-
-
-mkCheck :: TypeEnv -> Dm.Map Dtype Const -> Dtype -> [Node a O O]
-mkCheck te mp dt = [ Comment $ Cstring $ render $ printIr dt
-                   , Comment $ Cstring $ show dt
-                   , Comment $ Cstring $ "SizeInBits:" ++ show (getTypeSizeInBits te dt)
-                   , Comment $ Cstring $ "TypeStoreSize:" ++ show (getTypeStoreSize te dt)
-                   , Comment $ Cstring $ "Alignment:" ++ show (getTypeAlignment te dt AlignAbi) 
-                   , callLog [T (ucast $ ptr0 i8) (ucast $ fromJust $ Dm.lookup dt mp),
-                              ucast (T i64 (llvm_sizeof dt i64)), ucast $ toTC (sizeof te dt)]
-                   ]
+mkCheck :: DataLayoutMetrics dlm => dlm -> TypeEnv -> Dm.Map Dtype Const -> Dtype -> [Node a O O]
+mkCheck dlm te mp dt = [ Comment $ Cstring $ render $ printIr dt
+                       , Comment $ Cstring $ show dt
+                       , Comment $ Cstring $ "SizeInBits:" ++ show (getTypeSizeInBits dlm te dt)
+                       , Comment $ Cstring $ "TypeStoreSize:" ++ show (getTypeStoreSize dlm te dt)
+                       , Comment $ Cstring $ "Alignment:" ++ show (getTypeAlignment dlm te dt AlignAbi) 
+                       , callLog [T (ucast $ ptr0 i8) (ucast $ fromJust $ Dm.lookup dt mp),
+                                  ucast (T i64 (llvm_sizeof dt i64)), ucast $ toTC (sizeof dlm te dt)]
+                       ]
 
 
 callLog :: [T Dtype Value] -> (Node a) O O

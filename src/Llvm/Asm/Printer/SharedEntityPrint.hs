@@ -36,15 +36,13 @@ instance Print Mangling where
     ManglingO -> char 'o'
     ManglingW -> char 'w'
     
-instance Print AbiAlign where    
-  print (AbiAlign n) = print n
-
-instance Print PrefAlign where
-  print (PrefAlign n) = print n
-  
-
 integral :: Integral a => a -> Doc
 integral = integer . fromIntegral
+
+instance Print AlignMetrics where
+  print (AlignMetrics a1 ma2) = print a1 <> sepMaybe print colonSep ma2
+    where
+      colonSep = (char ':' <>)
 
 instance Print LayoutSpec where  
   print ls = case ls of
@@ -53,22 +51,16 @@ instance Print LayoutSpec where
       DlLittleS s1 s2 s3 -> char 's' <> (maybe empty integral s1) 
                             <> sepMaybe integral colonSep s2
                             <> sepMaybe integral colonSep s3
-      DlP as s a n -> char 'p' <> (print as) 
-                      <> colonSep (print s) 
-                      <> colonSep (print a) 
-                      <> sepMaybe print colonSep n
-      DlI s a n -> char 'i' <> (print s)
-                   <> colonSep (print a)
-                   <> sepMaybe print colonSep n
-      DlF s a n -> char 'f' <> (print s)
-                 <> colonSep (print a)
-                 <> sepMaybe print colonSep n
-      DlV s a n -> char 'v' <> (print s)
-                   <> colonSep (print a)
-                   <> sepMaybe print colonSep n
-      DlA s a n -> char 'a' <> (maybe empty print s)
-                   <> colonSep (print a)
-                   <> sepMaybe print colonSep n
+      DlP as s am -> char 'p' <> (print as) 
+                     <> colonSep (print s) 
+                     <> colonSep (print am) 
+      DlI s am -> char 'i' <> (print s)
+                  <> colonSep (print am)
+      DlF s am -> char 'f' <> (print s)
+                  <> colonSep (print am)
+      DlV s am -> char 'v' <> (print s)
+                  <> colonSep (print am)
+      DlA am -> char 'a' <> colonSep (print am)
       DlM m -> char 'm' <> colonSep (print m)
       DlN l -> char 'n' <> (hcat $ punctuate (char ':') $ fmap print l)
     where 
@@ -82,11 +74,6 @@ instance Print IcmpOp where
 
 instance Print FcmpOp where
   print x = text $ getValOrImplError (fcmpOpMap, "fcmpOpMap") x
-
-{-
-instance Print ConvertOp where
-  print x = text $ getValOrImplError (convertOpMap, "convertOpMap") x
--}
 
 instance Print Linkage where
   print LinkagePrivate = text "private"
@@ -224,8 +211,8 @@ instance Print DqString where
 instance Print Section where
   print (Section s) = text "section" <+> (print s)
 
-instance Print Alignment where
-    print (Alignment s) = text "align" <+>  (integral s)
+instance Print AlignInByte where
+    print (AlignInByte s) = text "align" <+>  (integral s)
 
 instance Print Gc where
     print (Gc s) = text "gc" <+> (print s)

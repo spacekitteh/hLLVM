@@ -9,7 +9,7 @@ import Prelude hiding (succ)
 import qualified Compiler.Hoopl as H
 
 import Llvm.Hir.Data
-import Llvm.Query.HirType
+import Llvm.Query.Type
 import Llvm.Util.Monadic (maybeM)
 import Debug.Trace
 

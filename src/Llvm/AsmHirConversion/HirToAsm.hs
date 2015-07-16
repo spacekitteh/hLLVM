@@ -22,6 +22,8 @@ import Llvm.AsmHirConversion.TypeConversion
 import Control.Monad.Reader
 import Llvm.AsmHirConversion.Specialization
 import Llvm.ErrorLoc
+import Llvm.Hir.DataLayoutMetrics
+
 
 
 class Conversion l1 l2 | l1 -> l2 where
@@ -114,13 +116,15 @@ mkConversion (op, t1, u, dt1) = do { u1 <- convert u
                                    ; return $ A.C_conv $ A.Conversion op (A.Typed t1 u1) dt1                                   
                                    }
 
-instance (Conversion v1 (Rm v2), Conversion idx1 (Rm v2)) => Conversion (I.GetElementPtr I.ScalarB v1 idx1) (Rm (A.GetElementPtr v2)) where
+instance (Conversion v1 (Rm v2), Conversion idx1 (Rm v2)) => Conversion (I.GetElementPtr I.ScalarB v1 idx1) 
+         (Rm (A.GetElementPtr v2)) where
   convert (I.GetElementPtr b u us) = do { ua <- convert u
                                         ; usa <- mapM convert us
                                         ; return $ A.GetElementPtr b (A.Pointer ua) usa
                                         }
           
-instance (Conversion v1 (Rm v2), Conversion idx1 (Rm v2)) => Conversion (I.GetElementPtr I.VectorB v1 idx1) (Rm (A.GetElementPtr v2)) where
+instance (Conversion v1 (Rm v2), Conversion idx1 (Rm v2)) => Conversion (I.GetElementPtr I.VectorB v1 idx1) 
+         (Rm (A.GetElementPtr v2)) where
   convert (I.GetElementPtr b u us) = do { ua <- convert u
                                         ; usa <- mapM convert us
                                         ; return $ A.GetElementPtr b (A.Pointer ua) usa
@@ -1318,12 +1322,13 @@ instance Conversion MInstWithDbg (Rm A.ComputingInstWithDbg) where
 instance Conversion TerminatorInstWithDbg (Rm A.TerminatorInstWithDbg) where
   convert (TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
 
-    
+{-    
 instance Conversion I.TlTriple (Rm A.TlTriple) where
   convert (I.TlTriple x) = return (A.TlTriple x)
 
 instance Conversion I.TlDataLayout (Rm A.TlDataLayout) where
   convert (I.TlDataLayout x) = return (A.TlDataLayout x)
+-}
 
 instance Conversion I.TlAlias (Rm A.TlAlias) where  
   convert (I.TlAlias  g v dll tlm na l a) = convertAliasee a >>= return . (A.TlAlias g v dll tlm na l)
@@ -1368,6 +1373,8 @@ instance Conversion I.TlGlobal (Rm A.TlGlobal) where
            a8 a8a (tconvert () a9) a10a a11 a12 a13
          }
     
+--mapAlignInByte = fmap (\(I.AlignInByte n) -> A.Alignment n)
+
 instance Conversion I.TlTypeDef (Rm A.TlTypeDef) where    
   convert x = case x of
     (I.TlFunTypeDef lid t) -> return (A.TlTypeDef lid (tconvert () t))
@@ -1448,8 +1455,6 @@ graphToBlocks g = do { (bl, bs, Nothing) <- H.foldGraphNodes convertNode g (retu
                      }
 
 toplevel2Ast :: I.Toplevel a -> Rm A.Toplevel
-toplevel2Ast (I.ToplevelTriple q) = Md.liftM A.ToplevelTriple (convert q)
-toplevel2Ast (I.ToplevelDataLayout q) = Md.liftM A.ToplevelDataLayout (convert q)
 toplevel2Ast (I.ToplevelAlias g) = Md.liftM A.ToplevelAlias (convert g)
 toplevel2Ast (I.ToplevelUnamedMd s) = Md.liftM (A.ToplevelUnamedMd) (convert s)
 toplevel2Ast (I.ToplevelNamedMd m) = Md.liftM A.ToplevelNamedMd (convert m) 
@@ -1464,5 +1469,9 @@ toplevel2Ast (I.ToplevelComdat l) = Md.liftM A.ToplevelComdat (convert l)
 toplevel2Ast (I.ToplevelAttribute n) = Md.liftM A.ToplevelAttribute (convert n)
 toplevel2Ast (I.ToplevelIntrinsic n) = Md.liftM A.ToplevelGlobal (convert n)
 
-hirToAsm ::  M.Map (A.GlobalId, H.Label) A.LabelId -> I.Module a -> A.Module
-hirToAsm iLm (I.Module ts) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) (ReaderData iLm (A.GlobalIdNum 0))
+hirToAsm ::  DataLayoutMetrics dlm => M.Map (A.GlobalId, H.Label) A.LabelId -> I.SpecializedModule dlm a -> A.Module
+hirToAsm iLm (I.SpecializedModule dlm (I.Module ts)) = 
+  let (A.Module tl) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) (ReaderData iLm (A.GlobalIdNum 0))
+      ls = toLayoutSpec dlm
+      tt = toTriple dlm
+  in A.Module ((A.ToplevelDataLayout $ A.TlDataLayout $ A.DataLayout ls):(A.ToplevelTriple $ A.TlTriple tt):tl)

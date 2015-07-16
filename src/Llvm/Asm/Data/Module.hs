@@ -155,12 +155,12 @@ data Expr = ExprGetElementPtr (GetElementPtr Value)
           deriving (Eq,Ord,Show)
 
 -- | Memory Access and Addressing Operations <http://llvm.org/releases/3.5.0/docs/LangRef.html#memory-access-and-addressing-operations>
-data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe Alignment)
-           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal)
+data MemOp = Alloca (IsOrIsNot InAllocaAttr) Type (Maybe (Typed Value)) (Maybe AlignInByte)
+           | Load (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe AlignInByte) (Maybe Nontemporal)
              (Maybe InvariantLoad) (Maybe Nonnull)
-           | LoadAtomic Atomicity (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe Alignment)
-           | Store (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment) (Maybe Nontemporal)
-           | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe Alignment)
+           | LoadAtomic Atomicity (IsOrIsNot Volatile) (Pointer (Typed Value)) (Maybe AlignInByte)
+           | Store (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe AlignInByte) (Maybe Nontemporal)
+           | StoreAtomic Atomicity (IsOrIsNot Volatile) (Typed Value) (Pointer (Typed Value)) (Maybe AlignInByte)
            | Fence (IsOrIsNot SingleThread) AtomicMemoryOrdering
            | CmpXchg (IsOrIsNot Weak) (IsOrIsNot Volatile) (Pointer (Typed Value)) (Typed Value) (Typed Value)
              (IsOrIsNot SingleThread) AtomicMemoryOrdering AtomicMemoryOrdering
@@ -281,7 +281,7 @@ data FunctionPrototype = FunctionPrototype { fp_linkage :: Maybe Linkage
                                            , fp_fun_attrs :: [FunAttr]
                                            , fp_section :: Maybe Section
                                            , fp_comdat :: Maybe Comdat
-                                           , fp_alignment :: Maybe Alignment
+                                           , fp_alignment :: Maybe AlignInByte
                                            , fp_gc :: Maybe Gc
                                            , fp_prefix :: Maybe Prefix
                                            , fp_prologue :: Maybe Prologue
@@ -334,7 +334,7 @@ data TlGlobal = TlGlobal (Maybe GlobalId)
                 (Maybe Const)
                 (Maybe Section)
                 (Maybe Comdat)
-                (Maybe Alignment)
+                (Maybe AlignInByte)
               deriving (Eq, Show)
 
 data TlTypeDef = TlTypeDef LocalId Type deriving (Eq, Show)

@@ -53,12 +53,6 @@ instance IrPrint a => IrPrint (Maybe a) where
 instance IrPrint Word64 where
   printIr n = integer $ fromIntegral n
 
-instance IrPrint TlTriple where
-  printIr (TlTriple s) = hsep [text "target", text "triple", equals, printIr s]
-
-instance IrPrint TlDataLayout where
-  printIr (TlDataLayout s) = hsep [text "target", text "datalayout", equals, printIr s]
-
 instance IrPrint TlAlias where
   printIr (TlAlias lhs vis dll tlm na link aliasee) =
     hsep [printIr lhs, equals, printIr vis, printIr dll, printIr tlm
@@ -121,8 +115,6 @@ instance IrPrint TlComdat where
   printIr (TlComdat l s) = hsep [printIr l, equals, printIr s]
 
 instance IrPrint a => IrPrint (Toplevel a) where
-  printIr (ToplevelTriple x) = printIr x
-  printIr (ToplevelDataLayout x) = printIr x
   printIr (ToplevelAlias x) = printIr x
   printIr (ToplevelUnamedMd x) = printIr x
   printIr (ToplevelNamedMd x) = printIr x
@@ -139,6 +131,9 @@ instance IrPrint a => IrPrint (Toplevel a) where
 
 instance IrPrint a => IrPrint (Module a) where
   printIr (Module tops) = fcat $ fmap printIr tops
+
+instance (Show dlm, IrPrint a) => IrPrint (SpecializedModule dlm a) where
+  printIr (SpecializedModule dlm m) = text (show dlm) <+> printIr m
 
 instance IrPrint a => IrPrint (Node a e x) where
   printIr (Lnode lbl) = printIr lbl
@@ -928,6 +923,8 @@ instance IrPrint PAttr where
     PReadOnly -> text "readonly"
     PReadNone -> text "readnone"
 
+instance IrPrint AlignInByte where
+  printIr (AlignInByte n) = text "align" <+> (integer $ fromIntegral n)
 
 instance IrPrint IcmpOp where
   printIr = P.print
@@ -975,8 +972,10 @@ instance IrPrint DqString where
 instance IrPrint Section where
   printIr = P.print
 
+{-
 instance IrPrint Alignment where
     printIr = P.print
+-}
 
 instance IrPrint Gc where
     printIr = P.print
@@ -1080,10 +1079,7 @@ instance IrPrint StackAlign where
 instance IrPrint Mangling where
   printIr = P.print
 
-instance IrPrint AbiAlign where
-  printIr = P.print
-
-instance IrPrint PrefAlign where
+instance IrPrint AlignMetrics where
   printIr = P.print
 
 instance IrPrint LayoutSpec where
@@ -1106,7 +1102,3 @@ instance IrPrint TargetTriple where
 
 instance IrPrint VarArgParam where
   printIr = P.print
-
-
-instance IrPrint DataLayoutInfo where
-  printIr (DataLayoutInfo e sa ptrs is fs as ni ml _) = text "datalayout"

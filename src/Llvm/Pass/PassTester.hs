@@ -23,4 +23,4 @@ optModule f (Module l) =
   let gs = globalIdOfModule (Module l)
       dl = irCxtOfModule (Module l)
   in mapM (opt dl gs f) l >>= \x -> let (lx, ly) = unzip $ concat x
-                                 in return (Module lx, ly)
+                                    in return (Module lx, ly)

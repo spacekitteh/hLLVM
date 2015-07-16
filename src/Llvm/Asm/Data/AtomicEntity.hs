@@ -173,8 +173,7 @@ selectionKindMap = M.fromList [(Any, "any"), (ExactMatch, "exactmatch"), (Larges
 
 data Section = Section DqString deriving (Eq,Ord,Show)
 
-data Alignment = Alignment Word32 deriving (Eq,Ord,Show)
-type MaybeAlignment = Maybe Alignment
+data AlignInByte = AlignInByte Word32 deriving (Eq,Ord,Show)
 
 data Gc = Gc DqString deriving (Eq,Ord,Show)
 data GlobalType = GlobalType String deriving (Eq,Ord,Show)
@@ -187,7 +186,7 @@ data GlobalOrLocalId = GolG GlobalId
                      | GolL LocalId
                        deriving (Eq,Ord,Show)
 
-data LocalId = LocalIdNum Word32 -- Integer
+data LocalId = LocalIdNum Word32 
              | LocalIdAlphaNum String
              | LocalIdDqString String
              deriving (Eq,Ord,Show)

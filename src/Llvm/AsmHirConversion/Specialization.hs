@@ -7,7 +7,8 @@ import qualified Llvm.Asm.Data as A
 import Llvm.Hir
 import Llvm.ErrorLoc
 import Data.Maybe
-
+import Llvm.Hir.DataLayoutMetrics
+import Llvm.Hir.Target.Linux_Gnu
 
 #define FLC  (FileLoc $(srcLoc))
 

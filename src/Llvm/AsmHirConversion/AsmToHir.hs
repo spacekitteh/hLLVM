@@ -19,6 +19,7 @@ import Llvm.AsmHirConversion.TypeConversion
 import Data.Maybe (fromJust)
 import Control.Monad.Reader
 import Llvm.AsmHirConversion.Specialization
+import Llvm.Hir.DataLayoutMetrics
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: A.GlobalId
@@ -867,7 +868,8 @@ convert_to_Minst x = case x of
        ; fna <- convert_FunId fn
        ; let ert = A.splitCallReturnType t
        ; apsa <- mapM convert_MetaParam aps                
-       ; return (Just $ specializeMinst $ I.Minst (I.CallSiteTypeRet $ dcast FLC ((tconvert mp (fst ert))::I.Utype)) fna apsa)
+       ; return (Just $ specializeMinst 
+                 $ I.Minst (I.CallSiteTypeRet $ dcast FLC ((tconvert mp (fst ert))::I.Utype)) fna apsa)
        }
   _ -> return Nothing 
 
@@ -1314,8 +1316,7 @@ specializeFirstParamAsRet x = case x of
        ; let (plist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
        ; case bl of 
          [Nothing, _, Nothing, Nothing, _] -> return Nothing
-         [Just _, Nothing, Nothing, Nothing, Just (A.PaAlign n)] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist (Just $ A.Alignment n) va
-         [Just _, Nothing, Nothing, Nothing, Nothing] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist Nothing va
+         [Just _, Nothing, Nothing, Nothing, pa] -> return $ Just $ I.FunOperandAsRet (dcast FLC ta) plist (mapPaAlign pa) va
          [Just _, Just _, _, _, Just (A.PaAlign n)] -> errorLoc FLC "byval cannot be used with sret"
        }
   (A.ActualParamLabel t pa v) ->
@@ -1349,12 +1350,9 @@ convert_ActualParam x = case x of
        ; let preds = [\x -> case x of 
                          A.PaAlign _ -> True
                          _ -> False]
-       ; let (plist, bl) = stripOffPa pa preds
-       ; let ma = case bl of 
-               [Nothing] -> Nothing
-               [Just (A.PaAlign n)] -> Just $ A.Alignment n
+       ; let (plist, [pn]) = stripOffPa pa preds
        ; case ta of
-         I.UtypeLabelX lbl -> return $ I.FunOperandLabel lbl plist ma (I.Val_const $ I.C_labelId va)
+         I.UtypeLabelX lbl -> return $ I.FunOperandLabel lbl plist (mapPaAlign pn) (I.Val_const $ I.C_labelId va)
        }    
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
@@ -1439,7 +1437,8 @@ convert_to_FunParamType x =
      }
 
 
-mapPaAlign pn = (fmap (\(A.PaAlign n) -> A.Alignment n) pn)
+mapPaAlign pn = fmap (\(A.PaAlign n) -> I.AlignInByte n) pn
+
 
 convert_to_FunParamTypeList :: [A.FormalParam] -> MM [I.FunOperand ()]
 convert_to_FunParamTypeList l = 
@@ -1706,11 +1705,13 @@ blockToGraph fn blocks =
      ; return (entry, body)
      }
   
+{-
 convert_TlTriple :: A.TlTriple -> (MM I.TlTriple)
 convert_TlTriple (A.TlTriple x) = return (I.TlTriple x)
   
 convert_TlDataLayout :: A.TlDataLayout -> (MM I.TlDataLayout)
 convert_TlDataLayout (A.TlDataLayout x) = return (I.TlDataLayout x)
+-}
 
 
 convert_TlAlias :: A.TlAlias -> (MM I.TlAlias)
@@ -1779,8 +1780,6 @@ convert_TlComdat (A.TlComdat l s) = return (I.TlComdat l s)
                                                  
 
 toplevel2Ir :: A.Toplevel -> MM (I.Toplevel a)
-toplevel2Ir (A.ToplevelTriple q) = Md.liftM I.ToplevelTriple (convert_TlTriple q)
-toplevel2Ir (A.ToplevelDataLayout q) = Md.liftM I.ToplevelDataLayout (convert_TlDataLayout q)
 toplevel2Ir (A.ToplevelAlias q) = Md.liftM I.ToplevelAlias (convert_TlAlias q)
 toplevel2Ir (A.ToplevelUnamedMd s) = Md.liftM I.ToplevelUnamedMd (convert_TlUnamedMd s)
 toplevel2Ir (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
@@ -1798,9 +1797,29 @@ toplevel2Ir (A.ToplevelModuleAsm q) = Md.liftM I.ToplevelModuleAsm (convert_TlMo
 toplevel2Ir (A.ToplevelAttribute n) = Md.liftM I.ToplevelAttribute (convert_TlAttribute n)
 toplevel2Ir (A.ToplevelComdat l) = Md.liftM I.ToplevelComdat (convert_TlComdat l)
 
-asmToHir :: A.Module -> H.SimpleUniqueMonad (IdLabelMap, I.Module a)
-asmToHir m@(A.Module ts) = 
-  let td = M.fromList $ A.typeDefOfModule m
-  in runLabelMapM emptyIdLabelMap 
-     $ (runReaderT (Md.liftM I.Module (mapM toplevel2Ir ts)) 
-        (ReaderData td (I.GlobalIdNum 0)))
+
+
+filterOutDataLayoutAndTriple :: [A.Toplevel] -> ((A.DataLayout, A.TargetTriple), [A.Toplevel])
+filterOutDataLayoutAndTriple tls = 
+  let [A.ToplevelTriple (A.TlTriple triple)] = filter (\x -> case x of
+                                                          A.ToplevelTriple a -> True
+                                                          _ -> False) tls
+      [A.ToplevelDataLayout (A.TlDataLayout dl)] = filter (\x -> case x of
+                                                              A.ToplevelDataLayout a -> True
+                                                              _ -> False) tls
+  in ((dl, triple), filter (\x -> case x of
+                               A.ToplevelTriple _ -> False
+                               A.ToplevelDataLayout _ -> False
+                               _ -> True) tls)
+                                      
+
+asmToHir :: (Show dlm, DataLayoutMetrics dlm) => dlm -> A.Module -> H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm a)
+asmToHir dlm m@(A.Module ts) = 
+  let ((A.DataLayout dl, tt), ts0) = filterOutDataLayoutAndTriple ts
+      td = M.fromList $ A.typeDefOfModule m
+  in if matchLayoutSpecAndTriple dlm dl tt then
+       runLabelMapM emptyIdLabelMap 
+       $ (runReaderT (Md.liftM (\l -> I.SpecializedModule dlm $ I.Module l) 
+                      (mapM toplevel2Ir ts0)) (ReaderData td (I.GlobalIdNum 0)))
+     else 
+       error $ show (dl,tt) ++ " does not match " ++ show dlm

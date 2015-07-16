@@ -24,6 +24,7 @@ import System.Exit
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List (stripPrefix)
+import Llvm.Matcher
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -151,13 +152,15 @@ main = do { sel <- cmdArgsRun mode
                                    ; hClose inh
                                    ; closeFileOrStdout ox outh
                                    }
-
             Ast2Ir ix ox -> do { inh <- openFile ix ReadMode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = A.simplify ast
-                               ; let (m, ir) = H.runSimpleUniqueMonad ((Cv.asmToHir ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.Module ()))
+                                     {-
+                               ; let (I.SpecializedModule _ ir) = mapModule id Nothing ast'
+                                     -- ; let (m, ir) = H.runSimpleUniqueMonad ((Cv.asmToHir ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.Module ()))
                                ; writeOutIr ir outh
+                                     -}
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
@@ -165,8 +168,7 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = A.simplify ast
-                               ; let (m, ir) = testAst2Ir ast'
-                                     ast'' = testIr2Ast m ir
+                               ; let ast'' = transformModule id Nothing ast' 
                                ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -176,9 +178,7 @@ main = do { sel <- cmdArgsRun mode
                  ; outh <- openFileOrStdout ox
                  ; ast <- testParser ix inh
                  ; let ast' = A.simplify ast
-                 ; let (m, ir) = testAst2Ir ast'
-                       testIr = Tveri.mkVerificationModule (ir::I.Module ())
-                       ast'' = testIr2Ast m testIr
+                 ; let ast'' = transformModule (Tveri.mkVerificationModule) Nothing ast' -- testIr2Ast m testIr
                  ; writeOutLlvm ast'' outh
                  ; hClose inh
                  ; closeFileOrStdout ox outh
@@ -187,8 +187,7 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = A.simplify ast
-                               ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
-                                     ast'' = Cv.hirToAsm (Sub.substitute chg $ Cv.invertMap (Cv.a2h m)) (Sub.substitute chg ir)
+                               ; let ast'' = transformModule2  (\(I.SpecializedModule dlm m) -> (I.SpecializedModule dlm $ Sub.substitute chg m, Sub.substitute chg)) Nothing ast' 
                                ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -197,9 +196,7 @@ main = do { sel <- cmdArgsRun mode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh
                                   ; let ast' = A.simplify ast
-                                  ; let (m, ir::I.Module I.NOOP) = testAst2Ir ast'
-                                        ir1 = Vis.visualize (Vis.sampleVisualPlugin) ir
-                                        ast'' = testIr2Ast m ir1
+                                  ; let ast'' = transformModule (\(I.SpecializedModule dlm m) -> I.SpecializedModule dlm $ Vis.visualize (Vis.sampleVisualPlugin dlm) m) Nothing ast'
                                   ; writeOutLlvm ast'' outh
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh
@@ -208,17 +205,18 @@ main = do { sel <- cmdArgsRun mode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
                                    ; let ast' = A.simplify ast
-                                   ; let (m, ir@(I.Module ls)::I.Module I.NOOP) = testAst2Ir ast'
-                                         irCxt = irCxtOfModule ir
-                                         srcInfo1 = srcInfoMap (unamedMetadata $ globalCxt irCxt)
-                                         sl = foldl (\p s -> case s of
-                                                        I.ToplevelDefine tld -> 
-                                                          (localIdSrcInfoMap (unamedMetadata $ globalCxt irCxt) (dbgDeclares $ funCxtOfTlDefine tld)):p
-                                                        _ -> 
-                                                          p
-                                                    ) [] ls
-                                   ; writeOutIr srcInfo1 outh
-                                   ; writeOutIr (reverse sl) outh
+                                   ; let (srcInfo2, sl2) = mapModule 
+                                                           (\(I.SpecializedModule _ ir@(I.Module ls)) -> -- (m, ir@(I.Module ls)::I.Module I.NOOP) = testAst2Ir ast'
+                                                             let irCxt = irCxtOfModule ir
+                                                                 srcInfo1 = srcInfoMap (unamedMetadata $ globalCxt irCxt)
+                                                                 sl = foldl (\p s -> case s of
+                                                                                I.ToplevelDefine tld -> 
+                                                                                  (localIdSrcInfoMap (unamedMetadata $ globalCxt irCxt) (dbgDeclares $ funCxtOfTlDefine tld)):p
+                                                                                _ -> p
+                                                                            ) [] ls
+                                                             in (srcInfo1, sl)) Nothing ast'
+                                   ; writeOutIr srcInfo2 outh
+                                   ; writeOutIr (reverse sl2) outh
                                    ; hClose inh
                                    ; closeFileOrStdout ox outh
                                    }
@@ -226,10 +224,10 @@ main = do { sel <- cmdArgsRun mode
                                    ; outh <- openFileOrStdout ox
                                    ; ast <- testParser ix inh
                                    ; let ast1 = A.simplify ast
-                                   ; let (m, ir) = testAst2Ir ast1
-                                   ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f 
-                                               ((O.optModule1 () N.fixUpPhi ir):: H.SimpleFuelMonad (I.Module ()))
-                                   ; let ast2 = testIr2Ast m ir1
+                                   {-; let (m, ir) = testAst2Ir ast1-}
+                                   {-; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f 
+                                               ((O.optModule1 () N.fixUpPhi ir):: H.SimpleFuelMonad (I.Module ())) -}
+                                   ; let ast2 = ast1 -- undefined -- transformModule (\ir -> H.runSimpleUniqueMonad $ H.runWithFuel f (O.optModule1 () N.fixUpPhi ir)) Nothing ast1 --testIr2Ast m ir1
                                    ; writeOutLlvm ast2 outh
                                    ; hClose inh
                                    ; closeFileOrStdout ox outh
@@ -238,10 +236,12 @@ main = do { sel <- cmdArgsRun mode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh
                                   ; let ast' = A.simplify ast
-                                  ; let (m, ir::I.Module ()) = testAst2Ir ast'
-                                  ; let ic = irCxtOfModule ir
-                                  ; let liv = H.runSimpleUniqueMonad $ H.runWithFuel f
-                                              ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionInterface Du.DataUsage))
+                                  ; let liv = mapModule (\(I.SpecializedModule _ ir) -> 
+                                                          let ic = irCxtOfModule ir
+                                                          in 
+                                                           H.runSimpleUniqueMonad $ H.runWithFuel f
+                                                           ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionInterface Du.DataUsage))
+                                                        ) Nothing ast'
                                   ; writeOutIr liv outh
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh
@@ -250,24 +250,20 @@ main = do { sel <- cmdArgsRun mode
                                       ; outh <- openFileOrStdout ox
                                       ; ast <- testParser ix inh
                                       ; let ast1 = A.simplify ast
+                                            {-
                                       ; let (m, ir) = testAst2Ir ast1
                                       ; let applySteps' = applySteps (extractSteps passes) ir
                                       ; let ir1 = H.runSimpleUniqueMonad $ H.runWithFuel f 
                                                   (applySteps' :: H.SimpleFuelMonad (I.Module ()))
                                       ; let ir2 = H.runSimpleUniqueMonad $ H.runWithFuel f 
-                                                  ((O.optModule1 () N.fixUpPhi ir1) :: H.SimpleFuelMonad (I.Module ()))
-                                      ; let ast2 = testIr2Ast m ir2
+                                                  ((O.optModule1 () N.fixUpPhi ir1) :: H.SimpleFuelMonad (I.Module ())) -}
+                                      ; let ast2 = ast1 -- undefined -- testIr2Ast m ir2
                                       ; writeOutLlvm ast2 outh
                                       ; hClose inh
                                       ; closeFileOrStdout ox outh
                                       }
             _ -> error $ "unexpected option " ++ show sel
           }
-   where
-      testAst2Ir e = H.runSimpleUniqueMonad $ Cv.asmToHir e
-      testIr2Ast m e = Cv.hirToAsm (Cv.invertMap (Cv.a2h m)) e
-
-
 
 openFileOrStdout :: Maybe FilePath -> IO Handle
 openFileOrStdout Nothing = return stdout

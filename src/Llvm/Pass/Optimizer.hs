@@ -8,8 +8,8 @@ import qualified Data.Set as Ds
 type Optimization m a u = a -> H.Label -> H.Graph (Node u) H.C H.C -> m (H.Graph (Node u) H.C H.C)
   
 opt :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a u -> (Toplevel u) -> m (Toplevel u)
-opt _ _ (ToplevelTriple s) = return $ ToplevelTriple s
-opt _ _ (ToplevelDataLayout s) = return $ ToplevelDataLayout s
+-- opt _ _ (ToplevelTriple s) = return $ ToplevelTriple s
+-- opt _ _ (ToplevelDataLayout s) = return $ ToplevelDataLayout s
 opt _ _ (ToplevelAlias s) = return $ ToplevelAlias s
 opt _ _ (ToplevelUnamedMd s) = return $ ToplevelUnamedMd s
 opt _ _ (ToplevelNamedMd v) = return $ ToplevelNamedMd v

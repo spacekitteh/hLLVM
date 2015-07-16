@@ -277,13 +277,13 @@ data Cinst where {
   I_alloca :: { inAllocaAttr :: IsOrIsNot InAllocaAttr
               , dtype :: Dtype
               , size :: Maybe (T (Type ScalarB I) Value)
-              , alignment :: Maybe Alignment
+              , alignment :: Maybe AlignInByte
               , result :: LocalId
               } -> Cinst;
 
   I_load :: { volatile :: IsOrIsNot Volatile
             , pointer :: T (Type ScalarB P) Value
-            , alignment :: Maybe Alignment
+            , alignment :: Maybe AlignInByte
             , temporal :: Maybe Nontemporal
             , invariantLoad :: Maybe InvariantLoad
             , nonull :: Maybe Nonnull
@@ -293,14 +293,14 @@ data Cinst where {
   I_loadatomic :: { atomicity :: Atomicity
                   , volatile :: IsOrIsNot Volatile
                   , pointer :: T (Type ScalarB P) Value
-                  , alignment :: Maybe Alignment
+                  , alignment :: Maybe AlignInByte
                   , result :: LocalId
                   } -> Cinst;
 
   I_store :: { volatile :: IsOrIsNot Volatile
              , storedvalue :: T Dtype Value
              , pointer :: T (Type ScalarB P) Value
-             , alignment :: Maybe Alignment
+             , alignment :: Maybe AlignInByte
              , nontemporal :: Maybe Nontemporal
              } -> Cinst;
 
@@ -308,7 +308,7 @@ data Cinst where {
                    , volatile :: IsOrIsNot Volatile
                    , storedvalue :: T Dtype Value
                    , pointer :: T (Type ScalarB P) Value
-                   , alignment :: Maybe Alignment
+                   , alignment :: Maybe AlignInByte
                    } -> Cinst;
 
   I_fence :: { singleThread :: IsOrIsNot SingleThread
@@ -1026,7 +1026,7 @@ data Minst = Minst CallSiteType GlobalId [MetaOperand]
 
 
 data MetaOperand = MetaOperandMeta MetaKindedConst
-                 | MetaOperandData Dtype [ParamAttr] (Maybe Alignment) Value
+                 | MetaOperandData Dtype [ParamAttr] (Maybe AlignInByte) Value
                  deriving (Eq, Ord, Show)
 {- -}
 -- | Terminator instructions cause control flow transferring and
@@ -1080,7 +1080,7 @@ data FunctionInterface = FunctionInterface { fi_linkage :: Maybe Linkage
                                            , fi_fun_attrs :: [FunAttr]
                                            , fi_section :: Maybe Section
                                            , fi_comdat :: Maybe Comdat
-                                           , fi_alignment :: Maybe Alignment
+                                           , fi_alignment :: Maybe AlignInByte --ment
                                            , fi_gc :: Maybe Gc
                                            , fi_prefix :: Maybe Prefix
                                            , fi_prologue :: Maybe Prologue
@@ -1099,11 +1099,11 @@ data FunSignature a = FunSignature { fs_callConv ::  CallConv
                                    , fs_params :: [FunOperand a]
                                    } deriving (Eq, Ord, Show)
 
-data FunOperand a = FunOperandData Dtype [PAttr] (Maybe Alignment) a
-                  | FunOperandExt Ext Dtype [PAttr] (Maybe Alignment) a
-                  | FunOperandAsRet Dtype [PAttr] (Maybe Alignment) a
-                  | FunOperandByVal Dtype [PAttr] (Maybe Alignment) a
-                  | FunOperandLabel (Type CodeLabelB X) [PAttr] (Maybe Alignment) a
+data FunOperand a = FunOperandData Dtype [PAttr] (Maybe AlignInByte) a
+                  | FunOperandExt Ext Dtype [PAttr] (Maybe AlignInByte) a
+                  | FunOperandAsRet Dtype [PAttr] (Maybe AlignInByte) a
+                  | FunOperandByVal Dtype [PAttr] (Maybe AlignInByte) a
+                  | FunOperandLabel (Type CodeLabelB X) [PAttr] (Maybe AlignInByte) a
                   deriving (Eq,Ord,Show)
                            
 data PAttr = PInReg

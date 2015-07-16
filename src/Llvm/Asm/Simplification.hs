@@ -3,6 +3,7 @@
 module Llvm.Asm.Simplification (simplify) where
 
 import Llvm.Asm.Data
+import Llvm.Asm.Data.Default
 import qualified Data.Map as M
 import qualified Data.Set as St
 import qualified Control.Monad.State as S
@@ -798,6 +799,26 @@ rnInsertValue2 f (InsertValue v1 v2 s) = S.liftM2 (\x y -> InsertValue x y s)
                                          (f v1) (f v2)
 
 
+normalizeDataLayoutAndTargetTriple :: [Toplevel] -> [Toplevel]
+normalizeDataLayoutAndTargetTriple tl = 
+  let hasTriple = \x -> case x of
+        ToplevelTriple _ -> True
+        _ -> False
+      hasDataLayout = \x -> case x of  
+        ToplevelDataLayout _ -> True
+        _ -> False
+  in if (any hasTriple tl) && (any hasDataLayout tl) then
+       tl
+     else if any hasTriple tl then
+            error $ show tl
+          else if any hasDataLayout tl then
+                 error $ show tl
+               else 
+                 (ToplevelDataLayout $ TlDataLayout defaultDataLayout):(ToplevelTriple $ TlTriple defaultTargetTriple):tl
+                                                      
+  
 simplify :: Module -> Module
 simplify (Module ml) = let (sl, ml1) = iter1 ml
-                       in Module (iter2 ml1 sl)
+                       in Module $ normalizeDataLayoutAndTargetTriple (iter2 ml1 sl)
+
+

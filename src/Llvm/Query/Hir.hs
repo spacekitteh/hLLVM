@@ -22,17 +22,6 @@ globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty 
 {- a transformation might add globals to a module, LLVM does not allow duplicate global 
    declarations. This function finds out what are not declared. 
 -}
-{-
-selectUndeclaredTlGlobals :: Module a -> [TlGlobal] -> [TlGlobal]
-selectUndeclaredTlGlobals (Module l) = 
-  let s = S.foldl (\p e -> case e of
-                      ToplevelGlobal (TlGlobalDtype{..}) -> maybe p (flip S.insert p) tlg_lhs
-                      ToplevelGlobal (TlGlobalOpaque{..}) -> maybe p (flip S.insert p) tlg_lhs   
-                      _ -> p
-                  ) S.empty l
-  in filter (\x -> case x of
-                TlGlobalDtype{..} -> maybe 
--}
 
 data SingleConstAddr = SingleConstAddr { globalId :: Either (GlobalId, Label) GlobalId
                                        , reconstructor :: Const -> Const

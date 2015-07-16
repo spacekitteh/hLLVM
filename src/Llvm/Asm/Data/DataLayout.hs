@@ -13,12 +13,20 @@ data LayoutAddrSpace = LayoutAddrSpace Word32
 data StackAlign = StackAlign AlignInBit
                 | StackAlignUnspecified deriving (Eq, Ord, Show)
 
+
+
 data SizeInBit = SizeInBit Word96 deriving (Eq, Ord, Show)
 data AlignInBit = AlignInBit Word32 deriving (Eq, Ord, Show)
 
+data AlignMetrics = AlignMetrics { abi :: AlignInBit
+                                 , pref :: Maybe AlignInBit
+                                 } deriving (Eq, Ord, Show)
+                    
+{-
 data AbiAlign = AbiAlign AlignInBit deriving (Eq, Ord, Show)
 
 data PrefAlign = PrefAlign AlignInBit deriving (Eq, Ord, Show)
+-}
 
 data Mangling = ManglingE
               | ManglingM
@@ -28,11 +36,11 @@ data Mangling = ManglingE
 data LayoutSpec = DlE Endianness
                 | DlS StackAlign
                 | DlLittleS (Maybe Word32) (Maybe Word32) (Maybe Word32)
-                | DlP LayoutAddrSpace SizeInBit AbiAlign (Maybe PrefAlign)
-                | DlI SizeInBit AbiAlign (Maybe PrefAlign)
-                | DlF SizeInBit AbiAlign (Maybe PrefAlign)
-                | DlV SizeInBit AbiAlign (Maybe PrefAlign) 
-                | DlA (Maybe SizeInBit) AbiAlign (Maybe PrefAlign)
+                | DlP LayoutAddrSpace SizeInBit AlignMetrics 
+                | DlI SizeInBit AlignMetrics 
+                | DlF SizeInBit AlignMetrics
+                | DlV SizeInBit AlignMetrics
+                | DlA AlignMetrics
                 | DlM Mangling
                 | DlN [SizeInBit] deriving (Eq, Ord, Show)
                 
