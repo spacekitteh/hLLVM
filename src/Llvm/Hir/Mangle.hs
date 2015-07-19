@@ -31,7 +31,7 @@ instance (Mangle l, Mangle r) => Mangle (Either l r) where
 instance (Mangle l, Mangle r) => Mangle (l, r) where  
   mangle (l,r) = mangle l ++ mangle r
 
-instance Mangle Const where
+instance (IrPrint g, Mangle g) => Mangle (Const g) where
   mangle c = replaceDq $ render $ printIr c
 
 instance Mangle Dtype where

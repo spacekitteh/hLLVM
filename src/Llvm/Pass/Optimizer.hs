@@ -5,11 +5,9 @@ import Llvm.Query.Hir
 import qualified Compiler.Hoopl as H 
 import qualified Data.Set as Ds
 
-type Optimization m a u = a -> H.Label -> H.Graph (Node u) H.C H.C -> m (H.Graph (Node u) H.C H.C)
+type Optimization m a g u = a -> H.Label -> H.Graph (Node g u) H.C H.C -> m (H.Graph (Node g u) H.C H.C)
   
-opt :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a u -> (Toplevel u) -> m (Toplevel u)
--- opt _ _ (ToplevelTriple s) = return $ ToplevelTriple s
--- opt _ _ (ToplevelDataLayout s) = return $ ToplevelDataLayout s
+opt :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a g u -> (Toplevel g u) -> m (Toplevel g u)
 opt _ _ (ToplevelAlias s) = return $ ToplevelAlias s
 opt _ _ (ToplevelUnamedMd s) = return $ ToplevelUnamedMd s
 opt _ _ (ToplevelNamedMd v) = return $ ToplevelNamedMd v
@@ -26,11 +24,11 @@ opt _ _ (ToplevelComdat s) = return $ ToplevelComdat s
 opt _ _ (ToplevelAttribute s) = return $ ToplevelAttribute s
 
 
-optModule :: (H.CheckpointMonad m, H.FuelMonad m) => Optimization m (Ds.Set (Dtype, GlobalId)) u -> Module u -> m (Module u)
+optModule :: (H.CheckpointMonad m, H.FuelMonad m, Ord g) => Optimization m (Ds.Set (Dtype, GlobalId g)) g u -> Module g u -> m (Module g u)
 optModule f (Module l) = 
   let gs = globalIdOfModule (Module l)
   in mapM (opt gs f) l >>= return . Module
 
-optModule1 :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a u -> Module u -> m (Module u)
+optModule1 :: (H.CheckpointMonad m, H.FuelMonad m) => a -> Optimization m a g u -> Module g u -> m (Module g u)
 optModule1 a f (Module l) = 
   mapM (opt a f) l >>= return . Module

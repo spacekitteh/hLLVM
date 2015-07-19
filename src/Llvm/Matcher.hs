@@ -10,14 +10,16 @@ import Llvm.Hir.Target.Linux_Gnu
 import Llvm.Hir.DataLayoutMetrics
 
 
-filterOutDataLayoutAndTriple :: [A.Toplevel] -> (([A.LayoutSpec], A.TargetTriple), [A.Toplevel]) -- (A.DataLayout, A.Triple)
+filterOutDataLayoutAndTriple :: [A.Toplevel] -> (([A.LayoutSpec], A.TargetTriple), [A.Toplevel])
 filterOutDataLayoutAndTriple tls = 
-  let [A.ToplevelTriple (A.TlTriple triple)] = filter (\x -> case x of
-                                                          A.ToplevelTriple a -> True
-                                                          _ -> False) tls
-      [A.ToplevelDataLayout (A.TlDataLayout (A.DataLayout dl))] = filter (\x -> case x of
-                                                                             A.ToplevelDataLayout a -> True
-                                                                             _ -> False) tls
+  let [A.ToplevelTriple (A.TlTriple triple)] = 
+        filter (\x -> case x of
+                   A.ToplevelTriple a -> True
+                   _ -> False) tls
+      [A.ToplevelDataLayout (A.TlDataLayout (A.DataLayout dl))] = 
+        filter (\x -> case x of
+                   A.ToplevelDataLayout a -> True
+                   _ -> False) tls
   in ((dl, triple), filter (\x -> case x of
                                A.ToplevelTriple _ -> False
                                A.ToplevelDataLayout _ -> False
@@ -27,7 +29,7 @@ filterOutDataLayoutAndTriple tls =
 getDT :: A.Module -> ([A.LayoutSpec], A.TargetTriple)
 getDT (A.Module l) = fst $ filterOutDataLayoutAndTriple l
 
-mapModule :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () -> b) -> Maybe dlm -> A.Module -> b
+mapModule :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () () -> b) -> Maybe dlm -> A.Module -> b
 mapModule f Nothing m = let (ls, tt) = getDT m
                         in if isI386_Pc_Linux_Gnu ls tt then
                              let (_, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir I386_Pc_Linux_Gnu m
@@ -35,12 +37,11 @@ mapModule f Nothing m = let (ls, tt) = getDT m
                            else
                              error $ "unsupported target"
 
-
-transformModule :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () -> I.SpecializedModule x ()) -> Maybe dlm -> A.Module -> A.Module 
+transformModule :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () () -> I.SpecializedModule x () ()) -> Maybe dlm -> A.Module -> A.Module 
 transformModule f Nothing m = transformModule2 (\x -> (f x, id)) Nothing m
-       
-transformModule2 :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () -> 
-                     (I.SpecializedModule x (), M.Map (A.GlobalId, H.Label) A.LabelId -> M.Map (A.GlobalId, H.Label) A.LabelId)) -> Maybe dlm -> A.Module -> A.Module 
+
+transformModule2 :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () () -> 
+                     (I.SpecializedModule x () (), M.Map (I.GlobalId (), H.Label) A.LabelId -> M.Map (I.GlobalId (), H.Label) A.LabelId)) -> Maybe dlm -> A.Module -> A.Module 
 transformModule2 f  Nothing m = 
   let (ls, tt) = getDT m
   in if isI386_Pc_Linux_Gnu ls tt then

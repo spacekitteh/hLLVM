@@ -1,4 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleInstances, GADTs, RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleInstances, GADTs
+, RecordWildCards, FunctionalDependencies #-}
 
 module Llvm.Hir.Cast where
 import Llvm.Hir.Data.Inst
@@ -38,7 +39,7 @@ instance Dcast l l where
   
 {- A datum that can be casted to a constant -}
 class Cvalue x where
-  toConst :: x -> Const
+  toConst :: x -> Const g
 
 instance Cvalue Int32 where
   toConst = C_s32
@@ -54,16 +55,19 @@ instance Cvalue Word64 where
 
 {- A data that can be casted to a value -}
 class Rvalue x where
-  toRvalue :: x -> Value
+  toRvalue :: x -> Value g
 
 instance Rvalue LocalId where
   toRvalue = Val_ssa
 
-instance Rvalue GlobalId where  
-  toRvalue = Val_const . C_globalAddr
 
-instance Rvalue Const where
+{-
+instance Rvalue (GlobalId g) g where
+  toRvalue g = Val_const (C_globalAddr g)
+
+instance Rvalue (Const g) g where
   toRvalue = Val_const 
+-}
 
 instance Rvalue Int32 where
   toRvalue = Val_const . C_s32 
@@ -79,7 +83,7 @@ instance Rvalue Word64 where
  indexing memory elements. 
 -}
 class TC x where
-  toTC :: x -> T (Type ScalarB I) Const
+  toTC :: x -> T (Type ScalarB I) (Const g)
 
 instance TC Word32 where
   toTC x = T (TpI 32) (toConst x)
@@ -93,7 +97,7 @@ instance TC Int32 where
 
 {- Typed Integer Value. -}
 class TV x where
-  toTV :: x -> T (Type ScalarB I) Value
+  toTV :: x -> T (Type ScalarB I) (Value g)
 
 instance TV Word32 where
   toTV x = T (TpI 32) (toRvalue x)
@@ -102,36 +106,36 @@ instance TV Int32 where
   toTV x = T (TpI 32) (toRvalue x)
   
   
-toTVs :: TV x => [x] -> [T (Type ScalarB I) Value]   
+toTVs :: TV x => [x] -> [T (Type ScalarB I) (Value g)]   
 toTVs l = fmap toTV l
 
-toTCs :: TC x => [x] -> [T (Type ScalarB I) Const]   
+toTCs :: TC x => [x] -> [T (Type ScalarB I) (Const g)]   
 toTCs l = fmap toTC l
 
-i32sToTvs :: [Int32] -> [T (Type ScalarB I) Value]
+i32sToTvs :: [Int32] -> [T (Type ScalarB I) (Value g)]
 i32sToTvs = toTVs
   
-i32sToTcs :: [Int32] -> [T (Type ScalarB I) Const]
+i32sToTcs :: [Int32] -> [T (Type ScalarB I) (Const g)]
 i32sToTcs = toTCs
 
-u32sToTvs :: [Word32] -> [T (Type ScalarB I) Value]
+u32sToTvs :: [Word32] -> [T (Type ScalarB I) (Value g)]
 u32sToTvs = toTVs
 
-u32sToTcs :: [Word32] -> [T (Type ScalarB I) Const]
+u32sToTcs :: [Word32] -> [T (Type ScalarB I) (Const g)]
 u32sToTcs = toTCs
 
-i32ToTv :: Int32 -> T (Type ScalarB I) Value
+i32ToTv :: Int32 -> T (Type ScalarB I) (Value g)
 i32ToTv = toTV
             
-u32ToTv :: Word32 -> T (Type ScalarB I) Value            
+u32ToTv :: Word32 -> T (Type ScalarB I) (Value g)            
 u32ToTv = toTV
 
 
 
-instance Ucast Const Value where
+instance Ucast (Const g) (Value g) where
   ucast = Val_const
 
-instance Dcast Value Const where
+instance Show g => Dcast (Value g) (Const g) where
   dcast lc x = case x of
     Val_const v -> v
     _ -> dcastError lc "Const" x
@@ -141,7 +145,6 @@ instance (Ucast t s, Ucast u v) => Ucast (T t u) (T s v) where
 
 instance (Dcast s t, Dcast v u) => Dcast (T s v) (T t u) where
   dcast lc (T s v) = T (dcast lc s) (dcast lc v)
-
 
 
 
@@ -643,6 +646,11 @@ instance Ucast (Type VectorB I) (IntOrPtrType VectorB) where
 instance Ucast (Type VectorB P) (IntOrPtrType VectorB) where
   ucast x = let (x1::Utype) = ucast x
             in dcast (FileLoc "irrefutable") x1
+
+{-
+instance Ucast (Value g) (Value g) where
+  ucast = id
+-}
 
 squeeze :: FileLoc -> Type RecordB D -> Type FirstClassB D
 squeeze loc x = case x of

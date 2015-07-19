@@ -30,6 +30,7 @@ toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
 toStep _ = Nothing
 
+chg :: Cg.Changer () ()
 chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of 
                              I.GlobalIdAlphaNum s -> case stripPrefix "llvm." s of
                                Nothing -> I.GlobalIdAlphaNum (s ++ "_g_")
@@ -187,7 +188,9 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = A.simplify ast
-                               ; let ast'' = transformModule2  (\(I.SpecializedModule dlm m) -> (I.SpecializedModule dlm $ Sub.substitute chg m, Sub.substitute chg)) Nothing ast' 
+                               ; let ast'' = transformModule2  
+                                             (\(I.SpecializedModule dlm m) -> 
+                                               (I.SpecializedModule dlm $ Sub.substitute chg m, Sub.substitute chg)) Nothing ast' 
                                ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -240,7 +243,7 @@ main = do { sel <- cmdArgsRun mode
                                                           let ic = irCxtOfModule ir
                                                           in 
                                                            H.runSimpleUniqueMonad $ H.runWithFuel f
-                                                           ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionInterface Du.DataUsage))
+                                                           ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map (I.FunctionInterface ()) (Du.DataUsage ())))
                                                         ) Nothing ast'
                                   ; writeOutIr liv outh
                                   ; hClose inh

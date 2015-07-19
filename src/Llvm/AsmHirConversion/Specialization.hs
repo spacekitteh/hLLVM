@@ -12,6 +12,34 @@ import Llvm.Hir.Target.Linux_Gnu
 
 #define FLC  (FileLoc $(srcLoc))
 
+specializeGlobalId :: A.GlobalId -> GlobalId g
+specializeGlobalId x = case x of
+  A.GlobalIdNum v -> GlobalIdNum v
+  A.GlobalIdAlphaNum v -> GlobalIdAlphaNum v
+  A.GlobalIdDqString v -> GlobalIdDqString v
+
+unspecializeGlobalId :: Show g =>  GlobalId g -> A.GlobalId
+unspecializeGlobalId x = case x of
+  GlobalIdNum v -> A.GlobalIdNum v
+  GlobalIdAlphaNum v -> A.GlobalIdAlphaNum v
+  GlobalIdDqString v -> A.GlobalIdDqString v
+  GlobalIdSpecialized _ -> errorLoc FLC $ "all specialized globalId should be converted to normal globalid, but " ++ show x
+
+
+specializeDollarId :: A.DollarId -> DollarId g
+specializeDollarId x = case x of
+  A.DollarIdNum v -> DollarIdNum v
+  A.DollarIdAlphaNum v -> DollarIdAlphaNum v
+  A.DollarIdDqString v -> DollarIdDqString v
+
+unspecializeDollarId :: Show g =>  DollarId g -> A.DollarId
+unspecializeDollarId x = case x of
+  DollarIdNum v -> A.DollarIdNum v
+  DollarIdAlphaNum v -> A.DollarIdAlphaNum v
+  DollarIdDqString v -> A.DollarIdDqString v
+  DollarIdSpecialized _ -> errorLoc FLC $ "all specialized globalId should be converted to normal globalid, but " ++ show x
+
+
 specializePAttr :: ParamAttr -> PAttr
 specializePAttr x = case x of
   PaInReg -> PInReg
@@ -72,13 +100,13 @@ unspecializeParamAsRetAttr x = case x of
 
 specializeRegisterIntrinsic :: Maybe LocalId -> A.CallSite -> Maybe (Maybe LocalId, MemLen, [A.ActualParam])
 specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
-  (Just r, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (GlobalIdAlphaNum nm))) [m] _) 
+  (Just r, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (A.GlobalIdAlphaNum nm))) [m] _) 
     | (nm == "llvm.read_register.i32" || nm == "llvm.read_register.i64") -> 
       let ml = case nm of
             "llvm.read_register.i32" -> MemLenI32
             "llvm.read_register.i64" -> MemLenI64
       in Just (Just r, ml, [m])
-  (Nothing, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (GlobalIdAlphaNum nm))) [m,v] _) 
+  (Nothing, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (A.GlobalIdAlphaNum nm))) [m,v] _) 
     | (nm == "llvm.write_register.i32" || nm == "llvm.write_register.i64") -> 
       let ml = case nm of
             "llvm.write_register.i32" -> MemLenI32
@@ -86,7 +114,7 @@ specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
       in Just (Nothing, ml, [m,v])
   (_, _) -> Nothing
 
-unspecializeRegisterIntrinsic :: Cinst -> Maybe (GlobalId, Type ScalarB I, [MetaOperand], Maybe LocalId)
+unspecializeRegisterIntrinsic :: Cinst a -> Maybe (GlobalId a, Type ScalarB I, [MetaOperand a], Maybe LocalId)
 unspecializeRegisterIntrinsic cinst = case cinst of
   I_llvm_read_register mLen mc r ->
     let (nm, typ) = case mLen of
@@ -101,7 +129,7 @@ unspecializeRegisterIntrinsic cinst = case cinst of
   _ -> Nothing
 
 
-specializeCallSite :: Maybe LocalId -> FunPtr -> CallFunInterface -> Maybe Cinst
+specializeCallSite :: Maybe LocalId -> FunPtr a -> CallFunInterface a -> Maybe (Cinst a)
 specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   (FunId (GlobalIdAlphaNum "llvm.va_start"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
@@ -154,7 +182,7 @@ specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   _ -> Nothing
 
 
-unspecializeIntrinsics :: Cinst -> Maybe Cinst
+unspecializeIntrinsics :: Cinst a -> Maybe (Cinst a)
 unspecializeIntrinsics inst = case inst of
   I_llvm_va_start v -> 
     Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_start")) 
@@ -250,10 +278,10 @@ unspecializeIntrinsics inst = case inst of
                      } Nothing
   _ -> Nothing
     
-tvToAp :: Ucast t Dtype => T t Value -> FunOperand Value
+tvToAp :: Ucast t Dtype => T t (Value g) -> FunOperand (Value g)
 tvToAp (T t v) = FunOperandData (ucast t) [] Nothing v
                  
-specializeTlGlobal :: TlGlobal -> Maybe TlIntrinsic
+specializeTlGlobal :: TlGlobal g -> Maybe (TlIntrinsic g)
 specializeTlGlobal tl = case tl of
   TlGlobalDtype {..} -> case tlg_lhs of
     GlobalIdAlphaNum nm | (nm == "llvm.used" 
@@ -271,7 +299,7 @@ specializeTlGlobal tl = case tl of
   _ -> Nothing
   
   
-unspecializeTlIntrinsics :: TlIntrinsic -> TlGlobal  
+unspecializeTlIntrinsics :: TlIntrinsic g -> TlGlobal g
 unspecializeTlIntrinsics tl = case tl of
   TlIntrinsic_llvm_used ty cnst sec -> mkGlobal "llvm.used" ty cnst sec
   TlIntrinsic_llvm_compiler_used ty cnst sec -> mkGlobal "llvm.compiler.used" ty cnst sec  
@@ -295,7 +323,7 @@ unspecializeTlIntrinsics tl = case tl of
       
     
     
-specializeMinst :: Minst -> Minst    
+specializeMinst :: Minst g -> Minst g
 specializeMinst mi = case mi of
   Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.declare") [m1,m2] ->  M_llvm_dbg_declare m1 m2
   Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.value") [m1,m2,m3] -> M_llvm_dbg_value m1 m2 m3
@@ -305,7 +333,7 @@ specializeMinst mi = case mi of
   _ -> mi
     
     
-unspecializeMinst :: Minst -> Minst
+unspecializeMinst :: Minst g -> Minst g
 unspecializeMinst mi = case mi of
   M_llvm_dbg_declare m1 m2 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.declare") [m1,m2]
   M_llvm_dbg_value m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.value") [m1,m2,m3]
@@ -315,7 +343,7 @@ unspecializeMinst mi = case mi of
   _ -> mi
 
 
-specializeUnamedMd :: TlUnamedMd -> TlUnamedMd
+specializeUnamedMd :: TlUnamedMd g -> TlUnamedMd g
 specializeUnamedMd x = case x of
   (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> 
     TlUnamedMd_DW_file_type n mc
@@ -326,7 +354,7 @@ specializeUnamedMd x = case x of
     TlUnamedMd_DW_lexical_block n [m1,m2,m3,m4,m5,m6]
   _ -> x
 
-unspecializeUnamedMd :: TlUnamedMd -> TlUnamedMd  
+unspecializeUnamedMd :: TlUnamedMd g -> TlUnamedMd g
 unspecializeUnamedMd x = case x of
   TlUnamedMd_DW_file_type n mc -> 
     (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786473")), mc])))

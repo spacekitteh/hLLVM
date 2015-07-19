@@ -6,7 +6,8 @@ module Llvm.AsmHirConversion.LabelMapM
        where
 import qualified Compiler.Hoopl as H
 import qualified Data.Map as M
-import qualified Llvm.Asm.Data as A
+import qualified Llvm.Asm.Data as A (LabelId(..), BlockLabel(..))
+import qualified Llvm.Hir.Data as I
 import Control.Applicative
 import Control.Monad (ap, liftM)
 #ifdef DEBUG
@@ -22,7 +23,7 @@ import Debug.Trace
 -- llvm-as happy
 -}
 
-data IdLabelMap = IdLabelMap { a2h :: M.Map (A.GlobalId, A.LabelId) H.Label } deriving (Show)
+data IdLabelMap = IdLabelMap { a2h :: M.Map (I.GlobalId (), A.LabelId) H.Label } deriving (Show)
 
 data LabelMapM m a = LabelMapM { unIlM :: IdLabelMap -> m (IdLabelMap, a) }
 
@@ -41,7 +42,7 @@ instance (Applicative m, H.UniqueMonad m) => Monad (LabelMapM m) where
   iLmM >>= k = LabelMapM $ \iLm -> unIlM iLmM iLm >>= \(iLm1, x) -> unIlM (k x) iLm1
 
 
-labelFor :: H.UniqueMonad m => (A.GlobalId, A.LabelId) -> LabelMapM m H.Label
+labelFor :: H.UniqueMonad m => (I.GlobalId (), A.LabelId) -> LabelMapM m H.Label
 labelFor al = LabelMapM $ \iLm -> case M.lookup al (a2h iLm) of
                                     Just hl -> return (iLm, hl)
                                     Nothing -> do { hl <- H.freshLabel
@@ -49,19 +50,16 @@ labelFor al = LabelMapM $ \iLm -> case M.lookup al (a2h iLm) of
                                                   ; return (iLm { a2h = a2h'}, hl)
                                                   }
 
--- typeDefs :: H.UniqueMonad m => LabelMapM m (M.Map A.LocalId A.Type)
--- typeDefs = LabelMapM $ \iLm -> return (iLm, typedefs iLm)
-
 revertMap :: A.LabelId -> A.BlockLabel
 revertMap (A.LabelNumber _) = error "irrefutable"
 revertMap x = A.ExplicitBlockLabel x
 
-emptyIdLabelMap = IdLabelMap { a2h = M.empty} -- , typedefs = td}
+emptyIdLabelMap = IdLabelMap { a2h = M.empty}
 
 runLabelMapM :: H.UniqueMonad m => IdLabelMap -> LabelMapM m a -> m (IdLabelMap, a)
 runLabelMapM iLm (LabelMapM f) = f iLm
 
-invertMap :: M.Map (A.GlobalId, A.LabelId) H.Label -> M.Map (A.GlobalId, H.Label) A.LabelId
+invertMap :: M.Map (I.GlobalId (), A.LabelId) H.Label -> M.Map (I.GlobalId (), H.Label) A.LabelId
 invertMap m = foldl (\p ((g,k),v) -> if M.member (g,v) p 
                                      then error $ "irrefutable error in invertMap, the values are not unique"
                                      else M.insert (g,v) k p

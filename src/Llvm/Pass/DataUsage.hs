@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, GADTs, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, GADTs, RecordWildCards, TemplateHaskell, MultiParamTypeClasses #-}
 
 module Llvm.Pass.DataUsage where
 import Data.Maybe
@@ -29,119 +29,119 @@ descriptive naming conventions:
 
 -}
 
-data DataUsage = DataUsage { -- | The addresses that store pointer parameters
-                             addrs_storing_ptr_params :: S.Set Value
+data DataUsage g = DataUsage { -- | The addresses that store pointer parameters
+                             addrs_storing_ptr_params :: S.Set (Value g)
                              -- | The local addresses that store pointer parameters
                            , stack_addrs_storing_ptr_params :: S.Set LocalId
                              -- | An address is captured if it's stored on stack or heap
-                           , addrs_captured :: S.Set Value
+                           , addrs_captured :: S.Set (Value g)
                              -- | An address of a local variable is stored on stack or heap
                            , stack_addrs_captured :: S.Set LocalId
                              -- | The stack or heap addresses that store another addresses
-                           , addrs_storing_ptrs :: S.Set Value
+                           , addrs_storing_ptrs :: S.Set (Value g)
                              -- | The addresses of local variables that stores another addresses
                            , stack_addrs_storing_ptrs :: S.Set LocalId
                              -- | The addresses are passed to va_start
-                           , addrs_passed_to_va_start :: S.Set Value
+                           , addrs_passed_to_va_start :: S.Set (Value g)
                              -- | The addresses of a local variables that are passed to va_start
                            , stack_addrs_passed_to_va_start :: S.Set LocalId
                              -- | The addresses of all stores
-                           , addrs_storing_values :: S.Set Value
+                           , addrs_storing_values :: S.Set (Value g)
                              -- | The addresses of local variable that store values
                            , stack_addrs_storing_values :: S.Set LocalId
                              -- | The addresses that are involved in pointer arithmatic
-                           , addrs_involving_pointer_arithmatic :: S.Set Value
+                           , addrs_involving_pointer_arithmatic :: S.Set (Value g)
                              -- | The stack addresses that are involved in pointer arithmatic
                            , stack_addrs_involving_pointer_arithmatic :: S.Set LocalId
                              -- | The constants used in a function
-                           , constants :: S.Set Const
+                           , constants :: S.Set (Const g)
                              -- | The call function info set
-                           , callFunInfoSet :: S.Set (FunPtr, CallFunInterface)
-                           , invokeFunInfoSet :: S.Set (FunPtr, InvokeFunInterface)
-                           , callAsmInfoSet :: S.Set CallAsmInterface
+                           , callFunInfoSet :: S.Set (FunPtr g, CallFunInterface g)
+                           , invokeFunInfoSet :: S.Set (FunPtr g, InvokeFunInterface g)
+                           , callAsmInfoSet :: S.Set (CallAsmInterface g)
                            } deriving (Eq, Ord, Show)
 
 
-class DataUsageUpdator a where
-  update :: a -> DataUsage -> DataUsage
+class DataUsageUpdator g a where
+  update :: a -> DataUsage g -> DataUsage g
   
-instance DataUsageUpdator () where  
+instance DataUsageUpdator () () where
   update _ = id
 
-addAddrStoringPtrParam :: Value -> DataUsage -> DataUsage
+addAddrStoringPtrParam :: Ord g => Value g -> DataUsage g -> DataUsage g
 addAddrStoringPtrParam v du@DataUsage{..} =
   du { addrs_storing_ptr_params = S.insert v addrs_storing_ptr_params }
 
-addStackAddrStoringPtrParam :: LocalId -> DataUsage -> DataUsage
+addStackAddrStoringPtrParam :: LocalId -> DataUsage g -> DataUsage g
 addStackAddrStoringPtrParam v du@DataUsage{..} =
   du { stack_addrs_storing_ptr_params = S.insert v stack_addrs_storing_ptr_params }
 
-addAddrCaptured :: Value -> DataUsage -> DataUsage
+addAddrCaptured :: Ord g => Value g -> DataUsage g -> DataUsage g
 addAddrCaptured v du@DataUsage{..} =
   du { addrs_captured = S.insert v addrs_captured }
 
-addStackAddrCaptured :: LocalId -> DataUsage -> DataUsage
+addStackAddrCaptured :: LocalId -> DataUsage g -> DataUsage g
 addStackAddrCaptured v du@DataUsage{..} =
   du { stack_addrs_captured = S.insert v stack_addrs_captured }
 
-addAddrStoringPtr :: Value -> DataUsage -> DataUsage
+addAddrStoringPtr :: Ord g => Value g -> DataUsage g -> DataUsage g
 addAddrStoringPtr v du@DataUsage{..} =
   du { addrs_storing_ptrs = S.insert v addrs_storing_ptrs }
 
-addStackAddrStoringPtr :: LocalId -> DataUsage -> DataUsage
+addStackAddrStoringPtr :: LocalId -> DataUsage g -> DataUsage g
 addStackAddrStoringPtr v du@DataUsage{..} =
   du { stack_addrs_storing_ptrs = S.insert v stack_addrs_storing_ptrs }
 
-addAddrPassedToVaStart :: Value -> DataUsage -> DataUsage
+addAddrPassedToVaStart :: Ord g => Value g -> DataUsage g -> DataUsage g
 addAddrPassedToVaStart v du@DataUsage{..} =
   du { addrs_passed_to_va_start = S.insert v addrs_passed_to_va_start }
 
-addStackAddrPassedToVaStart :: LocalId -> DataUsage -> DataUsage
+addStackAddrPassedToVaStart :: LocalId -> DataUsage g -> DataUsage g
 addStackAddrPassedToVaStart v du@DataUsage{..} =
   du { stack_addrs_passed_to_va_start = S.insert v stack_addrs_passed_to_va_start }
 
-addAddrStoringValue :: Value -> DataUsage -> DataUsage
+addAddrStoringValue :: Ord g => Value g -> DataUsage g -> DataUsage g
 addAddrStoringValue v du@DataUsage{..} =
   du { addrs_storing_values = S.insert v addrs_storing_values }
 
-addStackAddrStoringValue :: LocalId -> DataUsage -> DataUsage
+addStackAddrStoringValue :: LocalId -> DataUsage g -> DataUsage g
 addStackAddrStoringValue v du@DataUsage{..} =
   du { stack_addrs_storing_values = S.insert v stack_addrs_storing_values }
 
-addAddrInvolvingPtrArithm :: Value -> DataUsage -> DataUsage
+addAddrInvolvingPtrArithm :: Ord g => Value g -> DataUsage g -> DataUsage g
 addAddrInvolvingPtrArithm v du@DataUsage{..} =
   du { addrs_involving_pointer_arithmatic = S.insert v addrs_involving_pointer_arithmatic }
 
-addStackAddrInvolvingPtrArithm :: LocalId -> DataUsage -> DataUsage
+addStackAddrInvolvingPtrArithm :: LocalId -> DataUsage g -> DataUsage g
 addStackAddrInvolvingPtrArithm v du@DataUsage{..} =
   du { stack_addrs_involving_pointer_arithmatic = S.insert v stack_addrs_involving_pointer_arithmatic }
 
-addConst :: Value -> DataUsage -> DataUsage
+addConst :: Ord g => Value g -> DataUsage g -> DataUsage g
 addConst (Val_const c) du@DataUsage{..} = du { constants = S.insert c constants }
 addConst (Val_ssa _) du = du
 
-addMaybeConst :: Maybe Value -> DataUsage -> DataUsage
+addMaybeConst :: Ord g => Maybe (Value g) -> DataUsage g -> DataUsage g
 addMaybeConst (Just c) du = addConst c du
 addMaybeConst Nothing du = du
 
 
-aTv :: (Value -> DataUsage -> DataUsage) -> T t Value -> DataUsage -> DataUsage
+aTv :: (Value g -> DataUsage g -> DataUsage g) -> T t (Value g) -> DataUsage g -> DataUsage g
 aTv  f (T _ v) du = f v du
 
-applyToMaybe :: (a -> DataUsage -> DataUsage) -> Maybe a -> DataUsage -> DataUsage
+applyToMaybe :: (a -> DataUsage g -> DataUsage g) -> Maybe a -> DataUsage g -> DataUsage g
 applyToMaybe f (Just x) du = f x du
 applyToMaybe f Nothing du = du
 
 bubbleUp :: Ord x => x -> x -> S.Set x -> S.Set x
 bubbleUp dest src s = if S.member dest s then S.insert src s else s
 
-filterAlloca :: LocalId -> (DataUsage -> S.Set Value) -> (LocalId -> DataUsage -> DataUsage) -> DataUsage -> DataUsage
+filterAlloca :: Ord g => LocalId -> (DataUsage g -> S.Set (Value g)) -> (LocalId -> DataUsage g -> DataUsage g) -> DataUsage g -> DataUsage g
 filterAlloca ssa src addf du = if S.member (Val_ssa ssa) (src du) then addf ssa du else du
 
-bubbleUp2 :: Value -> (DataUsage -> S.Set Value) -> Value -> (Value -> DataUsage -> DataUsage) -> DataUsage -> DataUsage
+bubbleUp2 :: Ord g => Value g -> (DataUsage g -> S.Set (Value g)) -> Value g -> (Value g -> DataUsage g -> DataUsage g) -> DataUsage g -> DataUsage g
 bubbleUp2 dest setf src addf du = if S.member dest (setf du) then addf src du else du
 
-propogateUpPtrUsage :: LocalId -> Value -> DataUsage -> DataUsage
+propogateUpPtrUsage :: Ord g => LocalId -> Value g -> DataUsage g -> DataUsage g
 propogateUpPtrUsage dest src du =
   bubbleUp2 (Val_ssa dest) addrs_storing_ptr_params src addAddrStoringPtrParam
   $ bubbleUp2 (Val_ssa dest) addrs_captured src addAddrCaptured
@@ -152,7 +152,7 @@ propogateUpPtrUsage dest src du =
   $ bubbleUp2 (Val_ssa dest) addrs_involving_pointer_arithmatic src addAddrInvolvingPtrArithm
   du
 
-emptyDataUsage :: DataUsage
+emptyDataUsage :: DataUsage g
 emptyDataUsage =
   DataUsage 
   S.empty S.empty S.empty S.empty S.empty
@@ -162,7 +162,7 @@ emptyDataUsage =
 instance (IrPrint t1, IrPrint t2, IrPrint t3) => IrPrint (t1, t2, t3) where
   printIr (t1, t2, t3) = parens (printIr t1 <+> printIr t2 <+> printIr t3)
 
-instance IrPrint DataUsage where
+instance IrPrint g => IrPrint (DataUsage g) where
   printIr DataUsage{..} =
     text "addrs_storing_ptr_params:" <+> printIr addrs_storing_ptr_params
     $+$ text "stack_addrs_storing_ptr_params:" <+> printIr stack_addrs_storing_ptr_params
@@ -180,7 +180,7 @@ instance IrPrint DataUsage where
     $+$ text "callInfoSet:" <+> printIr callFunInfoSet
     $+$ text "callAsmSet:" <+> printIr callAsmInfoSet
 
-usageLattice :: H.DataflowLattice DataUsage
+usageLattice :: Ord g => H.DataflowLattice (DataUsage g)
 usageLattice = H.DataflowLattice
               { H.fact_name = "Data and Ssa variable Usage"
               , H.fact_bot = emptyDataUsage
@@ -191,7 +191,7 @@ usageLattice = H.DataflowLattice
               j = unionDataUsage old new
               ch = H.changeIf (j /= old)
 
-unionDataUsage :: DataUsage -> DataUsage -> DataUsage
+unionDataUsage :: Ord g => DataUsage g -> DataUsage g -> DataUsage g
 unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16)
   (DataUsage t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16)
   = DataUsage
@@ -202,13 +202,13 @@ unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16
     (s13 `S.union` t13) (s14 `S.union` t14) (s15 `S.union` t15)
     (s16 `S.union` t16)    
 
-bwdScan :: forall a.forall m. (Show a, DataUsageUpdator a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node a) DataUsage
+bwdScan :: forall g.forall a.forall m. (Show g, Ord g, Show a, DataUsageUpdator g a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node g a) (DataUsage g)
 bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                  , H.bp_transfer = H.mkBTransfer (bwdTran formalParams)
                                  , H.bp_rewrite = H.noBwdRewrite
                                  }
   where
-    bwdTran :: S.Set LocalId -> Node a e x -> H.Fact x DataUsage -> DataUsage
+    bwdTran :: (Show g, Ord g) => S.Set LocalId -> Node g a e x -> H.Fact x (DataUsage g) -> DataUsage g
     bwdTran fp n f = case n of
       Tnode tinst _ ->
         let f0 = foldl (\p l -> p `unionDataUsage` (fromMaybe emptyDataUsage $ H.lookupFact l f)) emptyDataUsage (H.successors n)
@@ -470,7 +470,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
 #ifdef DEBUG
       _ -> errorLoc FLC $ show n
 #endif
-    getValuesFromParams :: [FunOperand Value] -> S.Set Value
+    getValuesFromParams :: [FunOperand (Value g)] -> S.Set (Value g)
     getValuesFromParams ls = foldl (\p e -> case e of
                                                  FunOperandAsRet _ _ _ v -> S.insert v p
                                                  FunOperandData _ _ _ v -> S.insert v p
@@ -478,14 +478,14 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                                  _ -> p
                                               ) S.empty ls
 
-scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => S.Set LocalId 
-             -> Label -> H.Graph (Node a) H.C H.C -> m DataUsage
+scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => S.Set LocalId 
+             -> Label -> H.Graph (Node g a) H.C H.C -> m (DataUsage g)
 scanGraph fm entry graph =
   do { (_, a, _) <- H.analyzeAndRewriteBwd (bwdScan fm) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyDataUsage (H.lookupFact entry a))
      }
 
-scanDefine :: (CheckpointMonad m, FuelMonad m, Show a, DataUsageUpdator a) => IrCxt -> TlDefine a -> m DataUsage
+scanDefine :: (CheckpointMonad m, FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => IrCxt g -> TlDefine g a -> m (DataUsage g)
 scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
   where formalParamIds :: S.Set LocalId
         formalParamIds = let FunSignature { fs_params = r} = fi_signature fn
@@ -496,8 +496,8 @@ scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
                                       _ -> p
                                   ) S.empty r
 
-scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show a, DataUsageUpdator a) => Module a -> IrCxt -> 
-              m (Dm.Map FunctionInterface DataUsage)
+scanModule :: (H.CheckpointMonad m, H.FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => Module g a -> IrCxt g -> 
+              m (Dm.Map (FunctionInterface g) (DataUsage g))
 scanModule (Module l) ic =
   do { l0 <- mapM (\x -> case x of
                       ToplevelDefine def@(TlDefine fn _ _) ->

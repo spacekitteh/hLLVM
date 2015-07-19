@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies, TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies, TupleSections, RankNTypes #-}
 
 module Llvm.Pass.SizeofVerification where
 import Data.Maybe
@@ -43,9 +43,9 @@ visLattice = H.DataflowLattice
               j = Ds.union old new 
               ch = H.changeIf (j /= old)
 
-bwdScan :: (Ord a, H.FuelMonad m) => TypeEnv -> H.BwdPass m (Node a) Visualized
+bwdScan :: forall g.forall m.forall a.(Ord a, Show g, Eq g, H.FuelMonad m) => TypeEnv -> H.BwdPass m (Node g a) Visualized
 bwdScan te = 
-  let bwdTran :: (Node a) e x -> H.Fact x Visualized -> Visualized
+  let bwdTran :: (Node g a) e x -> H.Fact x Visualized -> Visualized
       bwdTran n@(Tnode _ _) f = let bs = H.successors n
                                 in foldl (\p l -> p `Ds.union` (fromMaybe emptyVisualized $ H.lookupFact l f)) 
                                    emptyVisualized bs
@@ -61,13 +61,13 @@ bwdScan te =
                , H.bp_rewrite = H.noBwdRewrite
                }
 
-scanDefine :: (CheckpointMonad m, FuelMonad m, Ord a) => TypeEnv -> TlDefine a -> m Visualized
+scanDefine :: (CheckpointMonad m, FuelMonad m, Ord g, Show g, Ord a) => TypeEnv -> TlDefine g a -> m Visualized
 scanDefine te (TlDefine fn entry graph) = 
   do { (_, a, b) <- H.analyzeAndRewriteBwd (bwdScan te) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyVisualized (H.lookupFact entry a))
      }
   
-scanModule :: (CheckpointMonad m, FuelMonad m, Ord a) => Module a -> m (Ds.Set Dtype)
+scanModule :: (CheckpointMonad m, FuelMonad m, Ord g, Show g, Ord a) => Module g a -> m (Ds.Set Dtype)
 scanModule m@(Module l) = 
   let IrCxt{..} = irCxtOfModule m
   in foldM (\p x -> case x of
@@ -85,7 +85,7 @@ scanModule m@(Module l) =
            ) Ds.empty l
 
 
-stringize :: Ds.Set Dtype -> ([Toplevel a], Dm.Map Dtype Const)
+stringize :: Ord g => Ds.Set Dtype -> ([Toplevel g a], Dm.Map Dtype (Const g))
 stringize mp = 
   let (kvs, tpls) = runSimpleLlvmGlobalGen ".sizeof_" 0 
                     (mapM (\c -> do { (DefAndRef _ (T _ c0)) <- internalize (render $ printIr c)
@@ -94,7 +94,7 @@ stringize mp =
   in (Dm.elems $ Dm.map llvmDef tpls, Dm.fromList kvs)
      
 
-mkVerificationModule :: (DataLayoutMetrics dlm, Ord a) => SpecializedModule dlm a -> SpecializedModule dlm a
+mkVerificationModule :: (DataLayoutMetrics dlm, Ord g, Show g, Ord a) => SpecializedModule dlm g a -> SpecializedModule dlm g a
 mkVerificationModule (SpecializedModule dlm m@(Module l)) = 
   let IrCxt{..} = irCxtOfModule m
       vis = H.runSimpleUniqueMonad $ H.runWithFuel H.infiniteFuel ((scanModule m):: H.SimpleFuelMonad Visualized)
@@ -112,18 +112,20 @@ mkVerificationModule (SpecializedModule dlm m@(Module l)) =
                                     ++ (fmap (ToplevelDeclare . TlDeclare) visFunctions)
                                     ++ [ToplevelDefine $ defineMain $ concat insts]))
 
-mkCheck :: DataLayoutMetrics dlm => dlm -> TypeEnv -> Dm.Map Dtype Const -> Dtype -> [Node a O O]
+mkCheck :: forall dlm.forall g.forall a.DataLayoutMetrics dlm => dlm -> TypeEnv -> Dm.Map Dtype (Const g) -> Dtype -> [Node g a O O]
 mkCheck dlm te mp dt = [ Comment $ Cstring $ render $ printIr dt
                        , Comment $ Cstring $ show dt
                        , Comment $ Cstring $ "SizeInBits:" ++ show (getTypeSizeInBits dlm te dt)
                        , Comment $ Cstring $ "TypeStoreSize:" ++ show (getTypeStoreSize dlm te dt)
                        , Comment $ Cstring $ "Alignment:" ++ show (getTypeAlignment dlm te dt AlignAbi) 
-                       , callLog [T (ucast $ ptr0 i8) (ucast $ fromJust $ Dm.lookup dt mp),
-                                  ucast (T i64 (llvm_sizeof dt i64)), ucast $ toTC (sizeof dlm te dt)]
+                       , callLog [T (ucast $ ptr0 i8) (ucast $ fromJust $ Dm.lookup dt mp)
+                                 , ucast (T i64 ((llvm_sizeof dt i64)::Const g))
+                                 , ucast ((toTC (sizeof dlm te dt))::T (Type ScalarB I) (Const g))
+                                 ]
                        ]
 
 
-callLog :: [T Dtype Value] -> (Node a) O O
+callLog :: [T Dtype (Value g)] -> (Node g a) O O
 callLog tvs = 
   let aps = fmap (\(T t v) -> FunOperandData t [] Nothing v) tvs
       callSiteType = Tfunction (RtypeVoidU Tvoid, []) [(MtypeData (ucast $ ptr0 i8), Nothing)
@@ -161,10 +163,10 @@ visFunctions = [FunctionDeclareData { fd_linkage = Nothing
                ]
 
 
-defineMain :: [Node a O O] -> TlDefine a
-defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph insts (T_return [ucast $ u32ToTv 0]))
+defineMain :: forall g.forall a.[Node g a O O] -> TlDefine g a
+defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph insts (T_return [ucast ((u32ToTv 0)::T (Type ScalarB I) (Value g))]))
                    in TlDefine mainFp entry graph
-  where mainFp :: FunctionInterface 
+  where mainFp :: FunctionInterface g
         mainFp = FunctionInterface { fi_linkage = Nothing
                                    , fi_visibility = Nothing
                                    , fi_dllstorage = Nothing
@@ -182,7 +184,7 @@ defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph ins
                                    , fi_prefix = Nothing
                                    , fi_prologue = Nothing
                                    }
-        composeGraph :: H.UniqueMonad m => [Node a O O] -> Tinst -> m (H.Label, H.Graph (Node a) C C)
+        composeGraph :: H.UniqueMonad m => [Node g a O O] -> Tinst g -> m (H.Label, H.Graph (Node g a) C C)
         composeGraph insts ret = do { lbl <- H.freshLabel
                                     ; let graph = mkFirst (Lnode lbl) 
                                                   H.<*> mkMiddles insts

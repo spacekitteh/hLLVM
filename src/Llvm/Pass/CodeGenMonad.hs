@@ -12,6 +12,7 @@ module Llvm.Pass.CodeGenMonad ( Cc, emitNodes, useBase, appendToBase, emitAll
 
 import Llvm.Hir.Data
 import Llvm.Hir.Mangle
+import Llvm.Hir.Print
 
 import Control.Monad
 import Control.Monad.Reader
@@ -51,11 +52,11 @@ instance Error e => MonadReader r (Context s r e) where
   ask = Ctxt ask
   local f m =  Ctxt (local f (unCtxt m))
 
-data CodeCache ad = CodeCache { insts :: [Node ad O O]
-                              , usedLhs :: S.Set LocalId
-                              } deriving (Eq, Ord, Show)
+data CodeCache g ad = CodeCache { insts :: [Node g ad O O]
+                                , usedLhs :: S.Set LocalId
+                                } deriving (Eq, Ord, Show)
 
-type Cc ad a = Context (CodeCache ad) LocalId String a
+type Cc g ad a = Context (CodeCache g ad) LocalId String a
 
 
 newLocalId :: LocalId -> String -> LocalId
@@ -64,33 +65,33 @@ newLocalId l suffix = case l of
   LocalIdAlphaNum s -> LocalIdDqString (s ++ suffix)
   LocalIdDqString s -> LocalIdDqString (s ++ suffix)
 
-newGlobalId :: GlobalId -> String -> GlobalId
+newGlobalId :: GlobalId g -> String -> GlobalId g
 newGlobalId l suffix = case l of
   GlobalIdNum n -> GlobalIdDqString ((show n) ++ suffix)
   GlobalIdAlphaNum s -> GlobalIdDqString (s ++ suffix)
   GlobalIdDqString s -> GlobalIdDqString (s ++ suffix)
 
-getLocalBase :: GlobalId -> LocalId
+getLocalBase :: GlobalId g -> LocalId
 getLocalBase g = case g of 
   GlobalIdNum n -> LocalIdDqString $ "@" ++ show n
   GlobalIdAlphaNum s -> LocalIdDqString $ "@" ++ s
   GlobalIdDqString s -> LocalIdDqString $ "@" ++ s
         
-baseOf :: Value -> LocalId       
+baseOf :: (IrPrint g, Mangle g) => Value g -> LocalId
 baseOf nb = case nb of
   Val_ssa s -> s
   Val_const c -> LocalIdDqString $ mangle c 
 
-useBase :: Value -> Cc ad a -> Cc ad a
+useBase :: (IrPrint g, Mangle g) => Value g -> Cc g ad a -> Cc g ad a
 useBase nb cca = local (\_ -> baseOf nb) cca
 
-appendToBase :: String -> Cc ad a -> Cc ad a
+appendToBase :: String -> Cc g ad a -> Cc g ad a
 appendToBase suffix cca = local (\x -> newLocalId x suffix) cca
 
-newCInst :: Cinst -> Cc ad ()
+newCInst :: Cinst g -> Cc g ad ()
 newCInst inst = modify (\cc@CodeCache{..} -> cc { insts = (Cnode inst []):insts })
 
-new :: String -> (LocalId -> Cinst) -> Cc ad LocalId
+new :: String -> (LocalId -> Cinst g) -> Cc g ad LocalId
 new rhsPrefix partialInst = 
   do { s <- get
      ; bs <- ask
@@ -106,25 +107,25 @@ new rhsPrefix partialInst =
                }
      }
 
-nativeNewValue :: String -> (LocalId -> Cinst) -> Cc ad Value
+nativeNewValue :: String -> (LocalId -> Cinst g) -> Cc g ad (Value g)
 nativeNewValue rhsPrefix partialInst  = liftM Val_ssa (new rhsPrefix partialInst)
   
-newValue :: String -> (LocalId -> Cinst) -> Cc ad Value
+newValue :: String -> (LocalId -> Cinst g) -> Cc g ad (Value g)
 newValue rhsPrefix partialInst = liftM Val_ssa (new rhsPrefix partialInst)
 
-newNode :: Node ad O O -> Cc ad ()
+newNode :: Node g ad O O -> Cc g ad ()
 newNode n = modify (\cc@CodeCache{..} -> cc { insts = n:insts }) 
 
-theEnd :: Cc ad ()
+theEnd :: Cc g ad ()
 theEnd = return ()
 
 unspecifiedBase :: LocalId
 unspecifiedBase = LocalIdDqString "base is not specified"
 
-emitNodes :: Cc ad a -> [Node ad O O]
+emitNodes :: Cc g ad a -> [Node g ad O O]
 emitNodes cca = fst (emitAll cca)
 
-emitAll :: Cc ad a -> ([Node ad O O], a)
+emitAll :: Cc g ad a -> ([Node g ad O O], a)
 emitAll cca = case runContextWithSnR cca (CodeCache [] S.empty) unspecifiedBase of
   Left e -> error (show e)
   Right (a,s) -> (reverse (insts s), a)

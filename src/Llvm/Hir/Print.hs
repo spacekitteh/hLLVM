@@ -53,12 +53,12 @@ instance IrPrint a => IrPrint (Maybe a) where
 instance IrPrint Word64 where
   printIr n = integer $ fromIntegral n
 
-instance IrPrint TlAlias where
+instance IrPrint g => IrPrint (TlAlias g) where
   printIr (TlAlias lhs vis dll tlm na link aliasee) =
     hsep [printIr lhs, equals, printIr vis, printIr dll, printIr tlm
          , printIr na, text "alias", printIr link, printIr aliasee]
 
-instance IrPrint TlUnamedMd where
+instance IrPrint g => IrPrint (TlUnamedMd g) where
   printIr x = case x of
     TlUnamedMd s t -> char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
     TlUnamedMd_DW_file_type n mc -> char '!'<>(integer $ fromIntegral n) <+> equals <+> printIr mc
@@ -68,16 +68,16 @@ instance IrPrint TlNamedMd where
   printIr (TlNamedMd mv nds) = char '!' <> text mv <+> 
                                equals <+> char '!'<>(braces (hsep $ punctuate comma $ fmap printIr nds))
 
-instance IrPrint TlDeclare where
+instance IrPrint g => IrPrint (TlDeclare g) where
   printIr (TlDeclare fproto) = text "declare" <+> printIr fproto
 
-instance IrPrint a => IrPrint (TlDefine a) where
+instance (IrPrint g, IrPrint a) => IrPrint (TlDefine g a) where
   printIr (TlDefine fproto entry graph) = text "define" <+> printIr fproto $$
                                           text "; the entry label is" <+>
                                           printIr entry $$
                                           printIr graph
 
-instance IrPrint TlGlobal where
+instance IrPrint g => IrPrint (TlGlobal g) where
   printIr x = case x of
     (TlGlobalDtype lhs linkage vis dll tlm un addrspace externali gty ty c section comdat align) ->
       hsep [printIr lhs, equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
@@ -86,7 +86,7 @@ instance IrPrint TlGlobal where
       hsep [printIr lhs, equals, printIr linkage, printIr vis, printIr dll, printIr tlm, printIr un, optSepToLlvm addrspace empty
            , printIr externali, printIr gty, printIr ty, printIr c, commaSepNonEmpty [printIr section, printIr comdat, printIr align]]
 
-instance IrPrint TlIntrinsic where
+instance IrPrint g => IrPrint (TlIntrinsic g) where
   printIr x = case x of
     TlIntrinsic_llvm_used ty c s -> hsep [text "llvm.used", printIr c, printIr s]
     TlIntrinsic_llvm_compiler_used ty c s -> hsep [text "llvm.compiler.used", printIr c, printIr s]
@@ -111,10 +111,10 @@ instance IrPrint TlModuleAsm where
 instance IrPrint TlAttribute where
   printIr (TlAttribute n l) = hsep [text "attributes", char '#' <> (integral n), braces (hsep $ fmap printIr l)]
 
-instance IrPrint TlComdat where
+instance IrPrint g => IrPrint (TlComdat g) where
   printIr (TlComdat l s) = hsep [printIr l, equals, printIr s]
 
-instance IrPrint a => IrPrint (Toplevel a) where
+instance (IrPrint g, IrPrint a) => IrPrint (Toplevel g a) where
   printIr (ToplevelAlias x) = printIr x
   printIr (ToplevelUnamedMd x) = printIr x
   printIr (ToplevelNamedMd x) = printIr x
@@ -129,13 +129,13 @@ instance IrPrint a => IrPrint (Toplevel a) where
   printIr (ToplevelComdat x) = printIr x
   printIr (ToplevelIntrinsic x) = printIr x
 
-instance IrPrint a => IrPrint (Module a) where
+instance (IrPrint g, IrPrint a) => IrPrint (Module g a) where
   printIr (Module tops) = fcat $ fmap printIr tops
 
-instance (Show dlm, IrPrint a) => IrPrint (SpecializedModule dlm a) where
+instance (Show dlm, IrPrint g, IrPrint a) => IrPrint (SpecializedModule dlm g a) where
   printIr (SpecializedModule dlm m) = text (show dlm) <+> printIr m
 
-instance IrPrint a => IrPrint (Node a e x) where
+instance (IrPrint g, IrPrint a) => IrPrint (Node g a e x) where
   printIr (Lnode lbl) = printIr lbl
   printIr (Pnode i dbgs) = commaSepList $ (printIr i):(fmap printIr dbgs)
   printIr (Cnode c dbgs) = commaSepList $ (printIr c):(fmap printIr dbgs)
@@ -144,7 +144,7 @@ instance IrPrint a => IrPrint (Node a e x) where
   printIr (Comment s) = vcat $ fmap (\x -> text ";" <> text x) (commentize s)
   printIr (Enode a dbgs) = commaSepList $ (printIr a):(fmap printIr dbgs)
 
-instance IrPrint a => IrPrint (H.Graph (Node a) H.C H.C) where
+instance (IrPrint g, IrPrint a) => IrPrint (H.Graph (Node g a) H.C H.C) where
   printIr g = braces (H.foldGraphNodes (\n -> \s -> s $$ (printIr n)) g empty)
 
 instance IrPrint Label where
@@ -158,10 +158,10 @@ instance IrPrint NoWrap where
     printIr Nuw = text "nuw"
     printIr Nsuw = text "nsw nuw"
 
-printX :: (String, Doc, T Utype Const, T Utype Const) -> Doc
+printX :: IrPrint g => (String, Doc, T Utype (Const g), T Utype (Const g)) -> Doc
 printX (op, cs, s1, s2) = text op <+> cs <+> parens (printIr s1 <> comma <+> printIr s2)
 
-printF :: (String, Doc, T Utype Const, T Utype Const) -> Doc
+printF :: IrPrint g => (String, Doc, T Utype (Const g), T Utype (Const g)) -> Doc
 printF (op, cs, s1, s2) = text op <+> cs <+> parens (printIr s1 <> comma <+> printIr s2)
 
 printConversion :: IrPrint x => Conversion s x -> (Doc -> Doc) -> Doc
@@ -180,57 +180,57 @@ printConversion x p = case x of
   Bitcast fv dt -> text "bitcast" <+> p (printIr fv <+> text "to" <+> printIr dt)
   AddrSpaceCast fv dt -> text "addrspacecast" <+> p (printIr fv <+> text "to" <+> printIr dt)
 
-instance IrPrint (Conversion s Const) where
+instance IrPrint g => IrPrint (Conversion s (Const g)) where
   printIr x = printConversion x parens
 
-instance IrPrint (GetElementPtr s Const Const) where
+instance IrPrint g => IrPrint (GetElementPtr s (Const g) (Const g)) where
   printIr (GetElementPtr b base indices) =
     hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
 
-instance IrPrint (GetElementPtr s Aliasee Const) where
+instance IrPrint g => IrPrint (GetElementPtr s (Aliasee g) (Const g)) where
   printIr (GetElementPtr b base indices) =
     hsep [text "getelementptr", printIr b, parens (commaSepList ((printIr base):fmap printIr indices))]
 
-instance IrPrint (Select s r Const) where
+instance IrPrint g => IrPrint (Select s r (Const g)) where
   printIr (Select cnd tc1 tc2) = text "select" <+> (parens (commaSepList [printIr cnd, printIr tc1, printIr tc2]))
 
 instance (IrPrint a, IrPrint b) => IrPrint (Either a b) where
   printIr (Left a) = printIr a
   printIr (Right b) = printIr b
 
-instance IrPrint (Icmp ScalarB Const) where
+instance IrPrint g => IrPrint (Icmp ScalarB (Const g)) where
   printIr (Icmp op t c1 c2) =
     text "icmp" <+> printIr op <+> parens (commaSepList [printIr (T t c1), printIr (T t c2)])
 
-instance IrPrint (Icmp VectorB Const) where
+instance IrPrint g => IrPrint (Icmp VectorB (Const g)) where
   printIr (Icmp op t c1 c2) =
     text "icmp" <+> printIr op <+> parens (commaSepList [printIr (T t c1), printIr (T t c2)])
 
-instance IrPrint (Fcmp s Const) where
+instance IrPrint g => IrPrint (Fcmp s (Const g)) where
   printIr (Fcmp op t c1 c2) =
     text "fcmp" <+> printIr op <+> parens (commaSepList [printIr (T t c1), printIr (T t c2)])
 
-instance IrPrint (ShuffleVector r Const) where
+instance IrPrint g => IrPrint (ShuffleVector r (Const g)) where
   printIr (ShuffleVector tc1 tc2 mask) =
     text "shufflevector" <+> parens (commaSepList [printIr tc1, printIr tc2, printIr mask])
 
-instance IrPrint (ExtractValue Const) where
+instance IrPrint g => IrPrint (ExtractValue (Const g)) where
   printIr (ExtractValue tc indices) =
     hsep [text "extractvalue", parens (commaSepList ((printIr tc:(fmap integral indices))))]
 
-instance IrPrint (InsertValue Const) where
+instance IrPrint g => IrPrint (InsertValue (Const g)) where
   printIr (InsertValue vect tc indices) =
     hsep [text "insertvalue", parens (commaSepList ((printIr vect:printIr tc:(fmap integral indices))))]
 
-instance IrPrint (ExtractElement r Const) where
+instance IrPrint g => IrPrint (ExtractElement r (Const g)) where
   printIr (ExtractElement tc index) =
     hsep [text "extractelement", parens (printIr tc <> comma <+> printIr index)]
 
-instance IrPrint (InsertElement r Const) where
+instance IrPrint g => IrPrint (InsertElement r (Const g)) where
   printIr (InsertElement tc1 tc2 index) =
     hsep [text "insertelement", parens (printIr tc1 <> comma <+> printIr tc2 <> comma <+> printIr index)]
 
-instance IrPrint Const where
+instance IrPrint g => IrPrint (Const g) where
   printIr cst = case cst of
     C_u8 v -> integral v
     C_u16 v -> integral v
@@ -376,45 +376,45 @@ instance IrPrint MdRef where
     MdRefName s -> printIr s
     MdRefNode s -> printIr s
 
-instance IrPrint MetaConst where
+instance IrPrint g => IrPrint (MetaConst g) where
   printIr (McStruct c) = char '!' <> braces (commaSepList (fmap printIr c))
   printIr (McString s) = char '!' <> (printIr s)
   printIr (McMdRef n) = printIr n
   printIr (McSsa s) = text $ show s
   printIr (McSimple sc) = printIr sc
 
-instance IrPrint (GetElementPtr s Value Value) where
+instance IrPrint g => IrPrint (GetElementPtr s (Value g) (Value g)) where
   printIr (GetElementPtr ib tv tcs) =
     hsep [text "getelementptr", printIr ib, printIr tv, (commaSepList $ fmap printIr tcs)]
 
-instance IrPrint (Icmp ScalarB Value) where
+instance IrPrint g => IrPrint (Icmp ScalarB (Value g)) where
   printIr (Icmp op t v1 v2) = hsep [text "icmp", printIr op, printIr t, printIr v1 <> comma, printIr v2]
 
-instance IrPrint (Icmp VectorB Value) where
+instance IrPrint g => IrPrint (Icmp VectorB (Value g)) where
   printIr (Icmp op t v1 v2) = hsep [text "icmp", printIr op, printIr t, printIr v1 <> comma, printIr v2]
 
-instance IrPrint (Fcmp s Value) where
+instance IrPrint g => IrPrint (Fcmp s (Value g)) where
   printIr (Fcmp op t v1 v2) = hsep [text "fcmp", printIr op, printIr t, printIr v1 <> comma, printIr v2]
 
-instance IrPrint (Conversion s Value) where
+instance IrPrint g => IrPrint (Conversion s (Value g)) where
   printIr x = printConversion x id
 
-instance IrPrint (Select s r Value) where
+instance IrPrint g => IrPrint (Select s r (Value g)) where
   printIr (Select c t f) = text "select" <+> (commaSepList [printIr c, printIr t, printIr f])
 
-instance IrPrint Value where
+instance IrPrint g => IrPrint (Value g) where
   printIr (Val_ssa i) = printIr i
   printIr (Val_const c) = printIr c
 
 
-instance IrPrint TypedConstOrNull where
+instance IrPrint g => IrPrint (TypedConstOrNull g) where
   printIr (TypedConst tc) = printIr tc
   printIr UntypedNull = text "null"
 
 instance (IrPrint t, IrPrint x) => IrPrint (T t x) where
   printIr (T t v) = printIr t <+> printIr v
 
-instance IrPrint FunPtr where
+instance IrPrint g => IrPrint (FunPtr g) where
   printIr (FunId g) = printIr g
   printIr (FunIdBitcast (T t g) toT) = text "bitcast" <> parens (printIr t <+> printIr g <+> text "to" <+> printIr toT)
   printIr (FunIdInttoptr (T t g) toT) = text "inttoptr" <> parens (printIr t <+> printIr g <+> text "to" <+> printIr toT)
@@ -439,18 +439,18 @@ instance (IrPrint a) => IrPrint (FunSignature a) where
                        , fs_params = params
                        } = commaSepList [printIr cc, printIr ty, printIr params]
     
-instance IrPrint CallFunInterface where
+instance IrPrint g => IrPrint (CallFunInterface g) where
   printIr x = case x of
     CallFunInterface{..} -> commaSepList [printIr cfi_tail, 
                                           printIr cfi_signature,
                                           printIr cfi_funAttrs]
 
-instance IrPrint InvokeFunInterface where
+instance IrPrint g => IrPrint (InvokeFunInterface g) where
   printIr x = case x of
     InvokeFunInterface{..} -> commaSepList [printIr ifi_signature, 
                                             printIr ifi_funAttrs]
 
-instance IrPrint CallAsmInterface where
+instance IrPrint g => IrPrint (CallAsmInterface g) where
   printIr CallAsmInterface{..} = commaSepList [printIr cai_type,
                                                printIr cai_sideeffect, 
                                                printIr cai_alignstack,
@@ -458,7 +458,7 @@ instance IrPrint CallAsmInterface where
                                                printIr cai_funAttrs]
   
 
-instance IrPrint Clause where
+instance IrPrint g => IrPrint (Clause g) where
   printIr (Catch tv) = text "catch" <+> printIr tv
   printIr (Filter tc) = text "filter" <+> printIr tc
   printIr (CcoS c) = printIr c
@@ -467,22 +467,22 @@ instance IrPrint Clause where
 instance IrPrint (Conversion s GlobalOrLocalId) where
   printIr x = printConversion x parens
 
-instance IrPrint (ExtractElement r Value) where
+instance IrPrint g => IrPrint (ExtractElement r (Value g)) where
   printIr (ExtractElement tv1 tv2) = hsep [text "extractelement", printIr tv1 <> comma, printIr tv2]
 
-instance IrPrint (InsertElement r Value) where
+instance IrPrint g => IrPrint (InsertElement r (Value g)) where
   printIr (InsertElement vect tv idx) =
     hsep [text "insertelement", printIr vect <> comma, printIr tv <> comma, printIr idx]
 
-instance IrPrint (ShuffleVector r Value) where
+instance IrPrint g => IrPrint (ShuffleVector r (Value g)) where
   printIr (ShuffleVector vect1 vect2 mask) =
     hsep [text "shufflevector", printIr vect1 <> comma, printIr vect2 <> comma, printIr mask]
 
-instance IrPrint (ExtractValue Value) where
+instance IrPrint g => IrPrint (ExtractValue (Value g)) where
   printIr (ExtractValue tv idxs) =
     hsep [text "extractvalue", printIr tv <> comma, (commaSepList $ fmap integral idxs)]
 
-instance IrPrint (InsertValue Value) where
+instance IrPrint g => IrPrint (InsertValue (Value g)) where
   printIr (InsertValue vect tv idx) = text "insertvalue" <+> 
                                       hsep (punctuate comma ((printIr vect):(printIr tv):(fmap integral idx)))
 
@@ -500,21 +500,21 @@ instance (IrPrint a) => IrPrint (FunOperand a) where
     (FunOperandLabel t att1 align v) ->
       hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
 
-instance IrPrint MetaOperand where
+instance IrPrint g => IrPrint (MetaOperand g) where
   printIr x = case x of
     MetaOperandData t att1 align v -> hsep [printIr t, hsep $ fmap printIr att1, printIr align, printIr v]
     MetaOperandMeta mc -> printIr mc
 
-instance IrPrint Dbg where
+instance IrPrint g => IrPrint (Dbg g) where
   printIr (Dbg mv meta) = printIr mv <+> printIr meta
 
 
-instance IrPrint Pinst where
+instance IrPrint g => IrPrint (Pinst g) where
   printIr (Pinst t pairs lhs) =  printIr lhs <+> equals <+> text "phi"
                                  <+> printIr t <+> (commaSepList $ fmap tvToLLvm pairs)
     where tvToLLvm (h1,h2) = brackets (printIr h1 <+> comma <+> printIr h2)
 
-instance IrPrint Cinst where
+instance IrPrint g => IrPrint (Cinst g) where
   printIr x = case x of
     (I_alloca ma t s a lhs) ->
       hsep [printIr lhs, equals, text "alloca", printIr ma, printIr t, commaSepMaybe s, commaSepMaybe a]
@@ -666,7 +666,7 @@ instance IrPrint Cinst where
     I_llvm_stacksave lhs -> hsep [printIr lhs, equals, text "llvm.stacksave"]
     I_llvm_stackrestore v -> hsep [text "llvm.stackrestore", printIr v]
 
-instance IrPrint Minst where
+instance IrPrint g => IrPrint (Minst g) where
   printIr mi = case mi of
     Minst cs fn params -> printIr cs <+> printIr fn <+> hsep (fmap printIr params)
     M_llvm_dbg_declare m1 m2 -> text "llvm.dbg.declare" <+> printIr m1 <+> printIr m2
@@ -680,7 +680,7 @@ instance IrPrint MemLen where
     MemLenI32 -> text "i32"
     MemLenI64 -> text "i64"
 
-instance IrPrint Tinst where
+instance IrPrint g => IrPrint (Tinst g) where
   printIr T_ret_void = text "ret" <+> text "void"
   printIr (T_return x) = text "ret" <+> (commaSepList $ fmap printIr x)
   printIr (T_br a) = text "br" <+> printIr a
@@ -697,14 +697,13 @@ instance IrPrint Tinst where
   printIr (T_resume a) = text "resume" <+> printIr a
   printIr T_unwind = text "unwind"
 
-instance IrPrint Aliasee where
+instance IrPrint g => IrPrint (Aliasee g) where
   printIr (Aliasee tv ) = printIr tv
   printIr (AliaseeTyped dt tv) = printIr dt <+> printIr tv
   printIr (AliaseeConversion c) = printConversion c parens
   printIr (AliaseeGEP a) = printIr a
 
-
-instance IrPrint FunctionInterface where
+instance IrPrint g => IrPrint (FunctionInterface g) where
   printIr (FunctionInterface fhLinkage fhVisibility fhDllStorageClass fhSig fhName 
            fhd fhAttr1 fhSection fhCmd fhAlign fhGc fhPrefix fhPrologue) =
     hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhSig
@@ -712,7 +711,7 @@ instance IrPrint FunctionInterface where
          , printIr fhSection, printIr fhCmd, printIr fhAlign, printIr fhGc, printIr fhPrefix, printIr fhPrologue]
 
 
-instance IrPrint FunctionDeclare where
+instance IrPrint g => IrPrint (FunctionDeclare g) where
   printIr (FunctionDeclareData fhLinkage fhVisibility fhDllStorageClass fhSig fhName
            fhd fhAttr1 fhSection fhCmd fhAlign fhGc fhPrefix fhPrologue) =
     hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhSig
@@ -725,7 +724,7 @@ instance IrPrint MetaKind where
     MKtype t -> printIr t
     MKmetadata -> text "metadata"
 
-instance IrPrint MetaKindedConst where
+instance IrPrint g => IrPrint (MetaKindedConst g) where
   printIr x = case x of
     MetaKindedConst mk mc -> printIr mk <+> printIr mc
     UnmetaKindedNull -> text "null"
@@ -904,10 +903,10 @@ instance IrPrint (IntOrPtrType VectorB) where
     IntOrPtrTypeI e -> printIr e
     IntOrPtrTypeP e -> printIr e
 
-instance IrPrint Prefix where
+instance IrPrint a => IrPrint (Prefix a) where
   printIr (Prefix n) = text "prefix" <+> printIr n
 
-instance IrPrint Prologue where
+instance IrPrint a => IrPrint (Prologue a) where
   printIr (Prologue n) = text "prologue" <+> printIr n
 
 instance IrPrint PAttr where
@@ -925,6 +924,25 @@ instance IrPrint PAttr where
 
 instance IrPrint AlignInByte where
   printIr (AlignInByte n) = text "align" <+> (integer $ fromIntegral n)
+
+instance IrPrint g => IrPrint (GlobalId g) where
+  printIr x = case x of
+    GlobalIdNum x -> printIr x
+    GlobalIdAlphaNum x -> text x
+    GlobalIdDqString x -> text x
+    GlobalIdSpecialized x -> printIr x
+
+
+instance IrPrint g => IrPrint (DollarId g) where
+  printIr x = case x of
+    DollarIdNum x -> printIr x
+    DollarIdAlphaNum x -> text x
+    DollarIdDqString x -> text x
+    DollarIdSpecialized x -> printIr x
+
+instance IrPrint g => IrPrint (Comdat g) where
+  printIr (Comdat x) = text "comdat" <+> printIr x
+
 
 instance IrPrint IcmpOp where
   printIr = P.print
@@ -972,11 +990,6 @@ instance IrPrint DqString where
 instance IrPrint Section where
   printIr = P.print
 
-{-
-instance IrPrint Alignment where
-    printIr = P.print
--}
-
 instance IrPrint Gc where
     printIr = P.print
 
@@ -989,8 +1002,6 @@ instance IrPrint GlobalOrLocalId where
 instance IrPrint LocalId where
   printIr = P.print
 
-instance IrPrint GlobalId where
-  printIr = P.print
 
 instance IrPrint BinaryConstant where
   printIr = P.print
@@ -1041,12 +1052,6 @@ instance IrPrint Nonnull where
 instance IrPrint TailCall where
   printIr = P.print
 
-instance IrPrint DollarId where
-  printIr = P.print
-
-
-instance IrPrint Comdat where
-  printIr = P.print
 
 instance IrPrint FastMathFlag where
   printIr = P.print
