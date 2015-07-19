@@ -10,6 +10,7 @@ The implemented functionalities:
 3. a set of utility functions to convert LLVM Assembly AST to and from Hir;
 4. a set of utility functions to query Hir.
 
+NOTES: After the Datalayout refectory, only i386_pc_linux_gnu target is implemented. Addtional efforts are needed to support other targets. 
 
 Build:
 ==============
