@@ -9,7 +9,7 @@ import Llvm.ErrorLoc
 import qualified Compiler.Hoopl as H
 import qualified Control.Monad as Md
 import qualified Data.Map as M
-import qualified Data.Set as S
+-- import qualified Data.Set as S
 import qualified Llvm.Asm.Data as A
 import qualified Llvm.Hir.Data as I
 import Llvm.Hir.Cast

@@ -5,7 +5,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Llvm.Pass.CodeGenMonad ( Cc, emitNodes, useBase, appendToBase, emitAll
-                              , newGlobalId, newNode, theEnd,newCInst, new, newValue
+                              , {-newGlobalId,-} newNode, theEnd,newCInst, new, newValue
                               , getLocalBase, newLocalId
                               ) where
 
@@ -65,17 +65,12 @@ newLocalId l suffix = case l of
   LocalIdAlphaNum s -> LocalIdDqString (s ++ suffix)
   LocalIdDqString s -> LocalIdDqString (s ++ suffix)
 
-newGlobalId :: GlobalId g -> String -> GlobalId g
-newGlobalId l suffix = case l of
-  GlobalIdNum n -> GlobalIdDqString ((show n) ++ suffix)
-  GlobalIdAlphaNum s -> GlobalIdDqString (s ++ suffix)
-  GlobalIdDqString s -> GlobalIdDqString (s ++ suffix)
-
-getLocalBase :: GlobalId g -> LocalId
+getLocalBase :: Mangle g => GlobalId g -> LocalId
 getLocalBase g = case g of 
   GlobalIdNum n -> LocalIdDqString $ "@" ++ show n
   GlobalIdAlphaNum s -> LocalIdDqString $ "@" ++ s
   GlobalIdDqString s -> LocalIdDqString $ "@" ++ s
+  GlobalIdSpecialized s -> LocalIdDqString $ "@" ++ mangle s
         
 baseOf :: (IrPrint g, Mangle g) => Value g -> LocalId
 baseOf nb = case nb of

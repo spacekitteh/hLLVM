@@ -15,11 +15,34 @@ import Data.Word (Word8, Word16, Word32, Word64)
 import Data.DoubleWord
 import Llvm.ErrorLoc
 
+class (Ord n, Eq n, Show n) => AbsName n where
+  prepend :: String -> n -> n
+  append :: n -> String -> n
+  
+instance AbsName () where  
+  prepend _ _ = error "AbsName () cannot be prepended." 
+  append _ _ = error "AbsName () cannot be appended."
+  
+{- It is required that g is an instance of AbsName -}
 data GlobalId g = GlobalIdNum Word32
                 | GlobalIdAlphaNum String
                 | GlobalIdDqString String
                 | GlobalIdSpecialized g
                 deriving (Eq, Ord, Show)
+                         
+instance AbsName g => AbsName (GlobalId g) where
+  prepend prefix n = case n of
+    GlobalIdNum n -> GlobalIdDqString (prefix ++ (show n))
+    GlobalIdAlphaNum s -> GlobalIdDqString (prefix ++ s)
+    GlobalIdDqString s -> GlobalIdDqString (prefix ++ s)
+    GlobalIdSpecialized n -> GlobalIdSpecialized $ prepend prefix n
+
+  append n suffix = case n of
+    GlobalIdNum n -> GlobalIdDqString ((show n) ++ suffix)
+    GlobalIdAlphaNum s -> GlobalIdDqString (s ++ suffix)
+    GlobalIdDqString s -> GlobalIdDqString (s ++ suffix)
+    GlobalIdSpecialized n -> GlobalIdSpecialized $ append n suffix
+
 data NoWrap =
   -- | No Signed Wrap
   Nsw

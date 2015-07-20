@@ -34,6 +34,9 @@ mapModule f Nothing m = let (ls, tt) = getDT m
                         in if isI386_Pc_Linux_Gnu ls tt then
                              let (_, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir I386_Pc_Linux_Gnu m
                              in f m1
+                           else if isX86_64_Pc_Linux_Gnu ls tt then
+                                  let (_, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir X86_64_Pc_Linux_Gnu m
+                                  in f m1         
                            else
                              error $ "unsupported target"
 
@@ -48,10 +51,12 @@ transformModule2 f  Nothing m =
        let (idmap, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir I386_Pc_Linux_Gnu m
        in let (m2, labelMap) = f m1
           in Cv.hirToAsm (labelMap $ Cv.invertMap (Cv.a2h idmap)) m2
-     else
-       error $ "unsupported target"       
-
-
+     else if isX86_64_Pc_Linux_Gnu ls tt then
+            let (idmap, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir X86_64_Pc_Linux_Gnu m
+            in let (m2, labelMap) = f m1
+               in Cv.hirToAsm (labelMap $ Cv.invertMap (Cv.a2h idmap)) m2             
+          else
+            error $ "unsupported target"       
 
 {-
 transformModuleIO :: (forall x. DataLayoutMetrics x => I.SpecializedModule x () -> IO (I.SpecializedModule x ())) -> Maybe dlm -> A.Module -> IO A.Module 

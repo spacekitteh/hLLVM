@@ -218,7 +218,6 @@ getScalarTypeSizeInBits te x =
     ScalarTypeP _ -> SizeInBit 32
 
 
-
 getGetElemtPtrIndexedType :: (Eq g, Show g) => TypeEnv -> Dtype -> [T (Type ScalarB I) (Value g)] -> Dtype
 getGetElemtPtrIndexedType te x is = case is of 
   [] -> x

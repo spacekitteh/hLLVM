@@ -132,8 +132,10 @@ instance (IrPrint g, IrPrint a) => IrPrint (Toplevel g a) where
 instance (IrPrint g, IrPrint a) => IrPrint (Module g a) where
   printIr (Module tops) = fcat $ fmap printIr tops
 
+{-
 instance (Show dlm, IrPrint g, IrPrint a) => IrPrint (SpecializedModule dlm g a) where
   printIr (SpecializedModule dlm m) = text (show dlm) <+> printIr m
+-}
 
 instance (IrPrint g, IrPrint a) => IrPrint (Node g a e x) where
   printIr (Lnode lbl) = printIr lbl

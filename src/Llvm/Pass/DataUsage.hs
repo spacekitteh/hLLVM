@@ -202,7 +202,8 @@ unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16
     (s13 `S.union` t13) (s14 `S.union` t14) (s15 `S.union` t15)
     (s16 `S.union` t16)    
 
-bwdScan :: forall g.forall a.forall m. (Show g, Ord g, Show a, DataUsageUpdator g a, H.FuelMonad m) => S.Set LocalId -> H.BwdPass m (Node g a) (DataUsage g)
+bwdScan :: forall g.forall a.forall m. (Show g, Ord g, Show a, DataUsageUpdator g a, H.FuelMonad m) => 
+           S.Set LocalId -> H.BwdPass m (Node g a) (DataUsage g)
 bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                  , H.bp_transfer = H.mkBTransfer (bwdTran formalParams)
                                  , H.bp_rewrite = H.noBwdRewrite

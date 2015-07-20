@@ -136,13 +136,11 @@ data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Ord, Show)
 
 data TlComdat g = TlComdat (Ci.DollarId g) Ci.SelectionKind deriving (Eq, Ord, Show)
 
-data Module g a = Module [Toplevel g a]
-
 {- 
   If a consumer does not demands specializing Cnode and GlobalId,
-  then SpecializedModule dlm () () is a typical instance
+  then Module () () is a typical instance
 -}
-data SpecializedModule dlm g a = SpecializedModule dlm (Module g a)
+data Module g a = Module [Toplevel g a]
   
 {-
    Node g a e x
@@ -189,7 +187,7 @@ instance (Show g, Show a) => Show (Node g a e x) where
     Enode a dbgs -> "Enode : Node O O:" ++ show a ++ show dbgs
     Tnode v dbgs -> "Tnode : Node O C:" ++ show v ++ show dbgs    
 
-instance (Eq g, Eq a) => Eq (Node g a e x) where
+instance (Eq g, Show g, Eq a) => Eq (Node g a e x) where
   (==) x1 x2 = case (x1, x2) of
     (Lnode l1, Lnode l2) -> l1 == l2
     (Pnode v1 d1, Pnode v2 d2) -> v1 == v2 && d1 == d2
@@ -200,7 +198,7 @@ instance (Eq g, Eq a) => Eq (Node g a e x) where
     (Tnode v1 d1, Tnode v2 d2) -> v1 == v2 && d1 == d2    
     (_, _) -> False
 
-instance (Show g, Ord g, Show a, Ord a) => Ord (Node g a e x) where
+instance (Ord g, Show g, Show a, Ord a) => Ord (Node g a e x) where
   compare x1 x2 = case (x1, x2) of
     (Lnode l1, Lnode l2) -> compare l1 l2
     (Pnode v1 d1, Pnode v2 d2) -> compare (v1,d1) (v2,d2)

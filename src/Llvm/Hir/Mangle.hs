@@ -38,6 +38,13 @@ instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
 
+instance Mangle g => Mangle (GlobalId g) where
+  mangle x = case x of
+    GlobalIdNum n -> show n
+    GlobalIdAlphaNum s -> s
+    GlobalIdDqString s -> s
+    GlobalIdSpecialized n -> mangle n
+
 instance Mangle Ext where
   mangle e = case e of
     Sign -> "s"
