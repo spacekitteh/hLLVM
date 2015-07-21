@@ -44,7 +44,7 @@ data TlIntrinsic g = TlIntrinsic_llvm_used { tli_type :: Type RecordB D
                                                    , tli_section :: Maybe Section
                                                    } 
                                            
-data TlAlias g = TlAlias { tla_lhs :: Ci.GlobalId g
+data TlAlias g = TlAlias { tla_lhs :: g
                          , tla_visibility :: Maybe Ci.Visibility
                          , tla_dllstorage :: Maybe Ci.DllStorageClass
                          , tla_tls :: Maybe Ci.ThreadLocalStorage
@@ -67,7 +67,7 @@ data FunctionDeclare g = FunctionDeclareData { fd_linkage :: Maybe Linkage
                                              , fd_visibility :: Maybe Visibility
                                              , fd_dllstorage :: Maybe DllStorageClass
                                              , fd_signature :: FunSignature ()
-                                             , fd_fun_name :: GlobalId g
+                                             , fd_fun_name :: g
                                              , fd_addr_naming :: Maybe AddrNaming
                                              , fd_fun_attrs :: [FunAttr]
                                              , fd_section :: Maybe Section
@@ -77,7 +77,7 @@ data FunctionDeclare g = FunctionDeclareData { fd_linkage :: Maybe Linkage
                                              , fd_prefix :: Maybe (Prefix g)
                                              , fd_prologue :: Maybe (Prologue g)
                                              } 
-                       | FunctionDeclareMeta { fd_fun_name :: GlobalId g
+                       | FunctionDeclareMeta { fd_fun_name :: g
                                              , fd_fun_attrs :: [FunAttr]
                                              , fd_retType :: Rtype
                                              , fd_metakinds :: [Either MetaKind Dtype]
@@ -91,7 +91,7 @@ type NOOP = ()
 data TlDefine g a = TlDefine (FunctionInterface g) H.Label (H.Graph (Node g a) H.C H.C) 
 
 
-data TlGlobal g = TlGlobalDtype { tlg_lhs :: Ci.GlobalId g
+data TlGlobal g = TlGlobalDtype { tlg_lhs :: g
                                 , tlg_linkage :: (Maybe Ci.Linkage)
                                 , tlg_visibility :: (Maybe Ci.Visibility)
                                 , tlg_dllstorage :: (Maybe Ci.DllStorageClass)
@@ -106,7 +106,7 @@ data TlGlobal g = TlGlobalDtype { tlg_lhs :: Ci.GlobalId g
                                 , tlg_comdat :: Maybe (Ci.Comdat g)
                                 , tlg_alignment :: Maybe Ci.AlignInByte
                                 }
-                | TlGlobalOpaque { tlg_lhs :: Ci.GlobalId g
+                | TlGlobalOpaque { tlg_lhs :: g
                                  , tlg_linkage :: (Maybe Ci.Linkage)
                                  , tlg_visiblity :: (Maybe Ci.Visibility)
                                  , tlg_dllstorage :: (Maybe Ci.DllStorageClass)
@@ -134,11 +134,11 @@ data TlModuleAsm = TlModuleAsm Ci.DqString deriving (Eq, Ord, Show)
 
 data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Ord, Show)
 
-data TlComdat g = TlComdat (Ci.DollarId g) Ci.SelectionKind deriving (Eq, Ord, Show)
+data TlComdat g = TlComdat g Ci.SelectionKind deriving (Eq, Ord, Show)
 
 {- 
   If a consumer does not demands specializing Cnode and GlobalId,
-  then Module () () is a typical instance
+  then Module GlobalId () is a typical instance
 -}
 data Module g a = Module [Toplevel g a]
   

@@ -12,9 +12,10 @@ opt _ _ (ToplevelAlias s) = return $ ToplevelAlias s
 opt _ _ (ToplevelUnamedMd s) = return $ ToplevelUnamedMd s
 opt _ _ (ToplevelNamedMd v) = return $ ToplevelNamedMd v
 opt _ _ (ToplevelDeclare fn) = return $ ToplevelDeclare fn
-opt gs f (ToplevelDefine (TlDefine fn entry graph)) = do { graph' <- f gs entry graph
-                                                         ; return $ ToplevelDefine $ TlDefine fn entry graph'
-                                                         }
+opt gs f (ToplevelDefine (TlDefine fn entry graph)) = 
+  do { graph' <- f gs entry graph
+     ; return $ ToplevelDefine $ TlDefine fn entry graph'
+     }
 opt _ _ (ToplevelGlobal s) = return $ ToplevelGlobal s
 opt _ _ (ToplevelTypeDef a) = return $ ToplevelTypeDef a
 opt _ _ (ToplevelDepLibs qs) = return $ ToplevelDepLibs qs
@@ -24,7 +25,7 @@ opt _ _ (ToplevelComdat s) = return $ ToplevelComdat s
 opt _ _ (ToplevelAttribute s) = return $ ToplevelAttribute s
 
 
-optModule :: (H.CheckpointMonad m, H.FuelMonad m, Ord g) => Optimization m (Ds.Set (Dtype, GlobalId g)) g u -> Module g u -> m (Module g u)
+optModule :: (H.CheckpointMonad m, H.FuelMonad m, Ord g) => Optimization m (Ds.Set (Dtype, g)) g u -> Module g u -> m (Module g u)
 optModule f (Module l) = 
   let gs = globalIdOfModule (Module l)
   in mapM (opt gs f) l >>= return . Module

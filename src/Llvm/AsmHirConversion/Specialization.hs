@@ -12,32 +12,26 @@ import Llvm.Hir.Target.Linux_Gnu
 
 #define FLC  (FileLoc $(srcLoc))
 
-specializeGlobalId :: A.GlobalId -> GlobalId g
+specializeGlobalId :: A.GlobalId -> Gname
 specializeGlobalId x = case x of
-  A.GlobalIdNum v -> GlobalIdNum v
-  A.GlobalIdAlphaNum v -> GlobalIdAlphaNum v
-  A.GlobalIdDqString v -> GlobalIdDqString v
+  A.GlobalIdNum v -> errorLoc FLC $ show x
+  A.GlobalIdAlphaNum v -> Gname v
+  A.GlobalIdDqString v -> Gname v
 
-unspecializeGlobalId :: Show g =>  GlobalId g -> A.GlobalId
+unspecializeGlobalId :: Gname -> A.GlobalId
 unspecializeGlobalId x = case x of
-  GlobalIdNum v -> A.GlobalIdNum v
-  GlobalIdAlphaNum v -> A.GlobalIdAlphaNum v
-  GlobalIdDqString v -> A.GlobalIdDqString v
-  GlobalIdSpecialized _ -> errorLoc FLC $ "all specialized globalId should be converted to normal globalid, but " ++ show x
+  Gname v -> A.GlobalIdDqString v
 
-
-specializeDollarId :: A.DollarId -> DollarId g
+specializeDollarId :: A.DollarId -> Gname
 specializeDollarId x = case x of
-  A.DollarIdNum v -> DollarIdNum v
-  A.DollarIdAlphaNum v -> DollarIdAlphaNum v
-  A.DollarIdDqString v -> DollarIdDqString v
+  A.DollarIdNum v -> errorLoc FLC $ show x
+  A.DollarIdAlphaNum v -> Gname v
+  A.DollarIdDqString v -> Gname v
 
-unspecializeDollarId :: Show g =>  DollarId g -> A.DollarId
+
+unspecializeDollarId :: Gname -> A.DollarId
 unspecializeDollarId x = case x of
-  DollarIdNum v -> A.DollarIdNum v
-  DollarIdAlphaNum v -> A.DollarIdAlphaNum v
-  DollarIdDqString v -> A.DollarIdDqString v
-  DollarIdSpecialized _ -> errorLoc FLC $ "all specialized globalId should be converted to normal globalid, but " ++ show x
+  Gname v -> A.DollarIdDqString v
 
 
 specializePAttr :: ParamAttr -> PAttr
@@ -114,33 +108,33 @@ specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
       in Just (Nothing, ml, [m,v])
   (_, _) -> Nothing
 
-unspecializeRegisterIntrinsic :: Cinst a -> Maybe (GlobalId a, Type ScalarB I, [MetaOperand a], Maybe LocalId)
+unspecializeRegisterIntrinsic :: Cinst Gname -> Maybe (Gname, Type ScalarB I, [MetaOperand Gname], Maybe LocalId)
 unspecializeRegisterIntrinsic cinst = case cinst of
   I_llvm_read_register mLen mc r ->
     let (nm, typ) = case mLen of
-          MemLenI32 -> (GlobalIdAlphaNum "llvm.read_register.i32", i32)
-          MemLenI64 -> (GlobalIdAlphaNum "llvm.read_register.i64", i64)
+          MemLenI32 -> (Gname "llvm.read_register.i32", i32)
+          MemLenI64 -> (Gname "llvm.read_register.i64", i64)
     in Just (nm, typ, [MetaOperandMeta mc], Just r)
   I_llvm_write_register mLen mc val ->
     let (nm, typ) = case mLen of
-          MemLenI32 -> (GlobalIdAlphaNum "llvm.write_register.i32", i32)
-          MemLenI64 -> (GlobalIdAlphaNum "llvm.write_register.i64", i64)
+          MemLenI32 -> (Gname "llvm.write_register.i32", i32)
+          MemLenI64 -> (Gname "llvm.write_register.i64", i64)
     in Just (nm, typ, [MetaOperandMeta mc, MetaOperandData (ucast typ) [] Nothing val], Nothing)
   _ -> Nothing
 
 
-specializeCallSite :: Maybe LocalId -> FunPtr a -> CallFunInterface a -> Maybe (Cinst a)
+specializeCallSite :: Maybe LocalId -> FunPtr Gname -> CallFunInterface Gname -> Maybe (Cinst Gname)
 specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
-  (FunId (GlobalIdAlphaNum "llvm.va_start"),
+  (FunId (Gname "llvm.va_start"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_va_start v
-  (FunId (GlobalIdAlphaNum "llvm.va_end"),
+  (FunId (Gname "llvm.va_end"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_va_end v
-  (FunId (GlobalIdAlphaNum "llvm.va_copy"),
+  (FunId (Gname "llvm.va_copy"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v1
                          ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_va_copy v1 v2
-  (FunId (GlobalIdAlphaNum nm), 
+  (FunId (Gname nm), 
    FunSignature Ccc _ 
    [FunOperandData t1 [] Nothing v1 -- dest
    ,FunOperandData t2 [] Nothing v2 -- src or setValue
@@ -173,19 +167,19 @@ specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
                                     (T (dcast FLC t1) v1) (T (dcast FLC t2) v2) (T (dcast FLC t3) v3)
                                     (T (dcast FLC t4) v4) (T (dcast FLC t5) v5)  
     in Just $ mod
-  (FunId (GlobalIdAlphaNum "llvm.stacksave"),
+  (FunId (Gname "llvm.stacksave"),
    FunSignature Ccc _ []) | isJust lhs -> 
     Just $ I_llvm_stacksave $ fromJust lhs
-  (FunId (GlobalIdAlphaNum "llvm.stackrestore"),
+  (FunId (Gname "llvm.stackrestore"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_stackrestore (T (dcast FLC t1) v)
   _ -> Nothing
 
 
-unspecializeIntrinsics :: Cinst a -> Maybe (Cinst a)
+unspecializeIntrinsics :: Cinst Gname -> Maybe (Cinst Gname)
 unspecializeIntrinsics inst = case inst of
   I_llvm_va_start v -> 
-    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_start")) 
+    Just $ I_call_fun (FunId (Gname "llvm.va_start")) 
     CallFunInterface { cfi_tail = TcNon 
                      , cfi_castType = Nothing
                      , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid, []) 
@@ -193,7 +187,7 @@ unspecializeIntrinsics inst = case inst of
                      , cfi_funAttrs = [] 
                      } Nothing
   I_llvm_va_end v -> 
-    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_end"))
+    Just $ I_call_fun (FunId (Gname "llvm.va_end"))
     CallFunInterface { cfi_tail = TcNon 
                      , cfi_castType = Nothing
                      , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid, []) 
@@ -201,7 +195,7 @@ unspecializeIntrinsics inst = case inst of
                      , cfi_funAttrs = [] 
                      } Nothing
   I_llvm_va_copy v1 v2 ->
-    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.va_copy"))
+    Just $ I_call_fun (FunId (Gname "llvm.va_copy"))
     CallFunInterface { cfi_tail = TcNon 
                      , cfi_castType = Nothing
                      , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid, []) 
@@ -214,7 +208,7 @@ unspecializeIntrinsics inst = case inst of
     let (nm, ltype) = case memLen of
           MemLenI32 -> ("llvm.memcpy.p0i8.p0i8.i32", i32)
           MemLenI64 -> ("llvm.memcpy.p0i8.p0i8.i64", i64)
-    in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
+    in Just $ I_call_fun (FunId (Gname nm))
        CallFunInterface { cfi_tail = TcNon 
                         , cfi_castType = Nothing
                         , cfi_signature = FunSignature Ccc  (Tfunction (RtypeVoidU Tvoid,[]) 
@@ -231,7 +225,7 @@ unspecializeIntrinsics inst = case inst of
     let (nm, ltype) = case memLen of
           MemLenI32 -> ("llvm.memmove.p0i8.p0i8.i32", i32)
           MemLenI64 -> ("llvm.memmove.p0i8.p0i8.i64", i64)
-    in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
+    in Just $ I_call_fun (FunId (Gname nm))
        CallFunInterface { cfi_tail = TcNon 
                         , cfi_castType = Nothing
                         , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
@@ -248,7 +242,7 @@ unspecializeIntrinsics inst = case inst of
     let (nm, ltype) = case memLen of
           MemLenI32 -> ("llvm.memset.p0i8.i32", i32)
           MemLenI64 -> ("llvm.memset.p0i8.i64", i64)
-    in Just $ I_call_fun (FunId (GlobalIdAlphaNum nm))
+    in Just $ I_call_fun (FunId (Gname nm))
        CallFunInterface { cfi_tail = TcNon 
                         , cfi_castType = Nothing
                         , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
@@ -262,14 +256,14 @@ unspecializeIntrinsics inst = case inst of
                         , cfi_funAttrs = []
                         } Nothing
   I_llvm_stacksave v -> 
-    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stacksave")) 
+    Just $ I_call_fun (FunId (Gname "llvm.stacksave")) 
     CallFunInterface { cfi_tail = TcNon 
                      , cfi_castType = Nothing
                      , cfi_signature = FunSignature Ccc (Tfunction (RtypeScalarP $ ptr0 i8,[]) [] Nothing) [] 
                      , cfi_funAttrs = [] 
                      } (Just v)
   I_llvm_stackrestore tv -> 
-    Just $ I_call_fun (FunId (GlobalIdAlphaNum "llvm.stackrestore")) 
+    Just $ I_call_fun (FunId (Gname "llvm.stackrestore")) 
     CallFunInterface { cfi_tail = TcNon 
                      , cfi_castType = Nothing
                      , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
@@ -281,13 +275,13 @@ unspecializeIntrinsics inst = case inst of
 tvToAp :: Ucast t Dtype => T t (Value g) -> FunOperand (Value g)
 tvToAp (T t v) = FunOperandData (ucast t) [] Nothing v
                  
-specializeTlGlobal :: TlGlobal g -> Maybe (TlIntrinsic g)
+specializeTlGlobal :: TlGlobal Gname -> Maybe (TlIntrinsic Gname)
 specializeTlGlobal tl = case tl of
   TlGlobalDtype {..} -> case tlg_lhs of
-    GlobalIdAlphaNum nm | (nm == "llvm.used" 
-                           || nm == "llvm.compiler.used" 
-                           || nm == "llvm.global_ctors" 
-                           || nm == "llvm.global_dtors") && tlg_linkage == Just LinkageAppending -> 
+    Gname nm | (nm == "llvm.used" 
+                   || nm == "llvm.compiler.used" 
+                   || nm == "llvm.global_ctors" 
+                   || nm == "llvm.global_dtors") && tlg_linkage == Just LinkageAppending -> 
       
       let cnf = case nm of
             "llvm.used" -> TlIntrinsic_llvm_used
@@ -299,13 +293,13 @@ specializeTlGlobal tl = case tl of
   _ -> Nothing
   
   
-unspecializeTlIntrinsics :: TlIntrinsic g -> TlGlobal g
+unspecializeTlIntrinsics :: TlIntrinsic Gname -> TlGlobal Gname
 unspecializeTlIntrinsics tl = case tl of
   TlIntrinsic_llvm_used ty cnst sec -> mkGlobal "llvm.used" ty cnst sec
   TlIntrinsic_llvm_compiler_used ty cnst sec -> mkGlobal "llvm.compiler.used" ty cnst sec  
   TlIntrinsic_llvm_global_ctors ty cnst sec -> mkGlobal "llvm.global_ctors" ty cnst sec  
   TlIntrinsic_llvm_global_dtors ty cnst sec -> mkGlobal "llvm.global_dtors" ty cnst sec
-  where mkGlobal str t c s = TlGlobalDtype { tlg_lhs = GlobalIdAlphaNum str
+  where mkGlobal str t c s = TlGlobalDtype { tlg_lhs = Gname str
                                            , tlg_linkage = Just LinkageAppending
                                            , tlg_visibility = Nothing
                                            , tlg_dllstorage = Nothing
@@ -323,27 +317,27 @@ unspecializeTlIntrinsics tl = case tl of
       
     
     
-specializeMinst :: Minst g -> Minst g
+specializeMinst :: Minst Gname -> Minst Gname
 specializeMinst mi = case mi of
-  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.declare") [m1,m2] ->  M_llvm_dbg_declare m1 m2
-  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.value") [m1,m2,m3] -> M_llvm_dbg_value m1 m2 m3
-  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.func.start") [m1] -> M_llvm_dbg_func_start m1
-  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.region.end") [m1] -> M_llvm_dbg_region_end m1  
-  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (GlobalIdAlphaNum "llvm.dbg.stopppoint") [m1,m2,m3] -> M_llvm_dbg_stoppoint m1 m2 m3
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (Gname "llvm.dbg.declare") [m1,m2] ->  M_llvm_dbg_declare m1 m2
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (Gname "llvm.dbg.value") [m1,m2,m3] -> M_llvm_dbg_value m1 m2 m3
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (Gname "llvm.dbg.func.start") [m1] -> M_llvm_dbg_func_start m1
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (Gname "llvm.dbg.region.end") [m1] -> M_llvm_dbg_region_end m1  
+  Minst (CallSiteTypeRet (RtypeVoidU Tvoid)) (Gname "llvm.dbg.stopppoint") [m1,m2,m3] -> M_llvm_dbg_stoppoint m1 m2 m3
   _ -> mi
     
     
-unspecializeMinst :: Minst g -> Minst g
+unspecializeMinst :: Minst Gname -> Minst Gname
 unspecializeMinst mi = case mi of
-  M_llvm_dbg_declare m1 m2 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.declare") [m1,m2]
-  M_llvm_dbg_value m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.value") [m1,m2,m3]
-  M_llvm_dbg_func_start m1 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.func.start") [m1]
-  M_llvm_dbg_region_end m1 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.region.end") [m1]
-  M_llvm_dbg_stoppoint m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (GlobalIdAlphaNum "llvm.dbg.stoppoint") [m1,m2,m3]  
+  M_llvm_dbg_declare m1 m2 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (Gname "llvm.dbg.declare") [m1,m2]
+  M_llvm_dbg_value m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (Gname "llvm.dbg.value") [m1,m2,m3]
+  M_llvm_dbg_func_start m1 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (Gname "llvm.dbg.func.start") [m1]
+  M_llvm_dbg_region_end m1 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (Gname "llvm.dbg.region.end") [m1]
+  M_llvm_dbg_stoppoint m1 m2 m3 -> Minst (CallSiteTypeRet $ RtypeVoidU Tvoid) (Gname "llvm.dbg.stoppoint") [m1,m2,m3]  
   _ -> mi
 
 
-specializeUnamedMd :: TlUnamedMd g -> TlUnamedMd g
+specializeUnamedMd :: TlUnamedMd Gname -> TlUnamedMd Gname
 specializeUnamedMd x = case x of
   (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> 
     TlUnamedMd_DW_file_type n mc
@@ -354,7 +348,7 @@ specializeUnamedMd x = case x of
     TlUnamedMd_DW_lexical_block n [m1,m2,m3,m4,m5,m6]
   _ -> x
 
-unspecializeUnamedMd :: TlUnamedMd g -> TlUnamedMd g
+unspecializeUnamedMd :: TlUnamedMd Gname -> TlUnamedMd Gname
 unspecializeUnamedMd x = case x of
   TlUnamedMd_DW_file_type n mc -> 
     (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786473")), mc])))

@@ -2,7 +2,6 @@
 module Llvm.Hir.Mangle where
 
 import Llvm.Hir.Data.Inst
-import Llvm.Hir.Data.Type
 import Llvm.Hir.Cast
 import Llvm.Hir.Print
 
@@ -38,12 +37,9 @@ instance Mangle Dtype where
   mangle t = let (t0::Utype) = ucast t 
              in replaceDq $ mangle t0
 
-instance Mangle g => Mangle (GlobalId g) where
+instance Mangle Gname where
   mangle x = case x of
-    GlobalIdNum n -> show n
-    GlobalIdAlphaNum s -> s
-    GlobalIdDqString s -> s
-    GlobalIdSpecialized n -> mangle n
+    Gname n -> n
 
 instance Mangle Ext where
   mangle e = case e of
@@ -142,12 +138,7 @@ instance Mangle a => Mangle (FunOperand a) where
     FunOperandByVal d atts align a -> "byval" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
     FunOperandAsRet d atts align a -> "sret" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a        
     FunOperandLabel d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
-  
-{-
-instance Mangle CallOperand where
-  mangle x = render $ printIr x
--}
-  
+
 instance Mangle (Type s r) where
   mangle x = case x of
     TpI n -> "i" ++ mangle n

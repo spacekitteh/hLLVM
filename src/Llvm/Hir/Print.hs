@@ -62,6 +62,7 @@ instance IrPrint g => IrPrint (TlUnamedMd g) where
   printIr x = case x of
     TlUnamedMd s t -> char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
     TlUnamedMd_DW_file_type n mc -> char '!'<>(integer $ fromIntegral n) <+> equals <+> printIr mc
+    _ -> text "()"
       
 
 instance IrPrint TlNamedMd where
@@ -719,6 +720,8 @@ instance IrPrint g => IrPrint (FunctionDeclare g) where
     hsep [printIr fhLinkage, printIr fhVisibility, printIr fhDllStorageClass, printIr fhSig
          , printIr fhName, printIr fhd, hsep $ fmap printIr fhAttr1
          , printIr fhSection, printIr fhCmd, printIr fhAlign, printIr fhGc, printIr fhPrefix, printIr fhPrologue]
+  printIr (FunctionDeclareMeta fhName attrs rtype metakinds) =
+    hsep [printIr fhName, printIr attrs, printIr rtype, printIr metakinds]
 
 
 instance IrPrint MetaKind where
@@ -927,24 +930,12 @@ instance IrPrint PAttr where
 instance IrPrint AlignInByte where
   printIr (AlignInByte n) = text "align" <+> (integer $ fromIntegral n)
 
-instance IrPrint g => IrPrint (GlobalId g) where
+instance IrPrint Gname where
   printIr x = case x of
-    GlobalIdNum x -> printIr x
-    GlobalIdAlphaNum x -> text x
-    GlobalIdDqString x -> text x
-    GlobalIdSpecialized x -> printIr x
-
-
-instance IrPrint g => IrPrint (DollarId g) where
-  printIr x = case x of
-    DollarIdNum x -> printIr x
-    DollarIdAlphaNum x -> text x
-    DollarIdDqString x -> text x
-    DollarIdSpecialized x -> printIr x
+    Gname x -> text x
 
 instance IrPrint g => IrPrint (Comdat g) where
   printIr (Comdat x) = text "comdat" <+> printIr x
-
 
 instance IrPrint IcmpOp where
   printIr = P.print

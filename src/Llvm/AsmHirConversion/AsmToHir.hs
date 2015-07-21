@@ -9,7 +9,6 @@ import Llvm.ErrorLoc
 import qualified Compiler.Hoopl as H
 import qualified Control.Monad as Md
 import qualified Data.Map as M
--- import qualified Data.Set as S
 import qualified Llvm.Asm.Data as A
 import qualified Llvm.Hir.Data as I
 import Llvm.Hir.Cast
@@ -22,7 +21,7 @@ import Llvm.AsmHirConversion.Specialization
 import Llvm.Hir.DataLayoutMetrics
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
-                              , funname :: I.GlobalId ()
+                              , funname :: I.Gname
                               }
 
 type MM = ReaderT ReaderData (LabelMapM H.SimpleUniqueMonad)
@@ -30,10 +29,10 @@ type MM = ReaderT ReaderData (LabelMapM H.SimpleUniqueMonad)
 typeDefs :: MM (M.Map A.LocalId A.Type)
 typeDefs = ask >>= return . typedefs
 
-funName :: MM (I.GlobalId ())
+funName :: MM I.Gname
 funName = ask >>= return . funname
 
-withFunName :: I.GlobalId () -> MM a -> MM a
+withFunName :: I.Gname -> MM a -> MM a
 withFunName g f = withReaderT (\(ReaderData x _) -> ReaderData x g) f
 
 
@@ -77,17 +76,25 @@ convert_LabelId x = do { fn <- funName
 convert_PercentLabel :: A.PercentLabel -> MM H.Label 
 convert_PercentLabel (A.PercentLabel l) = convert_LabelId l
 
+
+convert_PercentLabelEx :: I.Gname -> A.PercentLabel -> MM (Maybe H.Label)
+convert_PercentLabelEx g (A.PercentLabel l) = convert_LabelIdEx g l
+  where 
+    convert_LabelIdEx :: I.Gname -> A.LabelId -> MM (Maybe H.Label)
+    convert_LabelIdEx fn x = lift (getLabel (fn, x))
+
+
 convert_TargetLabel :: A.TargetLabel -> MM H.Label 
 convert_TargetLabel (A.TargetLabel tl) = convert_PercentLabel tl 
 
 convert_BlockLabel :: A.BlockLabel -> MM H.Label
 convert_BlockLabel (A.ImplicitBlockLabel p) = 
   error $ "ImplicitBlockLabel @" ++ show p 
-  ++ " should be normalized away in AstSimplification, and should not be leaked to Ast2Ir."
+  ++ " should be normalized away in Asm.Simplification, and should not be leaked to Ast2Ir."
 convert_BlockLabel (A.ExplicitBlockLabel b) = convert_LabelId b 
 
 
-convert_ComplexConstant :: A.ComplexConstant -> (MM (I.Const ()))
+convert_ComplexConstant :: A.ComplexConstant -> (MM (I.Const I.Gname))
 convert_ComplexConstant (A.Cstruct b fs) = Md.liftM (I.C_struct b) 
                                            (mapM convert_TypedConstOrNUll fs)
 convert_ComplexConstant (A.Cvector fs) = Md.liftM I.C_vector 
@@ -330,11 +337,12 @@ convert_to_GetElementPtr cvt cvidx (A.GetElementPtr b (A.Pointer (A.Typed t u)) 
      ; return $ I.GetElementPtr b (I.T ta ua) usa
      }
   where
-    convert_Tv_Tint (A.Typed t v) = do { mp <- typeDefs
-                                       ; va <- cvidx v
-                                       ; let (ta::I.Type I.ScalarB I.I) = dcast FLC ((tconvert mp t)::I.Utype)
-                                       ; return $ I.T ta va
-                                       }
+    convert_Tv_Tint (A.Typed t v) = 
+      do { mp <- typeDefs
+         ; va <- cvidx v
+         ; let (ta::I.Type I.ScalarB I.I) = dcast FLC ((tconvert mp t)::I.Utype)
+         ; return $ I.T ta va
+         }
 
 
 convert_to_GetElementPtr_V :: (u -> MM v) -> (u -> MM idx) -> A.GetElementPtr u -> (MM (I.GetElementPtr I.VectorB v idx))
@@ -358,7 +366,7 @@ cast_to_EitherScalarOrVectorI :: FileLoc -> I.T I.Utype v ->
 cast_to_EitherScalarOrVectorI flc (I.T t v) = case t of
   I.UtypeScalarI e -> Left $ I.T e v
   I.UtypeVectorI e -> Right $ I.T e v
-  _ -> error "$$$$"
+  _ -> errorLoc flc "$$$$"
   
   
 convert_to_Select_I :: (u -> MM v) -> A.Select u -> (MM (I.Select I.ScalarB I.I v))
@@ -605,7 +613,7 @@ convert_to_InsertElement_P cvt (A.InsertElement (A.Typed t1 u1) (A.Typed t2 u2) 
      }
 
 
-convert_SimpleConst :: A.SimpleConstant -> I.Const g
+convert_SimpleConst :: A.SimpleConstant -> I.Const I.Gname
 convert_SimpleConst x = case x of
   A.CpInt s -> I.C_int s
   A.CpUhexInt s -> I.C_uhex_int s
@@ -620,7 +628,7 @@ convert_SimpleConst x = case x of
   A.CpStr s -> I.C_str s
   A.CpBconst s -> convert_Bconst s
   
-convert_Bconst :: A.BinaryConstant -> I.Const g
+convert_Bconst :: A.BinaryConstant -> I.Const I.Gname
 convert_Bconst x = case x of
   A.BconstUint8 s -> I.C_u8 s
   A.BconstUint16 s -> I.C_u16 s
@@ -635,15 +643,17 @@ convert_Bconst x = case x of
   A.BconstInt96 s -> I.C_s96 s
   A.BconstInt128 s -> I.C_s128 s
 
-convert_Const :: A.Const -> MM (I.Const ())
+convert_Const :: A.Const -> MM (I.Const I.Gname)
 convert_Const x = 
   let cvt = convert_Const
   in case x of
     A.C_simple a -> return $ convert_SimpleConst a
     A.C_complex a -> convert_ComplexConstant a
     A.C_labelId a -> Md.liftM I.C_labelId (convert_LabelId a)
-    A.C_blockAddress g a -> do { a' <- convert_PercentLabel a
-                               ; return $ I.C_block (specializeGlobalId g) a'
+    A.C_blockAddress g a -> do { a' <- convert_PercentLabelEx (specializeGlobalId g) a
+                               ; case a' of
+                                 Just a'' -> return $ I.C_block (specializeGlobalId g) a''
+                                 Nothing -> errorLoc FLC $ show x
                                }
     A.C_binexp (A.Ie a@(A.IbinExpr _ _ t _ _)) -> 
       do { mp <- typeDefs
@@ -815,14 +825,14 @@ convert_MdRef x = case x of
   A.MdRefName n -> Md.liftM I.MdRefName (convert_MdName n)
   A.MdRefNode n -> Md.liftM I.MdRefNode (convert_MdNode n)  
 
-convert_MetaConst :: A.MetaConst -> MM (I.MetaConst ())
+convert_MetaConst :: A.MetaConst -> MM (I.MetaConst I.Gname)
 convert_MetaConst (A.McStruct c) = Md.liftM I.McStruct (mapM convert_MetaKindedConst c)
 convert_MetaConst (A.McString s) = return $ I.McString s
 convert_MetaConst (A.McMdRef n) = Md.liftM I.McMdRef (convert_MdRef n)
 convert_MetaConst (A.McSsa i) = return $ I.McSsa i
 convert_MetaConst (A.McSimple sc) = Md.liftM I.McSimple (convert_Const sc)
 
-convert_MetaKindedConst :: A.MetaKindedConst -> MM (I.MetaKindedConst ())
+convert_MetaKindedConst :: A.MetaKindedConst -> MM (I.MetaKindedConst I.Gname)
 convert_MetaKindedConst x = 
   do { mp <- typeDefs
      ; case x of
@@ -833,7 +843,7 @@ convert_MetaKindedConst x =
 
 
 
-convert_FunPtr :: A.FunName -> MM (I.FunPtr ())
+convert_FunPtr :: A.FunName -> MM (I.FunPtr I.Gname)
 convert_FunPtr fn = 
   case fn of
     A.FunNameGlobal g -> case g of
@@ -855,16 +865,16 @@ convert_FunPtr fn =
     A.FunName_undef -> return I.Fun_undef
 
 
-convert_FunId :: A.FunName -> MM (I.GlobalId ())
+convert_FunId :: A.FunName -> MM I.Gname
 convert_FunId (A.FunNameGlobal (A.GolG g)) = return $ specializeGlobalId g
 convert_FunId x = errorLoc FLC $ show x
 
 
-convert_Value :: A.Value -> MM (I.Value ())
+convert_Value :: A.Value -> MM (I.Value I.Gname)
 convert_Value (A.Val_local a) = return $ I.Val_ssa a
 convert_Value (A.Val_const a) = Md.liftM I.Val_const (convert_Const a)
 
-convert_to_Minst :: A.CallSite -> MM (Maybe (I.Minst ()))
+convert_to_Minst :: A.CallSite -> MM (Maybe (I.Minst I.Gname))
 convert_to_Minst x = case x of
   (A.CallSiteFun cc pa t fn aps fa) | any isMetaParam aps ->
     do { mp <- typeDefs
@@ -876,7 +886,8 @@ convert_to_Minst x = case x of
        }
   _ -> return Nothing 
 
-convert_to_CallFunInterface :: A.TailCall -> A.CallSite -> MM (Bool, I.FunPtr (), I.CallFunInterface ())
+convert_to_CallFunInterface :: A.TailCall -> A.CallSite 
+                               -> MM (Bool, I.FunPtr I.Gname, I.CallFunInterface I.Gname)
 convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) = 
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
@@ -890,7 +901,7 @@ convert_to_CallFunInterface tc (A.CallSiteFun cc pa t fn aps fa) =
                                                            })
      }
 
-convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr (), I.InvokeFunInterface ())
+convert_to_InvokeFunInterface :: A.CallSite -> MM (Bool, I.FunPtr I.Gname, I.InvokeFunInterface I.Gname)
 convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) = 
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
@@ -904,7 +915,7 @@ convert_to_InvokeFunInterface (A.CallSiteFun cc pa t fn aps fa) =
                                                              })
      }
 
-convert_to_CallAsmInterface :: A.InlineAsmExp -> MM (Bool, I.AsmCode, I.CallAsmInterface ())
+convert_to_CallAsmInterface :: A.InlineAsmExp -> MM (Bool, I.AsmCode, I.CallAsmInterface I.Gname)
 convert_to_CallAsmInterface  (A.InlineAsmExp t dia b1 b2 qs1 qs2 as fa) =
   do { mp <- typeDefs
      ; let ert = A.splitCallReturnType t
@@ -915,7 +926,8 @@ convert_to_CallAsmInterface  (A.InlineAsmExp t dia b1 b2 qs1 qs2 as fa) =
      }
 
     
-eitherRet :: [I.RetAttr] -> (A.Type, Maybe (A.Type, A.AddrSpace)) -> [A.ActualParam] -> MM (Maybe (I.Type I.ScalarB I.P), I.Type I.CodeFunB I.X)
+eitherRet :: [I.RetAttr] -> (A.Type, Maybe (A.Type, A.AddrSpace)) 
+             -> [A.ActualParam] -> MM (Maybe (I.Type I.ScalarB I.P), I.Type I.CodeFunB I.X)
 eitherRet retAttrs (rt, ft) actualParams = 
   let ts = fmap (\x -> case x of
                     A.ActualParamData t pa _ -> (t, pa)
@@ -931,7 +943,7 @@ eitherRet retAttrs (rt, ft) actualParams =
        Nothing -> return (Nothing, funType) 
      }
 
-convert_Clause :: A.Clause -> MM (I.Clause ())
+convert_Clause :: A.Clause -> MM (I.Clause I.Gname)
 convert_Clause x = case x of 
   (A.ClauseCatch (A.Typed t v)) -> do { mp <- typeDefs
                                       ; let (ti::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
@@ -949,7 +961,7 @@ convert_Clause x = case x of
 convert_GlobalOrLocalId :: A.GlobalOrLocalId -> MM I.GlobalOrLocalId
 convert_GlobalOrLocalId = return
 
-convert_Expr_CInst :: (Maybe A.LocalId, A.Expr) -> MM (I.Cinst ())
+convert_Expr_CInst :: (Maybe A.LocalId, A.Expr) -> MM (I.Cinst I.Gname)
 convert_Expr_CInst (Just lhs, A.ExprGetElementPtr c) = 
   do { mp <- typeDefs
      ; if getElemPtrIsTvector mp c then 
@@ -1115,7 +1127,7 @@ convert_Expr_CInst (Just lhs, A.ExprSelect a@(A.Select _ (A.Typed t _) _)) =
      }
 
 
-convert_MemOp :: (Maybe A.LocalId, A.MemOp) -> MM (I.Cinst ())
+convert_MemOp :: (Maybe A.LocalId, A.MemOp) -> MM (I.Cinst I.Gname)
 convert_MemOp (mlhs, c) = case (mlhs, c) of
   (Just lhs, A.Alloca mar t mtv ma) -> 
     do { mp <- typeDefs
@@ -1166,14 +1178,14 @@ convert_MemOp (mlhs, c) = case (mlhs, c) of
        }
   (_,_) -> error $ "AstIrConversion:irrefutable lhs:" ++ show mlhs ++ " rhs:" ++ show c
 
-convert_to_DtypedValue :: A.Typed A.Value -> MM (I.T I.Dtype (I.Value ()))
+convert_to_DtypedValue :: A.Typed A.Value -> MM (I.T I.Dtype (I.Value I.Gname))
 convert_to_DtypedValue (A.Typed t v) = do { mp <- typeDefs
                                           ; let (ti::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
                                           ; vi <- convert_Value v 
                                           ; return $ I.T ti vi
                                           }
                                               
-convert_to_DtypedConst :: A.Typed A.Const -> MM (I.T I.Dtype (I.Const ()))
+convert_to_DtypedConst :: A.Typed A.Const -> MM (I.T I.Dtype (I.Const I.Gname))
 convert_to_DtypedConst (A.Typed t v) = do { mp <- typeDefs
                                           ; let (ti::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
                                           ; vi <- convert_Const v 
@@ -1181,28 +1193,28 @@ convert_to_DtypedConst (A.Typed t v) = do { mp <- typeDefs
                                           }
 
 
-convert_to_TypedValue_SI :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.I) (I.Value ()))
+convert_to_TypedValue_SI :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.I) (I.Value I.Gname))
 convert_to_TypedValue_SI lc (A.Typed t v) = do { mp <- typeDefs
                                                ; let (ti::I.Type I.ScalarB I.I) = dcast lc ((tconvert mp t)::I.Utype)
                                                ; vi <- convert_Value v
                                                ; return $ I.T ti vi
                                                }
 
-convert_to_TypedValue_SF :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.F) (I.Value ()))
+convert_to_TypedValue_SF :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.F) (I.Value I.Gname))
 convert_to_TypedValue_SF lc (A.Typed t v) = do { mp <- typeDefs
                                                ; let (ti::I.Type I.ScalarB I.F) = dcast lc ((tconvert mp t)::I.Utype)
                                                ; vi <- convert_Value v
                                                ; return $ I.T ti vi
                                                }
 
-convert_to_TypedValue_SP :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.P) (I.Value ()))
+convert_to_TypedValue_SP :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.P) (I.Value I.Gname))
 convert_to_TypedValue_SP lc (A.Typed t v) = do { mp <- typeDefs
                                                ; let (ti::I.Type I.ScalarB I.P) = dcast lc ((tconvert mp t)::I.Utype)
                                                ; vi <- convert_Value v
                                                ; return $ I.T ti vi
                                                }
 
-convert_to_TypedAddrValue :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.P) (I.Value ()))
+convert_to_TypedAddrValue :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.P) (I.Value I.Gname))
 convert_to_TypedAddrValue lc (A.Typed t v) = do { mp <- typeDefs
                                                 ; let (ti::I.Type I.ScalarB I.P) = dcast lc ((tconvert mp t)::I.Utype)
                                                 ; vi <- convert_Value v
@@ -1215,7 +1227,7 @@ convert_Type_Dtype lc t = do { mp <- typeDefs
                              }
 
 
-convert_Rhs :: (Maybe A.LocalId, A.Rhs) -> MM (I.Node () () H.O H.O)
+convert_Rhs :: (Maybe A.LocalId, A.Rhs) -> MM (I.Node I.Gname () H.O H.O)
 convert_Rhs (mlhs, A.RhsMemOp c) = Md.liftM (\x -> I.Cnode x []) (convert_MemOp (mlhs, c))
 convert_Rhs (mlhs, A.RhsExpr e) = Md.liftM (\x -> I.Cnode x []) (convert_Expr_CInst (mlhs, e))
 convert_Rhs (lhs, A.RhsCall b cs) = 
@@ -1310,7 +1322,7 @@ convert_Rhs (lhs,rhs) =  errorLoc FLC $ "AstIrConversion:irrefutable error lhs:"
 
 
 
-specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe (I.FunOperand (I.Value ())))
+specializeFirstParamAsRet :: A.ActualParam -> MM (Maybe (I.FunOperand (I.Value I.Gname)))
 specializeFirstParamAsRet x = case x of
   (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
@@ -1332,7 +1344,7 @@ specializeFirstParamAsRet x = case x of
   A.ActualParamMeta mc -> errorLoc FLC $ show x ++ " is passed to convert_ActualParam"
 
 
-convert_ActualParam :: A.ActualParam -> MM (I.FunOperand (I.Value ()))
+convert_ActualParam :: A.ActualParam -> MM (I.FunOperand (I.Value I.Gname))
 convert_ActualParam x = case x of
   (A.ActualParamData t pa v) ->
     do { mp <- typeDefs
@@ -1369,7 +1381,7 @@ isFormalMetaParam x = case x of
   A.FormalParamMeta _ _ -> True
   _ -> False
 
-convert_MetaParam :: A.ActualParam -> MM (I.MetaOperand ())
+convert_MetaParam :: A.ActualParam -> MM (I.MetaOperand I.Gname)
 convert_MetaParam x = case x of
   A.ActualParamMeta mc -> Md.liftM I.MetaOperandMeta (convert_MetaKindedConst mc)
   A.ActualParamData t pa v ->
@@ -1383,13 +1395,13 @@ convert_MetaParam x = case x of
   _ -> errorLoc FLC $ show x ++ " is passed to convert_MetaParam"
 
 
-convert_constToAliasee :: A.Const -> MM (I.Aliasee ())
+convert_constToAliasee :: A.Const -> MM (I.Aliasee I.Gname)
 convert_constToAliasee (A.C_simple (A.CpGlobalAddr v)) = return $ I.Aliasee $ specializeGlobalId v
 convert_constToAliasee (A.C_conv cvt@(A.Conversion op src dt)) = convert_Aliasee (A.AliaseeConversion cvt)
 convert_constToAliasee x = errorLoc FLC $ show x
 
 
-convert_Aliasee :: A.Aliasee -> MM (I.Aliasee ())
+convert_Aliasee :: A.Aliasee -> MM (I.Aliasee I.Gname)
 convert_Aliasee ae = case ae of
   A.Aliasee (A.Typed t c) -> do { mp <- typeDefs
                                 ; let (ta::I.Dtype) = dcast FLC ((tconvert mp t)::I.Utype)
@@ -1407,13 +1419,13 @@ convert_Aliasee ae = case ae of
          else Md.liftM I.AliaseeGEP (convert_to_GetElementPtr convert_constToAliasee convert_Const a)
        }
 
-convert_Prefix :: A.Prefix -> MM (I.Prefix ())
+convert_Prefix :: A.Prefix -> MM (I.Prefix I.Gname)
 convert_Prefix (A.Prefix n) = Md.liftM I.Prefix (convert_TypedConstOrNUll n)
 
-convert_Prologue :: A.Prologue -> MM (I.Prologue ())
+convert_Prologue :: A.Prologue -> MM (I.Prologue I.Gname)
 convert_Prologue (A.Prologue n) = Md.liftM I.Prologue (convert_TypedConstOrNUll n)
 
-convert_TypedConstOrNUll :: A.TypedConstOrNull -> MM (I.TypedConstOrNull ())
+convert_TypedConstOrNUll :: A.TypedConstOrNull -> MM (I.TypedConstOrNull I.Gname)
 convert_TypedConstOrNUll x = case x of
   A.TypedConst (A.Typed t v) -> do { mp <- typeDefs
                                    ; vi <- convert_Const v
@@ -1430,11 +1442,16 @@ convert_to_FunParamType x =
        (A.FormalParamData dt pa _) ->
          case stripOffPa pa sRetByValSignExtZeroExtAlignPreds of
            (palist, bl) -> case bl of
-             [Just _,  Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
-             [Nothing, Just _,  Nothing, Nothing, pa] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
-             [Nothing, Nothing, Just _,  Nothing, pa] -> return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
-             [Nothing, Nothing, Nothing, Just _,  pa] -> return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
-             [Nothing, Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Just _,  Nothing, Nothing, Nothing, pa] -> 
+               return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Just _,  Nothing, Nothing, pa] -> 
+               return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Nothing, Just _,  Nothing, pa] -> 
+               return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Nothing, Nothing, Just _,  pa] -> 
+               return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
+             [Nothing, Nothing, Nothing, Nothing, pa] -> 
+               return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) ()
              _ -> errorLoc FLC $ show bl
        (A.FormalParamMeta mk fp) -> errorLoc FLC $ show x
      }
@@ -1481,7 +1498,7 @@ sRetByValSignExtZeroExtAlignPreds = [ (A.PaSRet==)
                                     ]
         
   
-convert_FunctionDeclareType :: A.FunctionPrototype -> MM (I.FunctionDeclare ())
+convert_FunctionDeclareType :: A.FunctionPrototype -> MM (I.FunctionDeclare I.Gname)
 convert_FunctionDeclareType  (A.FunctionPrototype { A.fp_linkage = f0 
                                                   , A.fp_visibility = f1 
                                                   , A.fp_dllstorage = f2 
@@ -1526,10 +1543,11 @@ convert_FunctionDeclareType  (A.FunctionPrototype { A.fp_linkage = f0
     do { mp <- typeDefs
        ; return $ I.FunctionDeclareMeta { I.fd_fun_name = specializeGlobalId f6
                                         , I.fd_retType = dcast FLC ((tconvert mp f5)::I.Utype)
-                                        , I.fd_metakinds = fmap (\x -> case x of
-                                                                    (A.FormalParamMeta m _) -> Left $ tconvert mp m
-                                                                    (A.FormalParamData dt _ _) -> Right $ (dcast FLC ((tconvert mp dt)::I.Utype))
-                                                                ) fpl
+                                        , I.fd_metakinds = 
+                                          fmap (\x -> case x of
+                                                   (A.FormalParamMeta m _) -> Left $ tconvert mp m
+                                                   (A.FormalParamData dt _ _) -> Right $ (dcast FLC ((tconvert mp dt)::I.Utype))
+                                               ) fpl
                                         , I.fd_fun_attrs = f9 
                                         }
        }
@@ -1541,16 +1559,21 @@ convert_to_FunParam x =
        (A.FormalParamData dt pa (A.FexplicitParam fp)) ->
          let (palist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
          in case bl of
-           [Just _,  Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
-           [Nothing, Just _,  Nothing, Nothing, pa] -> return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
-           [Nothing, Nothing,  Just _,  Nothing, pa] -> return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
-           [Nothing, Nothing, Nothing, Just _,  pa] -> return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
-           [Nothing, Nothing, Nothing, Nothing, pa] -> return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Just _,  Nothing, Nothing, Nothing, pa] -> 
+             return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Just _,  Nothing, Nothing, pa] -> 
+             return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Nothing,  Just _,  Nothing, pa] -> 
+             return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Nothing, Nothing, Just _,  pa] -> 
+             return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+           [Nothing, Nothing, Nothing, Nothing, pa] -> 
+             return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
            _ -> errorLoc FLC $ show bl
        (A.FormalParamData _ _ A.FimplicitParam) -> errorLoc FLC "implicit param should be normalized in AsmSimplification"
      }
   
-convert_FunctionInterface :: A.FunctionPrototype -> MM (I.FunctionInterface ())
+convert_FunctionInterface :: A.FunctionPrototype -> MM (I.FunctionInterface I.Gname)
 convert_FunctionInterface  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7@(A.FormalParamList plist mv) f8 f9 f10 f10a f11 f12 f13 f14) =
   do { mp <- typeDefs
      ; let (f5a::I.Rtype) = dcast FLC ((tconvert mp f5)::I.Utype)
@@ -1578,7 +1601,7 @@ convert_FunctionInterface  (A.FunctionPrototype f0 f1 f2 f3 f4 f5 f6 f7@(A.Forma
                                     }
      }
 
-convert_PhiInst :: A.PhiInst -> MM (I.Pinst ())
+convert_PhiInst :: A.PhiInst -> MM (I.Pinst I.Gname)
 convert_PhiInst phi@(A.PhiInst mg t branches) = 
   do { mp <- typeDefs
      ; branchesa <- mapM (pairM convert_Value convert_PercentLabel) branches             
@@ -1591,10 +1614,10 @@ convert_PhiInst phi@(A.PhiInst mg t branches) =
        Nothing -> errorLoc FLC $ "unused phi" ++ show phi
      }
 
-convert_CInst :: A.ComputingInst -> MM (I.Node () () H.O H.O)
+convert_CInst :: A.ComputingInst -> MM (I.Node I.Gname () H.O H.O)
 convert_CInst (A.ComputingInst mg rhs) = convert_Rhs (mg, rhs) 
 
-convert_TerminatorInst :: A.TerminatorInst -> MM (I.Tinst ())
+convert_TerminatorInst :: A.TerminatorInst -> MM (I.Tinst I.Gname)
 convert_TerminatorInst (A.RetVoid) = return I.T_ret_void
 convert_TerminatorInst (A.Return tvs) = Md.liftM I.T_return (mapM convert_to_DtypedValue tvs)
 convert_TerminatorInst (A.Br t) = Md.liftM I.T_br (convert_TargetLabel t)
@@ -1625,17 +1648,17 @@ convert_TerminatorInst (A.Resume tv) = Md.liftM I.T_resume (convert_to_DtypedVal
 convert_TerminatorInst A.Unreachable = return I.T_unreachable
 convert_TerminatorInst A.Unwind = return I.T_unwind
 
-convert_Dbg :: A.Dbg -> MM (I.Dbg ())
+convert_Dbg :: A.Dbg -> MM (I.Dbg I.Gname)
 convert_Dbg (A.Dbg mv mc) = Md.liftM2 I.Dbg (convert_MdRef mv) (convert_MetaConst mc)
 
-convert_PhiInstWithDbg :: A.PhiInstWithDbg -> MM (I.Pinst (), [I.Dbg ()])
+convert_PhiInstWithDbg :: A.PhiInstWithDbg -> MM (I.Pinst I.Gname, [I.Dbg I.Gname])
 convert_PhiInstWithDbg (A.PhiInstWithDbg ins dbgs) = 
   do { ins0 <- convert_PhiInst ins 
      ; dbgs0 <- mapM convert_Dbg dbgs
      ; return (ins0, dbgs0)
      }
 
-convert_CInstWithDbg :: A.ComputingInstWithDbg -> MM (I.Node () () H.O H.O)
+convert_CInstWithDbg :: A.ComputingInstWithDbg -> MM (I.Node I.Gname () H.O H.O)
 convert_CInstWithDbg (A.ComputingInstWithDbg ins dbgs) = 
   do { ins0 <- convert_CInst ins 
      ; dbgs0 <- mapM convert_Dbg dbgs
@@ -1644,7 +1667,7 @@ convert_CInstWithDbg (A.ComputingInstWithDbg ins dbgs) =
        I.Mnode n _ -> return $ I.Mnode n dbgs0
      }
   
-convert_TerminatorInstWithDbg :: A.TerminatorInstWithDbg -> MM (I.Tinst (), [I.Dbg ()])
+convert_TerminatorInstWithDbg :: A.TerminatorInstWithDbg -> MM (I.Tinst I.Gname, [I.Dbg I.Gname])
 convert_TerminatorInstWithDbg (A.TerminatorInstWithDbg term dbgs) = 
   do { term0 <- convert_TerminatorInst term 
      ; dbgs0 <- mapM convert_Dbg dbgs
@@ -1652,7 +1675,7 @@ convert_TerminatorInstWithDbg (A.TerminatorInstWithDbg term dbgs) =
      }
 
 
-toSingleNodeGraph :: A.Block -> MM (H.Graph (I.Node () ()) H.C H.C)
+toSingleNodeGraph :: A.Block -> MM (H.Graph (I.Node I.Gname ()) H.C H.C)
 toSingleNodeGraph (A.Block f  phi ms l) =
   do { f'  <- toFirst f
      ; phi' <- mapM toPhi phi
@@ -1661,16 +1684,16 @@ toSingleNodeGraph (A.Block f  phi ms l) =
      ; return $ H.mkFirst f' H.<*> H.mkMiddles phi' H.<*> H.mkMiddles ms' H.<*> H.mkLast l'
      }
 
-toFirst :: A.BlockLabel -> MM (I.Node () () H.C H.O)
+toFirst :: A.BlockLabel -> MM (I.Node I.Gname () H.C H.O)
 toFirst x = Md.liftM I.Lnode (convert_BlockLabel x)
 
-toPhi :: A.PhiInstWithDbg -> MM (I.Node () () H.O H.O)
+toPhi :: A.PhiInstWithDbg -> MM (I.Node I.Gname () H.O H.O)
 toPhi phi = Md.liftM (uncurry I.Pnode) (convert_PhiInstWithDbg phi)
 
-toMid :: A.ComputingInstWithDbg -> MM (I.Node () () H.O H.O)
+toMid :: A.ComputingInstWithDbg -> MM (I.Node I.Gname () H.O H.O)
 toMid inst = convert_CInstWithDbg inst
 
-toLast :: A.TerminatorInstWithDbg -> MM (I.Node () () H.O H.C)
+toLast :: A.TerminatorInstWithDbg -> MM (I.Node I.Gname () H.O H.C)
 toLast inst = Md.liftM (uncurry I.Tnode) (convert_TerminatorInstWithDbg inst)
 
 -- | the head must be the entry block
@@ -1686,7 +1709,7 @@ getEntryAndAlist bs =
      ; return (l, ord)
      }
 
-toGraph :: [A.Block] -> MM (H.Graph (I.Node () ()) H.C H.C)
+toGraph :: [A.Block] -> MM (H.Graph (I.Node I.Gname ()) H.C H.C)
 toGraph bs =
   {-
     It's more likely that only reachable blocks are pulled out and used to create
@@ -1701,7 +1724,7 @@ getBody graph = lift (LabelMapM f)
   where f m = return (m, graph)
 
 
-blockToGraph :: A.FunctionPrototype -> [A.Block] -> MM (H.Label, H.Graph (I.Node () ()) H.C H.C)
+blockToGraph :: A.FunctionPrototype -> [A.Block] -> MM (H.Label, H.Graph (I.Node I.Gname ()) H.C H.C)
 blockToGraph fn blocks =
   do { (entry, labels) <- getEntryAndAlist blocks
      ; body <- toGraph blocks 
@@ -1709,31 +1732,30 @@ blockToGraph fn blocks =
      }
   
 
-convert_TlAlias :: A.TlAlias -> MM (I.TlAlias ())
+convert_TlAlias :: A.TlAlias -> MM (I.TlAlias I.Gname)
 convert_TlAlias (A.TlAlias  g v dll tlm na l a) = convert_Aliasee a >>= return . (I.TlAlias (specializeGlobalId g) v dll tlm na l)
   
-convert_TlUnamedMd :: A.TlUnamedMd -> MM (I.TlUnamedMd ())
+convert_TlUnamedMd :: A.TlUnamedMd -> MM (I.TlUnamedMd I.Gname)
 convert_TlUnamedMd (A.TlUnamedMd s tv) = do { mc <- convert_MetaKindedConst tv 
                                             ; return $ specializeUnamedMd (I.TlUnamedMd s mc) 
                                             }
-  
-                                                 
+
 convert_TlNamedMd :: A.TlNamedMd -> (MM I.TlNamedMd)
 convert_TlNamedMd (A.TlNamedMd m ns) = do { nsa <- mapM convert_MdNode ns
                                           ; return $ I.TlNamedMd m nsa
                                           }
                                
-convert_TlDeclare :: A.TlDeclare -> MM (I.TlDeclare ())
+convert_TlDeclare :: A.TlDeclare -> MM (I.TlDeclare I.Gname)
 convert_TlDeclare (A.TlDeclare f) = convert_FunctionDeclareType f >>= return . I.TlDeclare
   
-convert_TlDefine :: A.TlDefine -> MM (I.TlDefine () ())
+convert_TlDefine :: A.TlDefine -> MM (I.TlDefine I.Gname ())
 convert_TlDefine  (A.TlDefine f b) = let (A.FunctionPrototype _ _ _ _ _ _ gid _ _ _ _ _ _ _ _ _) = f 
                                      in do { fa <- convert_FunctionInterface f
                                            ; (e, g) <- withFunName (specializeGlobalId gid) (blockToGraph f b)
                                            ; return $ I.TlDefine fa e g
                                            }
 
-convert_TlGlobal :: A.TlGlobal -> MM (I.TlGlobal ())
+convert_TlGlobal :: A.TlGlobal -> MM (I.TlGlobal I.Gname)
 convert_TlGlobal (A.TlGlobal a1 a2 a3 a4 a5 a6 a7 a8 a8a a9 a10 a11 a12 a13) =
   do { mp <- typeDefs
      ; let (a9a::I.Utype) = tconvert mp a9
@@ -1772,30 +1794,37 @@ convert_TlModuleAsm (A.TlModuleAsm s) = return (I.TlModuleAsm s)
 convert_TlAttribute :: A.TlAttribute -> MM I.TlAttribute
 convert_TlAttribute (A.TlAttribute n l) = return (I.TlAttribute n l)
   
-convert_TlComdat :: A.TlComdat -> MM (I.TlComdat ())
+convert_TlComdat :: A.TlComdat -> MM (I.TlComdat I.Gname)
 convert_TlComdat (A.TlComdat l s) = return (I.TlComdat (specializeDollarId l) s)
 
-convert_Comdat :: A.Comdat -> I.Comdat ()
+convert_Comdat :: A.Comdat -> I.Comdat I.Gname
 convert_Comdat (A.Comdat n) = I.Comdat (fmap specializeDollarId n)
 
 
-toplevel2Ir :: A.Toplevel -> MM (I.Toplevel () ())
-toplevel2Ir (A.ToplevelAlias q) = Md.liftM I.ToplevelAlias (convert_TlAlias q)
-toplevel2Ir (A.ToplevelUnamedMd s) = Md.liftM I.ToplevelUnamedMd (convert_TlUnamedMd s)
-toplevel2Ir (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
-toplevel2Ir (A.ToplevelDeclare f) = Md.liftM I.ToplevelDeclare (convert_TlDeclare f)
-toplevel2Ir (A.ToplevelDefine f) = Md.liftM I.ToplevelDefine (convert_TlDefine f)
-toplevel2Ir (A.ToplevelGlobal g) = do { tlg <- convert_TlGlobal g  
-                                      ; case specializeTlGlobal tlg of
-                                        Just tli -> return $ I.ToplevelIntrinsic tli
-                                        Nothing -> return $ I.ToplevelGlobal tlg
-                                      }
-toplevel2Ir (A.ToplevelTypeDef t) = Md.liftM I.ToplevelTypeDef (convert_TlTypeDef t)
-toplevel2Ir (A.ToplevelDepLibs qs) = Md.liftM I.ToplevelDepLibs (convert_TlDepLibs qs)
-toplevel2Ir (A.ToplevelUnamedType i) = Md.liftM I.ToplevelUnamedType (convert_TlUnamedType i)
-toplevel2Ir (A.ToplevelModuleAsm q) = Md.liftM I.ToplevelModuleAsm (convert_TlModuleAsm q)
-toplevel2Ir (A.ToplevelAttribute n) = Md.liftM I.ToplevelAttribute (convert_TlAttribute n)
-toplevel2Ir (A.ToplevelComdat l) = Md.liftM I.ToplevelComdat (convert_TlComdat l)
+toplevel2IrP1 :: A.Toplevel -> MM (A.FunctionPrototype, I.Toplevel I.Gname ())
+toplevel2IrP1 (A.ToplevelDefine f@(A.TlDefine fp _)) = do { f0 <- convert_TlDefine f
+                                                          ; return (fp, I.ToplevelDefine f0)
+                                                          }
+
+
+
+toplevel2IrP2 :: M.Map A.FunctionPrototype (I.Toplevel I.Gname ()) -> A.Toplevel -> MM (I.Toplevel I.Gname ())
+toplevel2IrP2 _ (A.ToplevelAlias q) = Md.liftM I.ToplevelAlias (convert_TlAlias q)
+toplevel2IrP2 _ (A.ToplevelUnamedMd s) = Md.liftM I.ToplevelUnamedMd (convert_TlUnamedMd s)
+toplevel2IrP2 _ (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
+toplevel2IrP2 _ (A.ToplevelDeclare f) = Md.liftM I.ToplevelDeclare (convert_TlDeclare f)
+toplevel2IrP2 mp (A.ToplevelDefine (A.TlDefine fp _)) = return $ fromJust $ M.lookup fp mp 
+toplevel2IrP2 _ (A.ToplevelGlobal g) = do { tlg <- convert_TlGlobal g  
+                                          ; case specializeTlGlobal tlg of
+                                            Just tli -> return $ I.ToplevelIntrinsic tli
+                                            Nothing -> return $ I.ToplevelGlobal tlg
+                                          }
+toplevel2IrP2 _ (A.ToplevelTypeDef t) = Md.liftM I.ToplevelTypeDef (convert_TlTypeDef t)
+toplevel2IrP2 _ (A.ToplevelDepLibs qs) = Md.liftM I.ToplevelDepLibs (convert_TlDepLibs qs)
+toplevel2IrP2 _ (A.ToplevelUnamedType i) = Md.liftM I.ToplevelUnamedType (convert_TlUnamedType i)
+toplevel2IrP2 _ (A.ToplevelModuleAsm q) = Md.liftM I.ToplevelModuleAsm (convert_TlModuleAsm q)
+toplevel2IrP2 _ (A.ToplevelAttribute n) = Md.liftM I.ToplevelAttribute (convert_TlAttribute n)
+toplevel2IrP2 _ (A.ToplevelComdat l) = Md.liftM I.ToplevelComdat (convert_TlComdat l)
 
 
 
@@ -1811,16 +1840,21 @@ filterOutDataLayoutAndTriple tls =
                                A.ToplevelTriple _ -> False
                                A.ToplevelDataLayout _ -> False
                                _ -> True) tls)
-                                      
 
 asmToHir :: (Show dlm, DataLayoutMetrics dlm) => dlm -> A.Module -> 
-            H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm () ())
+            H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm I.Gname ())
 asmToHir dlm m@(A.Module ts) = 
   let ((A.DataLayout dl, tt), ts0) = filterOutDataLayoutAndTriple ts
       td = M.fromList $ A.typeDefOfModule m
   in if matchLayoutSpecAndTriple dlm dl tt then
        runLabelMapM emptyIdLabelMap 
-       $ (runReaderT (Md.liftM (\l -> I.SpecializedModule dlm $ I.Module l) 
-                      (mapM toplevel2Ir ts0)) (ReaderData td (I.GlobalIdNum 0)))
+       $ (runReaderT (do { let defs0 = filter (\x -> case x of
+                                                  A.ToplevelDefine _ -> True
+                                                  _ -> False) ts0
+                         ; defs <- mapM toplevel2IrP1 defs0
+                         ; l <- mapM (toplevel2IrP2 (M.fromList defs))  ts0
+                         ; return $ I.SpecializedModule dlm $ I.Module l
+                         }
+                     ) (ReaderData td (I.Gname (errorLoc FLC $ "<fatal error>"))))
      else 
        error $ show (dl,tt) ++ " does not match " ++ show dlm

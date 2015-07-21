@@ -7,7 +7,7 @@ module Llvm.Hir.Data.Inst
        , module Data.Word
        , Label
        ) where
-import Llvm.Asm.SharedEntity hiding (GlobalId(..), Comdat(..), DollarId(..)) 
+import Llvm.Asm.SharedEntity hiding (GlobalId (..), Comdat(..), DollarId(..)) 
 import Llvm.Hir.Data.Type
 import Compiler.Hoopl (Label)
 import Data.Int
@@ -18,30 +18,26 @@ import Llvm.ErrorLoc
 class (Ord n, Eq n, Show n) => AbsName n where
   prepend :: String -> n -> n
   append :: n -> String -> n
+  mkName :: String -> n
   
 instance AbsName () where  
   prepend _ _ = error "AbsName () cannot be prepended." 
   append _ _ = error "AbsName () cannot be appended."
+  mkName _ = error "AbsName () cannot be newed."
   
-{- It is required that g is an instance of AbsName -}
-data GlobalId g = GlobalIdNum Word32
-                | GlobalIdAlphaNum String
-                | GlobalIdDqString String
-                | GlobalIdSpecialized g
-                deriving (Eq, Ord, Show)
-                         
-instance AbsName g => AbsName (GlobalId g) where
+
+{- Global name which bind to a static address at link and load time -}
+data Gname = Gname String deriving (Eq, Ord, Show)
+
+{- It is required that g is an instance of AbsName -}                         
+instance AbsName Gname where
   prepend prefix n = case n of
-    GlobalIdNum n -> GlobalIdDqString (prefix ++ (show n))
-    GlobalIdAlphaNum s -> GlobalIdDqString (prefix ++ s)
-    GlobalIdDqString s -> GlobalIdDqString (prefix ++ s)
-    GlobalIdSpecialized n -> GlobalIdSpecialized $ prepend prefix n
+    Gname n -> Gname (prefix ++ n)
 
   append n suffix = case n of
-    GlobalIdNum n -> GlobalIdDqString ((show n) ++ suffix)
-    GlobalIdAlphaNum s -> GlobalIdDqString (s ++ suffix)
-    GlobalIdDqString s -> GlobalIdDqString (s ++ suffix)
-    GlobalIdSpecialized n -> GlobalIdSpecialized $ append n suffix
+    Gname n -> Gname (n ++ suffix)
+    
+  mkName = Gname
 
 data NoWrap =
   -- | No Signed Wrap
@@ -115,7 +111,7 @@ data Const g = C_u8 Word8
              | C_true
              | C_false
              | C_zeroinitializer
-             | C_globalAddr (GlobalId g)
+             | C_globalAddr g
              | C_str String
              | C_struct Packing [TypedConstOrNull g]
              | C_vector [TypedConstOrNull g]
@@ -123,7 +119,8 @@ data Const g = C_u8 Word8
              | C_array [TypedConstOrNull g]
              | C_arrayN Word64 (TypedConstOrNull g)
              | C_labelId Label
-             | C_block (GlobalId g) Label
+             | C_block g Label
+             -- | C_blockUnresolved g A.PercentLabel 
              | C_add (Maybe NoWrap) (Type ScalarB I) (Const g) (Const g)
              | C_sub (Maybe NoWrap) (Type ScalarB I) (Const g) (Const g)
              | C_mul (Maybe NoWrap) (Type ScalarB I) (Const g) (Const g)
@@ -231,7 +228,7 @@ data MetaKindedConst g = MetaKindedConst MetaKind (MetaConst g)
                        | UnmetaKindedNull
                        deriving (Eq, Ord, Show)
 
-data FunPtr g = FunId (GlobalId g)
+data FunPtr g = FunId g
               | FunIdBitcast (T Dtype (Const g)) Dtype
               | FunIdInttoptr (T Dtype (Const g)) Dtype
               | FunSsa LocalId
@@ -1025,7 +1022,7 @@ data MemLen = MemLenI32
             | MemLenI64 deriving (Eq, Ord, Show)
 
 -- | LLVM metadata instructions
-data Minst g = Minst CallSiteType (GlobalId g) [MetaOperand g]
+data Minst g = Minst CallSiteType g [MetaOperand g]
              | M_llvm_dbg_declare (MetaOperand g) (MetaOperand g)
              | M_llvm_dbg_func_start (MetaOperand g)
              | M_llvm_dbg_stoppoint (MetaOperand g) (MetaOperand g) (MetaOperand g)
@@ -1076,25 +1073,19 @@ data Value g = Val_ssa LocalId
 
 data T t v = T t v deriving (Eq, Ord, Show)
 
-data Aliasee g = Aliasee (GlobalId g)
+data Aliasee g = Aliasee g
                | AliaseeTyped Dtype (Aliasee g)
                | AliaseeConversion (Conversion ScalarB (Aliasee g))
                | AliaseeGEP (GetElementPtr ScalarB (Aliasee g) (Const g))
                deriving (Eq, Ord, Show)
 
-data DollarId g = DollarIdNum Word32
-                | DollarIdAlphaNum String
-                | DollarIdDqString String
-                | DollarIdSpecialized g
-                deriving (Eq, Ord, Show)
-
-data Comdat g = Comdat (Maybe (DollarId g)) deriving (Eq, Ord, Show)
+data Comdat g = Comdat (Maybe g) deriving (Eq, Ord, Show)
 
 data FunctionInterface g = FunctionInterface { fi_linkage :: Maybe Linkage
                                              , fi_visibility :: Maybe Visibility
                                              , fi_dllstorage :: Maybe DllStorageClass
                                              , fi_signature :: FunSignature LocalId
-                                             , fi_fun_name :: GlobalId g
+                                             , fi_fun_name :: g
                                              , fi_addr_naming :: Maybe AddrNaming
                                              , fi_fun_attrs :: [FunAttr]
                                              , fi_section :: Maybe Section

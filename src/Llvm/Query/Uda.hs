@@ -21,7 +21,7 @@ import Data.Either
 
 
 class Uda a g where
-  use :: a -> S.Set (Either LocalId (GlobalId g))
+  use :: a -> S.Set (Either LocalId g)
   def :: g {- a hack to force restricting the type parameter g -} -> a -> S.Set LocalId -- defined ssa variables
   
   storeTo :: a -> S.Set (Value g)

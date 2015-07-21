@@ -11,11 +11,11 @@ data Step = Mem2Reg | Dce
           | PrepareRw
           deriving (Show,Eq)
 
-toPass :: (CheckpointMonad m, FuelMonad m) => Step -> Optimization m (Ds.Set (Dtype, GlobalId g)) g a
+toPass :: (CheckpointMonad m, FuelMonad m) => Step -> Optimization m (Ds.Set (Dtype, g)) g a
 toPass Mem2Reg = undefined -- mem2reg
 toPass Dce = dce
 
-applyPasses1 :: (CheckpointMonad m, FuelMonad m) => [Optimization m (Ds.Set (Dtype, GlobalId g)) g a] -> Module g a -> m (Module g a)
+applyPasses1 :: (CheckpointMonad m, FuelMonad m) => [Optimization m (Ds.Set (Dtype, g)) g a] -> Module g a -> m (Module g a)
 applyPasses1 steps m = undefined -- foldl (\p e -> p >>= optModule e) (return m) steps
 
 

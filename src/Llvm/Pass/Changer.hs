@@ -3,7 +3,7 @@ module Llvm.Pass.Changer where
 
 import Llvm.Hir.Data
 
-data Changer g h = Changer { change_GlobalId :: GlobalId g -> GlobalId h
+data Changer g h = Changer { change_GlobalId :: g -> h
                            , change_LocalId :: LocalId -> LocalId
                            , change_Label :: Label -> Label
                            , change_Const :: Const h -> Const h

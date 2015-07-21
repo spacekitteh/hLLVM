@@ -31,6 +31,9 @@ instance Substitutable a g b h => Substitutable (Maybe a) g (Maybe b) h where
 instance Substitutable a g b h => Substitutable [a] g [b] h where
   substitute chg l = fmap (substitute chg) l
 
+instance Substitutable () g () h where
+  substitute chg l = ()
+
 instance (Substitutable a g x h, Substitutable b g y h) => Substitutable (Either a b) g (Either x y) h where
   substitute chg (Left a) = Left $ substitute chg a
   substitute chg (Right a) = Right $ substitute chg a
@@ -990,6 +993,7 @@ instance Substitutable TlTypeDef g TlTypeDef h  where
 instance Substitutable (TlComdat g) g (TlComdat h) h where
   substitute chg (TlComdat lhs v) = TlComdat (substitute chg lhs) v
 
+{-
 instance Substitutable (DollarId g) g (DollarId h) h where
   substitute chg di = globalId2DollarId ((substitute chg ((dollarIdToGlobalId di))))
 
@@ -1004,6 +1008,7 @@ globalId2DollarId v = case v of
   GlobalIdNum x -> DollarIdNum x
   GlobalIdAlphaNum x -> DollarIdAlphaNum x
   GlobalIdDqString x -> DollarIdDqString x
+-}
 
 instance Substitutable (Comdat g) g (Comdat h) h where
   substitute chg (Comdat x) = Comdat (substitute chg x)
@@ -1020,7 +1025,7 @@ instance Substitutable TlUnamedType g TlUnamedType h where
 instance Substitutable TlDepLibs g TlDepLibs h where
   substitute chg = id
 
-instance Substitutable (GlobalId g) g (GlobalId h) h where
+instance Substitutable g g h h where
   substitute chg = change_GlobalId chg
 
 instance Substitutable (TlAlias g) g (TlAlias h) h where
@@ -1097,7 +1102,7 @@ instance Substitutable a g b h => Substitutable (Module g a) g (Module h b) h wh
 instance Substitutable g g g g where
   substitute _ = id
 
-instance (Ord g, Ord k, Ord h) => Substitutable (M.Map (GlobalId g, k) v) g (M.Map (GlobalId h, k) v) h where
+instance (Ord g, Ord k, Ord h) => Substitutable (M.Map (g, k) v) g (M.Map (h, k) v) h where
   substitute chg m = M.mapKeys (\(gid, k) -> (substitute chg gid, k)) m
 
 instance Substitutable (Prefix g) g (Prefix h) h where

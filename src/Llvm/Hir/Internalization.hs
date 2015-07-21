@@ -14,8 +14,8 @@ import qualified Data.Set as S
  Internalization converts a "metadata" value to a first class value that can be referred by LLVM code.
 v-}
 
-class (Monad m, MonadState (M.Map (Dtype, Const g) (DefAndRef g a)) m) =>  LlvmGlobalGenMonad g a m where
-  newGlobalId :: m (GlobalId g)
+class (Monad m, AbsName g, MonadState (M.Map (Dtype, Const g) (DefAndRef g a)) m) =>  LlvmGlobalGenMonad g a m where
+  newGlobalId :: m g
   getDefAndRef :: (Dtype, Const g) -> m (Maybe (DefAndRef g a))
   cacheToplevel :: (Dtype, Const g) -> DefAndRef g a -> m ()
 
@@ -62,10 +62,10 @@ instance Internalization String where
                           }
           }
 
-instance Ord g => LlvmGlobalGenMonad g a (StateT (M.Map (Dtype, Const g) (DefAndRef g a)) (State (String, Int))) where
+instance AbsName g => LlvmGlobalGenMonad g a (StateT (M.Map (Dtype, Const g) (DefAndRef g a)) (State (String, Int))) where
   newGlobalId = do { (prefix, cnt) <- lift get
                    ; lift $ put (prefix, cnt+1)
-                   ; return $ GlobalIdAlphaNum (prefix ++ show cnt)
+                   ; return $ mkName (prefix ++ show cnt)
                    }
   cacheToplevel k v = modify (M.insert k v)
   getDefAndRef k = do { s <- get

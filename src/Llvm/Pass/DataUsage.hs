@@ -65,7 +65,7 @@ data DataUsage g = DataUsage { -- | The addresses that store pointer parameters
 class DataUsageUpdator g a where
   update :: a -> DataUsage g -> DataUsage g
   
-instance DataUsageUpdator () () where
+instance DataUsageUpdator Gname () where
   update _ = id
 
 addAddrStoringPtrParam :: Ord g => Value g -> DataUsage g -> DataUsage g

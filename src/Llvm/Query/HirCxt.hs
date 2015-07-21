@@ -21,9 +21,9 @@ data FunCxt g = FunCxt { funInterface :: FunctionInterface g
                        } deriving (Eq, Ord, Show)
 
 data GlobalCxt g = GlobalCxt { typeEnv :: TypeEnv
-                             , globals :: M.Map (Ci.GlobalId g) (TlGlobal g, Ci.Dtype)
-                             , functions :: M.Map (Ci.GlobalId g) (FunctionDeclare g)
-                             , alias :: M.Map (Ci.GlobalId g) (TlAlias g)
+                             , globals :: M.Map g (TlGlobal g, Ci.Dtype)
+                             , functions :: M.Map g (FunctionDeclare g)
+                             , alias :: M.Map g (TlAlias g)
                              , attributes :: M.Map Word32 [FunAttr]
                              , unamedMetadata :: M.Map Word32 (TlUnamedMd g)
                              } deriving (Eq, Ord, Show)

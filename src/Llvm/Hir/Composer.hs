@@ -83,7 +83,7 @@ i_store loc = I_store { volatile = IsNot Volatile
                       , nontemporal = Nothing
                       }
 
-icallcmd :: GlobalId g -> [(Dtype, Value g)] -> Cinst g
+icallcmd :: g -> [(Dtype, Value g)] -> Cinst g
 icallcmd fname params = I_call_fun (FunId fname) 
                         CallFunInterface { cfi_tail = TcNon 
                                          , cfi_castType = Nothing
@@ -95,7 +95,7 @@ icallcmd fname params = I_call_fun (FunId fname)
                                          , cfi_funAttrs = [] 
                                          } Nothing
 
-icallfun :: GlobalId g -> [(Dtype, Value g)] -> Dtype -> LocalId -> Cinst g
+icallfun :: g -> [(Dtype, Value g)] -> Dtype -> LocalId -> Cinst g
 icallfun fname params retType rid = 
   let funType = Tfunction (ucast retType, []) (fmap (\x -> (MtypeData $ fst x, Nothing)) params) Nothing
   in 

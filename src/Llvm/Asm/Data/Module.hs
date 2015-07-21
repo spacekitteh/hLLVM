@@ -214,17 +214,17 @@ data VaArg = VaArg (Typed Value) Type deriving (Eq, Ord, Show)
 
 data LandingPad = LandingPad Type Type FunName (Maybe Cleanup) [Clause] deriving (Eq, Ord, Show)
 
-data Dbg = Dbg MdRef MetaConst deriving (Eq,Show)
+data Dbg = Dbg MdRef MetaConst deriving (Eq, Ord, Show)
 
-data PhiInst = PhiInst (Maybe LocalId) Type [(Value, PercentLabel)] deriving (Eq,Show)
+data PhiInst = PhiInst (Maybe LocalId) Type [(Value, PercentLabel)] deriving (Eq, Ord, Show)
 
-data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg] deriving (Eq, Show)
+data PhiInstWithDbg = PhiInstWithDbg PhiInst [Dbg] deriving (Eq, Ord, Show)
 
-data ComputingInst = ComputingInst (Maybe LocalId) Rhs deriving (Eq,Show)
+data ComputingInst = ComputingInst (Maybe LocalId) Rhs deriving (Eq, Ord, Show)
                                                                 
 data ComputingInstWithDbg = ComputingInstWithDbg ComputingInst [Dbg]
                           | ComputingInstWithComment String
-                          deriving (Eq,Show)
+                          deriving (Eq, Ord, Show)
 
 -- | Terminator Instructions <http://llvm.org/releases/3.0/docs/LangRef.html#terminators>
 data TerminatorInst =
@@ -248,10 +248,10 @@ data TerminatorInst =
     | Resume (Typed Value)
     -- | <http://llvm.org/releases/3.0/docs/LangRef.html#i_unreachable>
     | Unreachable
-      deriving (Eq,Show)
+      deriving (Eq, Ord, Show)
 
 data TerminatorInstWithDbg = TerminatorInstWithDbg TerminatorInst [Dbg]
-                             deriving (Eq,Show)
+                             deriving (Eq, Ord, Show)
 
 data ActualParam = ActualParamData Type [ParamAttr] Value
                  | ActualParamLabel Type [ParamAttr] PercentLabel
@@ -267,7 +267,7 @@ data Typed v = Typed Type v deriving (Eq, Ord, Show)
 data Aliasee = Aliasee (Typed Const) 
              | AliaseeConversion (Conversion Const)
              | AliaseeGetElementPtr (GetElementPtr Const)
-             deriving (Eq,Show)
+             deriving (Eq, Ord, Show)
 
 data FunctionPrototype = FunctionPrototype { fp_linkage :: Maybe Linkage
                                            , fp_visibility :: Maybe Visibility
@@ -303,23 +303,23 @@ data Toplevel = ToplevelTriple TlTriple
               | ToplevelModuleAsm TlModuleAsm
               | ToplevelAttribute TlAttribute
               | ToplevelComdat TlComdat
-              deriving (Eq,Show)
+              deriving (Eq, Ord, Show)
 
 
-data TlTriple = TlTriple TargetTriple deriving (Eq, Show)
+data TlTriple = TlTriple TargetTriple deriving (Eq, Ord, Show)
 
-data TlDataLayout = TlDataLayout DataLayout deriving (Eq, Show)
+data TlDataLayout = TlDataLayout DataLayout deriving (Eq, Ord, Show)
 
 data TlAlias = TlAlias GlobalId (Maybe Visibility) (Maybe DllStorageClass) (Maybe ThreadLocalStorage)
-               AddrNaming (Maybe Linkage) Aliasee deriving (Eq, Show)
+               AddrNaming (Maybe Linkage) Aliasee deriving (Eq, Ord, Show)
 
-data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Show)
+data TlUnamedMd = TlUnamedMd Word32 MetaKindedConst deriving (Eq, Ord, Show)
 
-data TlNamedMd = TlNamedMd String [MdNode] deriving (Eq, Show)
+data TlNamedMd = TlNamedMd String [MdNode] deriving (Eq, Ord, Show)
 
-data TlDeclare = TlDeclare FunctionPrototype deriving (Eq, Show)
+data TlDeclare = TlDeclare FunctionPrototype deriving (Eq, Ord, Show)
 
-data TlDefine = TlDefine FunctionPrototype [Block] deriving (Eq, Show)
+data TlDefine = TlDefine FunctionPrototype [Block] deriving (Eq, Ord, Show)
 
 data TlGlobal = TlGlobal (Maybe GlobalId)
                 (Maybe Linkage)
@@ -335,22 +335,22 @@ data TlGlobal = TlGlobal (Maybe GlobalId)
                 (Maybe Section)
                 (Maybe Comdat)
                 (Maybe AlignInByte)
-              deriving (Eq, Show)
+              deriving (Eq, Ord, Show)
 
-data TlTypeDef = TlTypeDef LocalId Type deriving (Eq, Show)
+data TlTypeDef = TlTypeDef LocalId Type deriving (Eq, Ord, Show)
 
-data TlDepLibs = TlDepLibs [DqString] deriving (Eq, Show)
+data TlDepLibs = TlDepLibs [DqString] deriving (Eq, Ord, Show)
 
-data TlUnamedType = TlUnamedType Word32 Type deriving (Eq, Show)
+data TlUnamedType = TlUnamedType Word32 Type deriving (Eq, Ord, Show)
 
-data TlModuleAsm = TlModuleAsm DqString deriving (Eq, Show)
+data TlModuleAsm = TlModuleAsm DqString deriving (Eq, Ord, Show)
 
-data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Show)
+data TlAttribute = TlAttribute Word32 [FunAttr] deriving (Eq, Ord, Show)
 
-data TlComdat = TlComdat DollarId SelectionKind deriving (Eq, Show)
+data TlComdat = TlComdat DollarId SelectionKind deriving (Eq, Ord, Show)
 
 data Block = Block BlockLabel [PhiInstWithDbg] [ComputingInstWithDbg] TerminatorInstWithDbg
-           deriving (Eq,Show)
+           deriving (Eq, Ord, Show)
 
 blockLabel :: Block -> BlockLabel
 blockLabel (Block v _ _ _) = v

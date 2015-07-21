@@ -17,7 +17,7 @@ opt dl gs f (ToplevelDefine (TlDefine fn entry graph)) =
 opt _ _ _ _ = return []
 
 
-optModule :: (Show g, Ord g, H.CheckpointMonad m, H.FuelMonad m) => Optimization m (Ds.Set (Dtype, GlobalId g)) g u x -> Module g u -> 
+optModule :: (Show g, Ord g, H.CheckpointMonad m, H.FuelMonad m) => Optimization m (Ds.Set (Dtype, g)) g u x -> Module g u -> 
              m (Module g u, [(FunctionInterface g, x)])
 optModule f (Module l) = 
   let gs = globalIdOfModule (Module l)

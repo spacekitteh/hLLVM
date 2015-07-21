@@ -37,7 +37,7 @@ data VisualPlugin dlm g a = VisualPlugin {
   , visPrefix :: Maybe String
   -- the functions whose instructions should be visualized. 
   -- If the set does not exist, all functions are visualized
-  , includedFunctions :: Maybe (Ds.Set (GlobalId g))
+  , includedFunctions :: Maybe (Ds.Set g)
   , visFunctions :: [FunctionDeclare g]
   , captureCinsts :: Cinst g -> Ds.Set String -> Ds.Set String
   , visNodeOO :: TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O]
@@ -99,13 +99,15 @@ bwdScan collectString =
                , H.bp_rewrite = H.noBwdRewrite
                }
 
-scanDefine :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m, Ord g, Show g, IrPrint g) => VisualPlugin dlm g a -> TlDefine g a -> m Visualized
+scanDefine :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m, Ord g, Show g, IrPrint g) => 
+              VisualPlugin dlm g a -> TlDefine g a -> m Visualized
 scanDefine visualPlugin (TlDefine fn entry graph) = 
   do { (_, a, b) <- H.analyzeAndRewriteBwd (bwdScan (captureCinsts visualPlugin)) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyVisualized (H.lookupFact entry a))
      }
   
-scanModule :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m, Ord g, IrPrint g, Show g) => VisualPlugin dlm g a -> Module g a -> m (Ds.Set String)
+scanModule :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m, Ord g, IrPrint g, Show g) => 
+              VisualPlugin dlm g a -> Module g a -> m (Ds.Set String)
 scanModule visPlugin (Module l) = 
   foldM (\p x -> case x of
             ToplevelDefine def@(TlDefine fn _ _) ->
@@ -159,7 +161,7 @@ rwDefine rwNodeOO te gmp (TlDefine fn entry graph) =
   in TlDefine fn entry graph0
 
 {- this is more correct, because we inherit the DataLayoutMetrics of the input module in the output module -}
-rwModule :: (DataLayoutMetrics dlm, Ord g, Eq g, Show g) => VisualPlugin dlm g a -> Module g a -> Ds.Set String -> Module g a
+rwModule :: (DataLayoutMetrics dlm, AbsName g) => VisualPlugin dlm g a -> Module g a -> Ds.Set String -> Module g a
 rwModule visPlugin m@(Module l) duM = 
   let (globals, duC) = stringnize duM
       irCxt = irCxtOfModule m
@@ -173,7 +175,7 @@ rwModule visPlugin m@(Module l) duM =
                   _ -> x
               ) l)
 
-stringnize ::  Ord g => Ds.Set String  -> ([Toplevel g a], Dm.Map String (Const g))
+stringnize ::  AbsName g => Ds.Set String  -> ([Toplevel g a], Dm.Map String (Const g))
 stringnize mp = 
   let (kvs, tpl) = runSimpleLlvmGlobalGen ".visual_" 0 
                    (mapM (\c -> do { (DefAndRef _ (T _ c0)) <- internalize c
@@ -181,7 +183,7 @@ stringnize mp =
                                    }) (Ds.toList mp))
   in (Dm.elems $ Dm.map llvmDef tpl, Dm.fromList kvs)
 
-visualize :: (DataLayoutMetrics dlm, Ord g, Eq g, Show g, IrPrint g) => VisualPlugin dlm g a -> Module g a -> Module g a
+visualize :: (DataLayoutMetrics dlm, AbsName g, IrPrint g) => VisualPlugin dlm g a -> Module g a -> Module g a
 visualize visPlugin m = 
   let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel ((scanModule visPlugin m)::H.SimpleFuelMonad (Ds.Set String))
   in rwModule visPlugin m mp

@@ -65,12 +65,9 @@ newLocalId l suffix = case l of
   LocalIdAlphaNum s -> LocalIdDqString (s ++ suffix)
   LocalIdDqString s -> LocalIdDqString (s ++ suffix)
 
-getLocalBase :: Mangle g => GlobalId g -> LocalId
-getLocalBase g = case g of 
-  GlobalIdNum n -> LocalIdDqString $ "@" ++ show n
-  GlobalIdAlphaNum s -> LocalIdDqString $ "@" ++ s
-  GlobalIdDqString s -> LocalIdDqString $ "@" ++ s
-  GlobalIdSpecialized s -> LocalIdDqString $ "@" ++ mangle s
+getLocalBase :: Mangle g => g -> LocalId
+getLocalBase g = LocalIdDqString $ "@" ++ mangle g
+
         
 baseOf :: (IrPrint g, Mangle g) => Value g -> LocalId
 baseOf nb = case nb of

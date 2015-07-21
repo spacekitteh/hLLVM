@@ -85,7 +85,7 @@ scanModule m@(Module l) =
            ) Ds.empty l
 
 
-stringize :: Ord g => Ds.Set Dtype -> ([Toplevel g a], Dm.Map Dtype (Const g))
+stringize :: AbsName g => Ds.Set Dtype -> ([Toplevel g a], Dm.Map Dtype (Const g))
 stringize mp = 
   let (kvs, tpls) = runSimpleLlvmGlobalGen ".sizeof_" 0 
                     (mapM (\c -> do { (DefAndRef _ (T _ c0)) <- internalize (render $ printIr c)
@@ -94,7 +94,7 @@ stringize mp =
   in (Dm.elems $ Dm.map llvmDef tpls, Dm.fromList kvs)
      
 
-mkVerificationModule :: (DataLayoutMetrics dlm, Ord g, Show g, Ord a) => SpecializedModule dlm g a -> SpecializedModule dlm g a
+mkVerificationModule :: (DataLayoutMetrics dlm, AbsName g, Ord a) => SpecializedModule dlm g a -> SpecializedModule dlm g a
 mkVerificationModule (SpecializedModule dlm m@(Module l)) = 
   let IrCxt{..} = irCxtOfModule m
       vis = H.runSimpleUniqueMonad $ H.runWithFuel H.infiniteFuel ((scanModule m):: H.SimpleFuelMonad Visualized)
@@ -112,7 +112,8 @@ mkVerificationModule (SpecializedModule dlm m@(Module l)) =
                                     ++ (fmap (ToplevelDeclare . TlDeclare) visFunctions)
                                     ++ [ToplevelDefine $ defineMain $ concat insts]))
 
-mkCheck :: forall dlm.forall g.forall a.DataLayoutMetrics dlm => dlm -> TypeEnv -> Dm.Map Dtype (Const g) -> Dtype -> [Node g a O O]
+mkCheck :: forall dlm.forall g.forall a.(DataLayoutMetrics dlm, AbsName g) => dlm 
+           -> TypeEnv -> Dm.Map Dtype (Const g) -> Dtype -> [Node g a O O]
 mkCheck dlm te mp dt = [ Comment $ Cstring $ render $ printIr dt
                        , Comment $ Cstring $ show dt
                        , Comment $ Cstring $ "SizeInBits:" ++ show (getTypeSizeInBits dlm te dt)
@@ -125,19 +126,20 @@ mkCheck dlm te mp dt = [ Comment $ Cstring $ render $ printIr dt
                        ]
 
 
-callLog :: [T Dtype (Value g)] -> (Node g a) O O
+callLog :: AbsName g => [T Dtype (Value g)] -> (Node g a) O O
 callLog tvs = 
   let aps = fmap (\(T t v) -> FunOperandData t [] Nothing v) tvs
       callSiteType = Tfunction (RtypeVoidU Tvoid, []) [(MtypeData (ucast $ ptr0 i8), Nothing)
                                                       ,(MtypeData (ucast i64), Nothing)
                                                       ,(MtypeData (ucast i64), Nothing)] Nothing
-  in Cnode (I_call_fun (FunId (GlobalIdAlphaNum "check_int2"))
+  in Cnode (I_call_fun (FunId (mkName "check_int2"))
             CallFunInterface { cfi_tail = TcNon 
                              , cfi_castType = Nothing
                              , cfi_signature = FunSignature Ccc callSiteType aps 
                              , cfi_funAttrs = [] 
                              } Nothing) []
 
+visFunctions :: AbsName g => [FunctionDeclare g]
 visFunctions = [FunctionDeclareData { fd_linkage = Nothing
                                     , fd_visibility = Nothing
                                     , fd_dllstorage = Nothing
@@ -150,7 +152,7 @@ visFunctions = [FunctionDeclareData { fd_linkage = Nothing
                                                                                 ,FunOperandData (ucast i64) [] Nothing ()
                                                                                 ] 
                                                                   }
-                                    , fd_fun_name = GlobalIdAlphaNum "check_int2"
+                                    , fd_fun_name = mkName "check_int2"
                                     , fd_addr_naming = Nothing
                                     , fd_fun_attrs = []
                                     , fd_section = Nothing
@@ -163,7 +165,7 @@ visFunctions = [FunctionDeclareData { fd_linkage = Nothing
                ]
 
 
-defineMain :: forall g.forall a.[Node g a O O] -> TlDefine g a
+defineMain :: forall g.forall a.AbsName g => [Node g a O O] -> TlDefine g a
 defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph insts (T_return [ucast ((u32ToTv 0)::T (Type ScalarB I) (Value g))]))
                    in TlDefine mainFp entry graph
   where mainFp :: FunctionInterface g
@@ -174,7 +176,7 @@ defineMain insts = let (entry, graph) = H.runSimpleUniqueMonad (composeGraph ins
                                                                  , fs_type = Tfunction (RtypeScalarI (TpI 32), []) [] Nothing
                                                                  , fs_params = []
                                                                  }
-                                   , fi_fun_name = GlobalIdAlphaNum "main"
+                                   , fi_fun_name = mkName "main"
                                    , fi_addr_naming = Nothing
                                    , fi_fun_attrs = []
                                    , fi_section = Nothing

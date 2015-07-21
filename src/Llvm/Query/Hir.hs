@@ -13,7 +13,7 @@ import Llvm.ErrorLoc
 
 
 -- this should be a map, globalid might have an opaque type
-globalIdOfModule :: Ord g => (Module g a) -> S.Set (Dtype, GlobalId g) 
+globalIdOfModule :: Ord g => (Module g a) -> S.Set (Dtype, g) 
 globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty tl
   where globalIdOf (ToplevelGlobal (TlGlobalDtype lhs _ _ _ _ _ _ _ _ t _ _ _ _)) = S.singleton (t, lhs)
         globalIdOf _ = S.empty
@@ -23,7 +23,7 @@ globalIdOfModule (Module tl) = foldl (\a b -> S.union a (globalIdOf b)) S.empty 
    declarations. This function finds out what are not declared. 
 -}
 
-data SingleConstAddr g = SingleConstAddr { globalId :: Either (GlobalId g, Label) (GlobalId g)
+data SingleConstAddr g = SingleConstAddr { globalId :: Either (g, Label) g
                                          , reconstructor :: Const g -> Const g
                                          }
 

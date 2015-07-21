@@ -118,7 +118,7 @@ mem2RegPass = FwdPass { fp_lattice = mem2RegLattice
                       }
 
 
-mem2reg :: (CheckpointMonad m, FuelMonad m, Eq g) => Ds.Set (Dtype, GlobalId g) -> Label -> Graph (Node g a) C C -> m (Graph (Node g a) C C)
+mem2reg :: (CheckpointMonad m, FuelMonad m, Eq g) => Ds.Set (Dtype, g) -> Label -> Graph (Node g a) C C -> m (Graph (Node g a) C C)
 mem2reg _ entry graph =
   do { (graph', _, _) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph
                          (mapSingleton entry (Dm.empty)) -- initFact gs))
