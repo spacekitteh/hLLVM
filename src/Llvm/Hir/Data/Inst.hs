@@ -68,7 +68,8 @@ data Conversion s v where {
 data GetElementPtr s v idx = GetElementPtr (IsOrIsNot InBounds) (T (Type s P) v) [T (Type s I) idx]
                            deriving (Eq,Ord,Show)
 
-data Select s r v = Select (Either (T (Type ScalarB I) v) (T (Type s I) v)) (T (Type s r) v) (T (Type s r) v)
+data Select s r v = Select (Either (T (Type ScalarB I) v) (T (Type s I) v)) 
+                    (T (Type s r) v) (T (Type s r) v)
                   deriving (Eq,Ord,Show)
 
 data Icmp s v = Icmp IcmpOp (IntOrPtrType s) v v deriving (Eq,Ord,Show)
@@ -76,13 +77,15 @@ data Icmp s v = Icmp IcmpOp (IntOrPtrType s) v v deriving (Eq,Ord,Show)
 data Fcmp s v = Fcmp FcmpOp (Type s F) v v deriving (Eq,Ord,Show)
 
 {- vector operations -}
-data ShuffleVector r v = ShuffleVector (T (Type VectorB r) v) (T (Type VectorB r) v) (T (Type VectorB I) v)
+data ShuffleVector r v = ShuffleVector (T (Type VectorB r) v) (T (Type VectorB r) v) 
+                         (T (Type VectorB I) v)
                        deriving (Eq,Ord,Show)
 
 data ExtractElement r v = ExtractElement (T (Type VectorB r) v) (T (Type ScalarB I) v)
                         deriving (Eq,Ord,Show)
 
-data InsertElement r v = InsertElement (T (Type VectorB r) v) (T (Type ScalarB r) v) (T (Type ScalarB I) v)
+data InsertElement r v = InsertElement (T (Type VectorB r) v) (T (Type ScalarB r) v) 
+                         (T (Type ScalarB I) v)
                        deriving (Eq,Ord,Show)
 
 {- aggregate operations -}

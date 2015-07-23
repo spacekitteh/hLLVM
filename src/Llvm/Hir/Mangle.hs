@@ -78,6 +78,18 @@ instance Mangle Utype where
                    UtypeLabelX e -> mangle e
              in replaceDq s
 
+instance (IrPrint g, Mangle g) => Mangle (FunPtr g) where
+  mangle t = case t of
+    FunId n -> "f." ++ mangle n
+    FunIdBitcast tv d -> "f." ++ (render $ printIr tv) ++ mangle d
+    FunIdInttoptr tv d -> "f." ++ (render $ printIr tv) ++ mangle d
+    FunSsa x -> "f." ++ mangle x
+    Fun_null -> "f.null"
+    Fun_undef -> "f.undef"
+
+instance Mangle LocalId where
+  mangle t = render $ printIr t
+
 instance Mangle ScalarType where
   mangle t = case t of
     ScalarTypeI x -> mangle x

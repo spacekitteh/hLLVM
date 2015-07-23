@@ -135,10 +135,12 @@ applyToMaybe f Nothing du = du
 bubbleUp :: Ord x => x -> x -> S.Set x -> S.Set x
 bubbleUp dest src s = if S.member dest s then S.insert src s else s
 
-filterAlloca :: Ord g => LocalId -> (DataUsage g -> S.Set (Value g)) -> (LocalId -> DataUsage g -> DataUsage g) -> DataUsage g -> DataUsage g
+filterAlloca :: Ord g => LocalId -> (DataUsage g -> S.Set (Value g)) 
+                -> (LocalId -> DataUsage g -> DataUsage g) -> DataUsage g -> DataUsage g
 filterAlloca ssa src addf du = if S.member (Val_ssa ssa) (src du) then addf ssa du else du
 
-bubbleUp2 :: Ord g => Value g -> (DataUsage g -> S.Set (Value g)) -> Value g -> (Value g -> DataUsage g -> DataUsage g) -> DataUsage g -> DataUsage g
+bubbleUp2 :: Ord g => Value g -> (DataUsage g -> S.Set (Value g)) 
+             -> Value g -> (Value g -> DataUsage g -> DataUsage g) -> DataUsage g -> DataUsage g
 bubbleUp2 dest setf src addf du = if S.member dest (setf du) then addf src du else du
 
 propogateUpPtrUsage :: Ord g => LocalId -> Value g -> DataUsage g -> DataUsage g
@@ -157,7 +159,8 @@ emptyDataUsage =
   DataUsage 
   S.empty S.empty S.empty S.empty S.empty
   S.empty S.empty S.empty S.empty S.empty
-  S.empty S.empty S.empty S.empty S.empty S.empty
+  S.empty S.empty S.empty S.empty S.empty 
+  S.empty 
 
 instance (IrPrint t1, IrPrint t2, IrPrint t3) => IrPrint (t1, t2, t3) where
   printIr (t1, t2, t3) = parens (printIr t1 <+> printIr t2 <+> printIr t3)
@@ -200,7 +203,7 @@ unionDataUsage (DataUsage s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 s14 s15 s16
     (s7 `S.union` t7)   (s8 `S.union` t8)   (s9 `S.union` t9)
     (s10 `S.union` t10) (s11 `S.union` t11) (s12 `S.union` t12)
     (s13 `S.union` t13) (s14 `S.union` t14) (s15 `S.union` t15)
-    (s16 `S.union` t16)    
+    (s16 `S.union` t16)
 
 bwdScan :: forall g.forall a.forall m. (Show g, Ord g, Show a, DataUsageUpdator g a, H.FuelMonad m) => 
            S.Set LocalId -> H.BwdPass m (Node g a) (DataUsage g)
@@ -486,7 +489,8 @@ scanGraph fm entry graph =
      ; return (fromMaybe emptyDataUsage (H.lookupFact entry a))
      }
 
-scanDefine :: (CheckpointMonad m, FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => IrCxt g -> TlDefine g a -> m (DataUsage g)
+scanDefine :: (CheckpointMonad m, FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => IrCxt g 
+              -> TlDefine g a -> m (DataUsage g)
 scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
   where formalParamIds :: S.Set LocalId
         formalParamIds = let FunSignature { fs_params = r} = fi_signature fn
