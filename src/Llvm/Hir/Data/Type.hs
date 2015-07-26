@@ -67,7 +67,8 @@ data Type sto rep where {
   Topaque_array :: Word64 -> Type OpaqueB D -> Type OpaqueB D;
 
   Tpointer :: Etype -> AddrSpace -> Type ScalarB P;
-  Tfunction :: (Rtype, [RetAttr]) -> [(Mtype, Maybe AlignInByte)] -> Maybe VarArgParam -> Type CodeFunB X;
+  Tfunction :: (Rtype, [RetAttr]) -> [(Mtype, Maybe AlignInByte)]
+               -> Maybe VarArgParam -> Type CodeFunB X;
   {- reference types -}
 
   {- referee is Scalar -}
@@ -300,7 +301,7 @@ instance Ord (Type s r) where
     (Tfirst_class_name s, Tfirst_class_name s1) -> compare s s1
     (Tfirst_class_quoteName s, Tfirst_class_quoteName s1) -> compare s s1
     (Tfirst_class_no s, Tfirst_class_no s1) -> compare s s1
-    
+
     (Tpointer e as, Tpointer e1 as1) -> compare (e,as) (e1,as1)
     (Tfunction rt tp mv, Tfunction rt1 tp1 mv1) -> compare (rt,tp,mv) (rt1, tp1, mv1)
 
@@ -403,7 +404,7 @@ data Rtype = RtypeScalarI (Type ScalarB I)
 
 data Mtype = MtypeAsRet Dtype
            | MtypeData Dtype
-           | MtypeByVal Dtype             
+           | MtypeByVal Dtype
            | MtypeExt Ext Dtype
            | MtypeLabel (Type CodeLabelB X)
            deriving (Eq, Ord, Show)

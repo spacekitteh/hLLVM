@@ -125,7 +125,7 @@ instance Mangle Packing where
     Unpacked -> "UNPK"
   
 instance Mangle VarArgParam where
-  mangle _ = "3dot"
+  mangle _ = "Z"
   
 instance Mangle TypeParamList where
   mangle (TypeParamList l va) = "(" ++ mangle l ++ mangle va ++ ")"
@@ -145,37 +145,42 @@ instance Mangle RetAttr where
 
 instance Mangle a => Mangle (FunOperand a) where
   mangle x = case x of
-    FunOperandData d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
-    FunOperandExt e d atts align a -> mangle e ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
-    FunOperandByVal d atts align a -> "byval" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
-    FunOperandAsRet d atts align a -> "sret" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a        
-    FunOperandLabel d atts align a -> mangle d ++ mangle atts ++ mangle align ++ mangle a
+    FunOperandData d atts align a -> 
+      mangle d ++ mangle atts ++ mangle align ++ mangle a
+    FunOperandExt e d atts align a -> 
+      "ext" ++ mangle e ++ mangle d ++ mangle atts ++ mangle align ++ mangle a
+    FunOperandByVal d atts align a -> 
+      "byval" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a    
+    FunOperandAsRet d atts align a -> 
+      "sret" ++ mangle d ++ mangle atts ++ mangle align ++ mangle a        
+    FunOperandLabel d atts align a -> 
+      mangle d ++ mangle atts ++ mangle align ++ mangle a
 
 instance Mangle (Type s r) where
   mangle x = case x of
     TpI n -> "i" ++ mangle n
     TpF n -> "f" ++ mangle n
-    TpV n -> "vi" ++ mangle n
+    TpV n -> "v" ++ mangle n
     Tvoid -> "void"
-    TpHalf -> "half"
-    TpFloat -> "float"
-    TpDouble -> "double"
-    TpFp128 -> "fp128"
-    TpX86Fp80 -> "x86fp80"
-    TpPpcFp128 -> "ppcfp128"
-    TpX86Mmx -> "x86mmx"
+    TpHalf -> "F1_"
+    TpFloat -> "f"
+    TpDouble -> "d"
+    TpFp128 -> "F4_"
+    TpX86Fp80 -> "F5_"
+    TpPpcFp128 -> "F6_"
+    TpX86Mmx -> "F7_"
     TpNull -> "null"
     TpLabel -> "label"
     Topaque -> "opaque"
-    Tarray n d -> "a_" ++ mangle n ++ "_" ++ mangle d
+    Tarray n d -> "A_" ++ mangle n ++ "_" ++ mangle d
 
     TvectorI n d -> "vi_" ++ mangle n ++ "_" ++ mangle d
     TvectorF n d -> "vf_" ++ mangle n ++ "_" ++ mangle d
     TvectorP n d -> "vp_" ++ mangle n ++ "_" ++ mangle d
 
-    Tstruct p ds -> "s_" ++ mangle p ++ "_" ++ mangle ds
-    Tpointer e as -> "ptr_" ++ mangle e ++ "_" ++ show as
-    Tfunction (rt,atts) tp mv -> "fun_" ++ mangle rt ++ "_" ++ mangle tp ++ "_" ++ mangle mv
+    Tstruct p ds -> "S_" ++ mangle p ++ "_" ++ mangle ds
+    Tpointer e as -> "P_" ++ mangle e ++ "_" ++ show as
+    Tfunction (rt,atts) tp mv -> "F_" ++ mangle rt ++ mangle atts ++ "_" ++ mangle tp ++ "_" ++ mangle mv
     {- Scalar -}
     TnameScalarI s -> show s
     TquoteNameScalarI s -> show s
