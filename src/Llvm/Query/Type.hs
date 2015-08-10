@@ -553,6 +553,7 @@ instance (Eq g, Show g) => TypeOf (Cinst g) Dtype where
       Rint t _ -> Just $ ucast t
       NearByInt t _ -> Just $ ucast t
       Round t _ -> Just $ ucast t
+    I_llvm_ctpop { dv = T t _ } -> Just $ t  
     _ -> errorLoc FLC $ "unsupported " ++ show x 
     
     

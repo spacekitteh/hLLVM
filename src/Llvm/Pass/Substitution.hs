@@ -867,6 +867,10 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                            , align = (substitute chg) align
                                            , isvolatile = (substitute chg) isvolatile
                                            }
+        I_llvm_ctpop{..} -> I_llvm_ctpop { suffix = suffix
+                                         , dv = substitute chg dv
+                                         , result = cid result
+                                         }
                            {-
   I_llvm_math_f32 :: MathUnaryOp -> Value -> LocalId -> Cinst;
   I_llvm_math_f64 :: MathUnaryOp -> Value -> LocalId -> Cinst;

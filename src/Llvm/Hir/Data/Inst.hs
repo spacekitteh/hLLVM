@@ -995,6 +995,10 @@ data Cinst g where {
 
   I_llvm_bitset_test :: (Value g) -> (Value g) -> LocalId -> Cinst g;
   I_llvm_donothing :: Cinst g;
+  I_llvm_ctpop :: { suffix :: String
+                  , dv :: T Dtype (Value g)
+                  , result :: LocalId
+                  } -> Cinst g;
   } deriving (Eq, Ord, Show)
 
 

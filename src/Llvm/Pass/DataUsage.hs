@@ -469,6 +469,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
         I_llvm_libm_una{..} -> f
         I_llvm_libm_bin{..} -> f
         I_llvm_powi{..} -> f
+        I_llvm_ctpop { dv = d } -> aTv addConst d f
         _ -> errorLoc FLC $ show n ++ " is not supported."
       Mnode _ _ -> f
 #ifdef DEBUG

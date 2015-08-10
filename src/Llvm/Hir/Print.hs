@@ -39,6 +39,11 @@ instance IrPrint v => IrPrint (S.Set v) where
 instance IrPrint () where
   printIr _ = text "()"
 
+instance IrPrint Bool where
+  printIr b = case b of
+    True -> text "true"
+    False -> text "false"
+
 commaSepMaybe :: IrPrint a => Maybe a -> Doc
 commaSepMaybe = maybe empty ((comma <+>) . printIr)
 
@@ -668,6 +673,7 @@ instance IrPrint g => IrPrint (Cinst g) where
     I_llvm_write_register ml ma mv -> hsep [text "llvm.write_register", printIr ml, printIr ma, printIr mv]
     I_llvm_stacksave lhs -> hsep [printIr lhs, equals, text "llvm.stacksave"]
     I_llvm_stackrestore v -> hsep [text "llvm.stackrestore", printIr v]
+    I_llvm_ctpop s dv lhs -> hsep [printIr lhs, equals, text "llvm.ctpop", text s, printIr dv] 
 
 instance IrPrint g => IrPrint (Minst g) where
   printIr mi = case mi of

@@ -9,6 +9,7 @@ import Llvm.ErrorLoc
 import Data.Maybe
 import Llvm.Hir.DataLayoutMetrics
 import Llvm.Hir.Target.Linux_Gnu
+import Data.List (stripPrefix)
 
 #define FLC  (FileLoc $(srcLoc))
 
@@ -173,6 +174,9 @@ specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   (FunId (Gname "llvm.stackrestore"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
     Just $ I_llvm_stackrestore (T (dcast FLC t1) v)
+  (FunId (Gname gname),
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | ((isJust $ stripPrefix "llvm.ctpop." gname) && isJust lhs) -> 
+    Just $ I_llvm_ctpop { suffix = fromJust $ stripPrefix "llvm.ctpop." gname, dv = T t1 v, result = fromJust lhs } 
   _ -> Nothing
 
 
@@ -270,6 +274,14 @@ unspecializeIntrinsics inst = case inst of
                                                          [(MtypeData (ucast $ ptr0 i8),Nothing)] Nothing) [tvToAp tv] 
                      , cfi_funAttrs = [] 
                      } Nothing
+  I_llvm_ctpop { suffix = s, dv = tv@(T t v), result = r } ->
+    Just $ I_call_fun (FunId (Gname $ "llvm.ctpop." ++ s)) 
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (ucast t,[]) 
+                                                         [(MtypeData t,Nothing)] Nothing) [tvToAp tv] 
+                     , cfi_funAttrs = []
+                     } (Just r)
   _ -> Nothing
     
 tvToAp :: Ucast t Dtype => T t (Value g) -> FunOperand (Value g)

@@ -22,7 +22,7 @@ data FunCxt g = FunCxt { funInterface :: FunctionInterface g
 
 data GlobalCxt g = GlobalCxt { typeEnv :: TypeEnv
                              , globals :: M.Map g (TlGlobal g, Ci.Dtype)
-                             , functions :: M.Map g (FunctionDeclare g)
+                             , functions :: M.Map g (FunctionDeclare g, Bool)
                              , alias :: M.Map g (TlAlias g)
                              , attributes :: M.Map Word32 [FunAttr]
                              , unamedMetadata :: M.Map Word32 (TlUnamedMd g)
@@ -117,9 +117,9 @@ globalCxtOfModule (Module tl) =
                           _ -> False
                       ) tl
       funs = fmap (\tl -> case tl of
-                      ToplevelDeclare (TlDeclare fp@FunctionDeclareData{..}) -> (fd_fun_name, fp)
+                      ToplevelDeclare (TlDeclare fp@FunctionDeclareData{..}) -> (fd_fun_name, (fp, False))
                       ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> 
-                        (fi_fun_name, convert_to_FunctionDeclareType fp))
+                        (fi_fun_name, (convert_to_FunctionDeclareType fp, True)))
              $ filter (\x -> case x of
                           ToplevelDeclare (TlDeclare FunctionDeclareData{..}) -> True
                           ToplevelDefine{..} -> True
