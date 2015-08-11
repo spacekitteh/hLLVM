@@ -70,6 +70,7 @@ library
                      Llvm.Asm.Parser.Type,
                      Llvm.Asm,
                      Llvm.AsmHirConversion,
+                     Llvm.AsmHirConversion.MapLabels,
                      Llvm.AsmHirConversion.AsmToHir,
                      Llvm.AsmHirConversion.HirToAsm,
                      Llvm.AsmHirConversion.Specialization,

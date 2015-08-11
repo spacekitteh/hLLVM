@@ -14,17 +14,17 @@ import qualified Data.Set as S
  Internalization converts a "metadata" value to a first class value that can be referred by LLVM code.
 v-}
 
-class (Monad m, MonadState (M.Map (Dtype, Const) (DefAndRef a)) m) =>  LlvmGlobalGenMonad a m where
-  newGlobalId :: m GlobalId
-  getDefAndRef :: (Dtype, Const) -> m (Maybe (DefAndRef a))
-  cacheToplevel :: (Dtype, Const) -> DefAndRef a -> m ()
+class (Monad m, AbsName g, MonadState (M.Map (Dtype, Const g) (DefAndRef g a)) m) =>  LlvmGlobalGenMonad g a m where
+  newGlobalId :: m g
+  getDefAndRef :: (Dtype, Const g) -> m (Maybe (DefAndRef g a))
+  cacheToplevel :: (Dtype, Const g) -> DefAndRef g a -> m ()
 
-data DefAndRef a = DefAndRef { llvmDef :: Toplevel a
-                             , llvmRef :: T (Type ScalarB P) Const
-                             }
+data DefAndRef g a = DefAndRef { llvmDef :: Toplevel g a
+                               , llvmRef :: T (Type ScalarB P) (Const g)
+                               }
 
 class (Ord x, Eq x) => Internalization x where
-  internalize :: LlvmGlobalGenMonad a m => x -> m (DefAndRef a)
+  internalize :: LlvmGlobalGenMonad g a m => x -> m (DefAndRef g a)
 
 instance Internalization String where
   internalize c =
@@ -62,16 +62,16 @@ instance Internalization String where
                           }
           }
 
-instance LlvmGlobalGenMonad a (StateT (M.Map (Dtype, Const) (DefAndRef a)) (State (String, Int))) where
+instance AbsName g => LlvmGlobalGenMonad g a (StateT (M.Map (Dtype, Const g) (DefAndRef g a)) (State (String, Int))) where
   newGlobalId = do { (prefix, cnt) <- lift get
                    ; lift $ put (prefix, cnt+1)
-                   ; return $ GlobalIdAlphaNum (prefix ++ show cnt)
+                   ; return $ mkName (prefix ++ show cnt)
                    }
   cacheToplevel k v = modify (M.insert k v)
   getDefAndRef k = do { s <- get
                       ; return $ M.lookup k s
                       }
 
-runSimpleLlvmGlobalGen :: String -> Int -> (StateT (M.Map (Dtype, Const) (DefAndRef a)) (State (String, Int))) x ->
-                          (x, (M.Map (Dtype, Const) (DefAndRef a)))
+runSimpleLlvmGlobalGen :: String -> Int -> (StateT (M.Map (Dtype, Const g) (DefAndRef g a)) (State (String, Int))) x ->
+                          (x, (M.Map (Dtype, Const g) (DefAndRef g a)))
 runSimpleLlvmGlobalGen prefix initCnt f = evalState (runStateT f M.empty) (prefix, initCnt)

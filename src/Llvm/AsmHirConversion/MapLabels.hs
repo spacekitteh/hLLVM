@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE CPP, TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables, TupleSections #-}
-module Llvm.AsmHirConversion.AsmToHir(asmToHir) where
+module Llvm.AsmHirConversion.MapLabels(compMapping) where
 
 import Llvm.ErrorLoc
 #define FLC  (FileLoc $(srcLoc))
@@ -19,11 +19,9 @@ import Data.Maybe (fromJust)
 import Control.Monad.Reader
 import Llvm.AsmHirConversion.Specialization
 import Llvm.Hir.DataLayoutMetrics
-import Llvm.AsmHirConversion.MapLabels(compMapping)
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: I.Gname
-                              , idLabelMap :: IdLabelMap                                
                               }
 
 type MM = ReaderT ReaderData (LabelMapM H.SimpleUniqueMonad)
@@ -35,7 +33,7 @@ funName :: MM I.Gname
 funName = ask >>= return . funname
 
 withFunName :: I.Gname -> MM a -> MM a
-withFunName g f = withReaderT (\(ReaderData x _ lm) -> ReaderData x g lm) f
+withFunName g f = withReaderT (\(ReaderData x _) -> ReaderData x g) f
 
 
 stripOffPa :: [A.ParamAttr] -> [A.ParamAttr -> Bool] -> 
@@ -81,15 +79,7 @@ convert_PercentLabelEx :: I.Gname -> A.PercentLabel -> MM (Maybe H.Label)
 convert_PercentLabelEx g (A.PercentLabel l) = convert_LabelIdEx g l
   where 
     convert_LabelIdEx :: I.Gname -> A.LabelId -> MM (Maybe H.Label)
-    convert_LabelIdEx fn x = do { r <- ask
-                                ; let oldlabel = M.lookup (fn,x) (a2h $ idLabelMap r)
-                                ; newlabel <- lift (getLabel (fn, x))
-                                ; case (newlabel, oldlabel) of
-                                  (Nothing, Nothing) -> errorLoc FLC $ show (fn,x)
-                                  (Just x, Just y) | x == y -> return $ Just x  
-                                  (Nothing, Just y) -> return $ Just y
-                                  _ -> errorLoc FLC $ show (newlabel, oldlabel) ++ show (fn, x)
-                                }
+    convert_LabelIdEx fn x = lift (getLabel (fn, x))
 
 
 convert_TargetLabel :: A.TargetLabel -> MM H.Label 
@@ -661,7 +651,7 @@ convert_Const x =
     A.C_blockAddress g a -> do { a' <- convert_PercentLabelEx (specializeGlobalId g) a
                                ; case a' of
                                  Just a'' -> return $ I.C_block (specializeGlobalId g) a''
-                                 Nothing -> errorLoc FLC $ show x 
+                                 Nothing -> return $ I.C_u32 0 -- we don't report error here:-) because we only need the labal mapping.
                                }
     A.C_binexp (A.Ie a@(A.IbinExpr _ _ t _ _)) -> 
       do { mp <- typeDefs
@@ -1851,22 +1841,20 @@ filterOutDataLayoutAndTriple tls =
                                A.ToplevelDataLayout _ -> False
                                _ -> True) tls)
 
-asmToHir :: (Show dlm, DataLayoutMetrics dlm) => dlm -> A.Module -> 
-            H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm I.Gname ())
-asmToHir dlm m@(A.Module ts) = 
-  let (lbMap,_) = H.runSimpleUniqueMonad (compMapping dlm m)
-  in 
-   let ((A.DataLayout dl, tt), ts0) = filterOutDataLayoutAndTriple ts
-       td = M.fromList $ A.typeDefOfModule m
-   in if matchLayoutSpecAndTriple dlm dl tt then
-        runLabelMapM emptyIdLabelMap 
-        $ (runReaderT (do { let defs0 = filter (\x -> case x of
-                                                   A.ToplevelDefine _ -> True
-                                                   _ -> False) ts0
-                          ; defs <- mapM toplevel2IrP1 defs0
-                          ; l <- mapM (toplevel2IrP2 (M.fromList defs))  ts0
-                          ; return $ I.SpecializedModule dlm $ I.Module l
-                          }
-                      ) (ReaderData td (I.Gname (errorLoc FLC $ "<fatal error>")) lbMap))
-      else 
-        error $ show (dl,tt) ++ " does not match " ++ show dlm
+compMapping :: (Show dlm, DataLayoutMetrics dlm) => dlm -> A.Module -> 
+               H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm I.Gname ())
+compMapping dlm m@(A.Module ts) = 
+  let ((A.DataLayout dl, tt), ts0) = filterOutDataLayoutAndTriple ts
+      td = M.fromList $ A.typeDefOfModule m
+  in if matchLayoutSpecAndTriple dlm dl tt then
+       runLabelMapM emptyIdLabelMap 
+       $ (runReaderT (do { let defs0 = filter (\x -> case x of
+                                                  A.ToplevelDefine _ -> True
+                                                  _ -> False) ts0
+                         ; defs <- mapM toplevel2IrP1 defs0
+                         ; l <- mapM (toplevel2IrP2 (M.fromList defs))  ts0
+                         ; return $ I.SpecializedModule dlm $ I.Module l
+                         }
+                     ) (ReaderData td (I.Gname (errorLoc FLC $ "<fatal error>"))))
+     else 
+       error $ show (dl,tt) ++ " does not match " ++ show dlm

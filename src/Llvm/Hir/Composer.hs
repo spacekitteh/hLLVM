@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TemplateHaskell #-}
+{-# LANGUAGE CPP, TemplateHaskell, RankNTypes #-}
 module Llvm.Hir.Composer where
 
 #define FLC  (FileLoc $(srcLoc))
@@ -52,14 +52,14 @@ x86_fp80 = TpX86Fp80
 isInbounds :: IsOrIsNot InBounds
 isInbounds = Is InBounds
 
-iload :: T (Type ScalarB P) Value -> LocalId -> Cinst
+iload :: T (Type ScalarB P) (Value g) -> LocalId -> Cinst g
 iload p r = I_load (IsNot Volatile) p Nothing Nothing Nothing Nothing r
 
-istore :: T Dtype Value -> T (Type ScalarB P) Value -> Cinst
+istore :: T Dtype (Value g) -> T (Type ScalarB P) (Value g) -> Cinst g
 istore v p = I_store (IsNot Volatile) v p Nothing Nothing
 
 
-i_alloca :: FileLoc -> Cinst
+i_alloca :: FileLoc -> Cinst g
 i_alloca loc = I_alloca { result = errorLoc loc "please assign a new variable name"
                         , inAllocaAttr = IsNot InAllocaAttr
                         , dtype = errorLoc loc "please specify the allocated date type"
@@ -67,7 +67,7 @@ i_alloca loc = I_alloca { result = errorLoc loc "please assign a new variable na
                         , alignment = Nothing
                         }
 
-i_getelementptr :: FileLoc -> Cinst
+i_getelementptr :: FileLoc -> Cinst g
 i_getelementptr loc = I_getelementptr { result = errorLoc loc "please assign a new variable name"
                                       , inBounds = IsNot InBounds
                                       , pointer = errorLoc loc "please assign a pointer"
@@ -75,7 +75,7 @@ i_getelementptr loc = I_getelementptr { result = errorLoc loc "please assign a n
                                       }
 
 
-i_store :: FileLoc -> Cinst
+i_store :: FileLoc -> Cinst g
 i_store loc = I_store { volatile = IsNot Volatile
                       , storedvalue = errorLoc loc "please specified the stored value"
                       , pointer = errorLoc loc " please assign a pointer"
@@ -83,7 +83,7 @@ i_store loc = I_store { volatile = IsNot Volatile
                       , nontemporal = Nothing
                       }
 
-icallcmd :: GlobalId -> [(Dtype, Value)] -> Cinst
+icallcmd :: g -> [(Dtype, Value g)] -> Cinst g
 icallcmd fname params = I_call_fun (FunId fname) 
                         CallFunInterface { cfi_tail = TcNon 
                                          , cfi_castType = Nothing
@@ -95,7 +95,7 @@ icallcmd fname params = I_call_fun (FunId fname)
                                          , cfi_funAttrs = [] 
                                          } Nothing
 
-icallfun :: GlobalId -> [(Dtype, Value)] -> Dtype -> LocalId -> Cinst
+icallfun :: g -> [(Dtype, Value g)] -> Dtype -> LocalId -> Cinst g
 icallfun fname params retType rid = 
   let funType = Tfunction (ucast retType, []) (fmap (\x -> (MtypeData $ fst x, Nothing)) params) Nothing
   in 
@@ -109,8 +109,9 @@ icallfun fname params retType rid =
                    , cfi_funAttrs = []
                    } (Just rid)
 
-llvm_sizeof :: Dtype -> Type ScalarB I -> Const
+llvm_sizeof :: forall g.Dtype -> Type ScalarB I -> Const g
 llvm_sizeof s intType = let start = C_getelementptr (Is InBounds) (T (Tpointer (ucast s) 0) C_null) [toTC (0::Word32)]
                             end = C_getelementptr (Is InBounds) (T (Tpointer (ucast s) 0) C_null) [toTC (1::Word32)]
                         in C_sub Nothing intType (toInt end) (toInt start)
-  where toInt ptr = C_ptrtoint (T (Tpointer (ucast s) 0) ptr) intType
+  where 
+    toInt ptr = C_ptrtoint (T (Tpointer (ucast s) 0) ptr) intType

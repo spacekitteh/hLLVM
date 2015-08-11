@@ -227,7 +227,7 @@ rwTinst f (Tinst c) = rwTerminatorInstWithDbg f c >>= return . Tinst
 rwTinst _ _ = Nothing
 -}
 
-rwNode :: MaybeChange Value -> MaybeChange (Node a e x)
+rwNode :: MaybeChange (Value g) -> MaybeChange (Node g a e x)
 rwNode = undefined
 
 {-
@@ -236,7 +236,7 @@ rwNode f n@(Tinst _) = rwTinst f n
 rwNode _ _  = Nothing
 -}
 
-nodeToGraph :: Node a e x -> H.Graph (Node a) e x
+nodeToGraph :: Node g a e x -> H.Graph (Node g a) e x
 nodeToGraph n@(Lnode _) = H.mkFirst n
 nodeToGraph n@(Pnode _ _) = H.mkMiddle n
 nodeToGraph n@(Cnode _ _) = H.mkMiddle n

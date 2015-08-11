@@ -14,11 +14,11 @@ strToApInt s = case ((reads s)::[(Integer,String)]) of
   [(n,"")] -> n
   _ -> error $ "is not integer " ++ s
 
-castTypedValueToTypedConst :: Show t => T t Value -> T t Const
+castTypedValueToTypedConst :: (Show t, Show g) => T t (Value g) -> T t (Const g)
 castTypedValueToTypedConst (T t (Val_const c)) = T t c
 castTypedValueToTypedConst x = error $ "is not const " ++ show x
 
-castTypedConstToTypedValue :: T t Const -> T t Value  
+castTypedConstToTypedValue :: T t (Const g) -> T t (Value g)
 castTypedConstToTypedValue (T t c) = T t (Val_const c) 
 
 
@@ -29,7 +29,7 @@ castToStructType :: MonadError Qerror m => Type x r -> m (Packing, [Dtype])
 castToStructType (Tstruct p ts) = return (p, ts)
 castToStructType x = throwError (QerrWithInfo $ (show x) ++ " is not a struct type")
 
-getUniqueInteger :: Show t => T t Const -> Integer
+getUniqueInteger :: (Show t, Show g) => T t (Const g) -> Integer
 getUniqueInteger (T _ (C_int s))  = strToApInt s
 getUniqueInteger (T _ (C_u8 s)) = fromIntegral s
 getUniqueInteger (T _ (C_u16 s)) = fromIntegral s

@@ -24,17 +24,15 @@ import Llvm.AsmHirConversion.Specialization
 import Llvm.ErrorLoc
 import Llvm.Hir.DataLayoutMetrics
 
-
-
 class Conversion l1 l2 | l1 -> l2 where
   convert :: l1 -> l2
 
-data ReaderData = ReaderData { mp :: (M.Map (A.GlobalId, H.Label) A.LabelId)
-                             , funname :: A.GlobalId
+data ReaderData = ReaderData { mp :: (M.Map (I.Gname, H.Label) A.LabelId)
+                             , funname :: I.Gname
                              }
 type Rm = Reader ReaderData
 
-withFunName :: A.GlobalId -> Rm a -> Rm a
+withFunName :: I.Gname -> Rm a -> Rm a
 withFunName g = withReader (\(ReaderData x _) -> ReaderData x g)
 
 
@@ -53,6 +51,17 @@ instance Conversion H.Label (Rm A.LabelId) where
                    Just l0 -> return l0
                    Nothing -> return $  A.LabelDqString $ "_hoopl_label_" ++ show l 
                  }
+              
+convert_to_LabelExt :: I.Gname -> H.Label -> Rm A.LabelId              
+convert_to_LabelExt fn l = do { (ReaderData r _) <- ask
+                              ; case M.lookup (fn,l) r of 
+                                Just l0 -> return l0
+                                Nothing -> errorLoc FLC $ show (fn,l)
+                              }
+
+convert_to_PercentLabelExt :: I.Gname -> H.Label -> Rm A.PercentLabel
+convert_to_PercentLabelExt fn l = Md.liftM A.PercentLabel (convert_to_LabelExt fn l)
+
 
 convert_to_PercentLabel :: H.Label -> Rm A.PercentLabel
 convert_to_PercentLabel l = Md.liftM A.PercentLabel (convert l)
@@ -111,7 +120,7 @@ instance Conversion v1 (Rm v2) => Conversion (I.Conversion I.VectorB v1) (Rm (A.
                     ; return $ A.Conversion op (A.Typed t1 u1) dt1
                     }
                  
-mkConversion :: (A.ConvertOp, A.Type, I.Const, A.Type) -> Rm A.Const
+mkConversion :: (A.ConvertOp, A.Type, I.Const I.Gname, A.Type) -> Rm A.Const
 mkConversion (op, t1, u, dt1) = do { u1 <- convert u
                                    ; return $ A.C_conv $ A.Conversion op (A.Typed t1 u1) dt1                                   
                                    }
@@ -231,13 +240,14 @@ instance Conversion v1 (Rm v2) => Conversion (I.InsertElement I.F v1) (Rm (A.Ins
   convert (I.InsertElement u1 u2 u3) = Md.liftM3 A.InsertElement (convert u1) (convert u2) (convert u3)
 
 instance Conversion v1 (Rm v2) => Conversion (I.InsertElement I.P v1) (Rm (A.InsertElement v2)) where
-  convert (I.InsertElement u1 u2 u3) = Md.liftM3 A.InsertElement (convert u1) (convert u2) (convert u3)
+  convert (I.InsertElement u1 u2 u3) = Md.liftM3 A.InsertElement (convert u1) 
+                                       (convert u2) (convert u3)
 
 
 
 
 
-instance Conversion I.Const (Rm A.Const) where
+instance Conversion (I.Const I.Gname) (Rm A.Const) where
   convert x = case x of
     I.C_int s -> return $ A.C_simple $ A.CpInt s 
     I.C_uhex_int s -> return $ A.C_simple $ A.CpUhexInt s
@@ -248,7 +258,7 @@ instance Conversion I.Const (Rm A.Const) where
     I.C_true -> return $ A.C_simple $ A.CpTrue
     I.C_false -> return $ A.C_simple $ A.CpFalse
     I.C_zeroinitializer -> return $ A.C_simple $ A.CpZeroInitializer
-    I.C_globalAddr s -> return $ A.C_simple $ A.CpGlobalAddr s
+    I.C_globalAddr s -> return $ A.C_simple $ A.CpGlobalAddr (unspecializeGlobalId s)
     I.C_str s -> return $ A.C_simple $ A.CpStr s
     I.C_u8 s -> return $ A.C_simple $ A.CpBconst $ A.BconstUint8 s
     I.C_u16 s -> return $ A.C_simple $ A.CpBconst $ A.BconstUint16 s
@@ -273,8 +283,8 @@ instance Conversion I.Const (Rm A.Const) where
                           ; return (A.C_complex $ A.Carray $ (fmap (\_ -> v) [1..n]))
                           }
     I.C_labelId a -> Md.liftM A.C_labelId (convert a)
-    I.C_block g a -> do { a' <- convert_to_PercentLabel a
-                        ; return $ A.C_blockAddress g a'
+    I.C_block g a -> do { a' <- convert_to_PercentLabelExt g a
+                        ; return $ A.C_blockAddress (unspecializeGlobalId g) a'
                         }
     I.C_add nw t u1 u2 -> Md.liftM (A.C_binexp . A.Ie) 
                           (Md.liftM2 (A.IbinExpr A.Add (cnowrap nw) (tconvert () t)) (convert u1) (convert u2))
@@ -430,19 +440,19 @@ instance Conversion I.MdRef (Rm A.MdRef) where
     I.MdRefName c -> Md.liftM A.MdRefName (convert c)
     I.MdRefNode c -> Md.liftM A.MdRefNode (convert c)
 
-instance Conversion I.MetaConst (Rm A.MetaConst) where
+instance Conversion (I.MetaConst I.Gname) (Rm A.MetaConst) where
     convert (I.McStruct c) = Md.liftM A.McStruct $ mapM convert c
     convert (I.McString s) = return $ A.McString s
     convert (I.McMdRef n) = Md.liftM A.McMdRef $ convert n
     convert (I.McSsa i) = return $ A.McSsa i
     convert (I.McSimple sc) = Md.liftM A.McSimple (convert sc)
 
-instance Conversion I.MetaKindedConst (Rm A.MetaKindedConst) where
+instance Conversion (I.MetaKindedConst I.Gname) (Rm A.MetaKindedConst) where
   convert x = case x of
     (I.MetaKindedConst mk mc) -> Md.liftM (A.MetaKindedConst (tconvert () mk)) (convert mc)
     I.UnmetaKindedNull -> return A.UnmetaKindedNull
 
-instance Conversion I.Value (Rm A.Value) where
+instance Conversion (I.Value I.Gname) (Rm A.Value) where
     convert (I.Val_ssa a) = return $ A.Val_local a
     convert (I.Val_const a) = Md.liftM A.Val_const (convert a)
 
@@ -451,11 +461,11 @@ instance Conversion I.CallSiteType (Rm A.Type) where
     I.CallSiteTypeRet x -> return $ tconvert () x
     I.CallSiteTypeFun ft as -> return $ tconvert () (I.Tpointer (ucast ft) as)
     
-instance Conversion I.FunPtr (Rm A.FunName) where
+instance Conversion (I.FunPtr I.Gname) (Rm A.FunName) where
   convert x = case x of
     I.Fun_null -> return A.FunName_null
     I.Fun_undef -> return A.FunName_undef    
-    I.FunId g -> return $ A.FunNameGlobal (A.GolG g)
+    I.FunId g -> return $ A.FunNameGlobal (A.GolG $ unspecializeGlobalId g)
     I.FunSsa l -> return $ A.FunNameGlobal (A.GolL l)
     I.FunIdBitcast (I.T st c) dt -> do { tv1 <- convert (I.T st c)
                                        ; return $ A.FunNameBitcast tv1 (tconvert () dt)
@@ -464,8 +474,9 @@ instance Conversion I.FunPtr (Rm A.FunName) where
                                         ; return $ A.FunNameInttoptr tv1 (tconvert () dt)
                                         }
 
-instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite)) where
-  convert  (fn, I.CallFunInterface { I.cfi_tail = tc, I.cfi_castType = castType, I.cfi_signature = sig, I.cfi_funAttrs = fa}) = 
+instance Conversion (I.FunPtr I.Gname, I.CallFunInterface I.Gname) (Rm (A.TailCall, A.CallSite)) where
+  convert  (fn, I.CallFunInterface { I.cfi_tail = tc, I.cfi_castType = castType
+                                   , I.cfi_signature = sig, I.cfi_funAttrs = fa}) = 
     do { fna <- convert fn
        ; (cc, pa, ret, aps) <- convert sig
        ; let funType = case castType of
@@ -474,7 +485,7 @@ instance Conversion (I.FunPtr, I.CallFunInterface) (Rm (A.TailCall, A.CallSite))
        ; return (tc, A.CallSiteFun cc pa funType fna aps fa)
        }
     
-instance Conversion (I.FunPtr, I.InvokeFunInterface) (Rm A.CallSite) where
+instance Conversion (I.FunPtr I.Gname, I.InvokeFunInterface I.Gname) (Rm A.CallSite) where
   convert  (fn, I.InvokeFunInterface { I.ifi_castType = castType, I.ifi_signature = sig, I.ifi_funAttrs = fa}) =  
     do { fna <- convert fn
        ; (cc, pa, ret, aps) <- convert sig
@@ -490,14 +501,14 @@ instance Conversion (I.Type I.CodeFunB I.X) (Rm (A.Type, [I.RetAttr], Maybe A.Va
 getReturnType :: I.Type I.CodeFunB I.X -> Rm (A.Type, [I.RetAttr], Maybe A.VarArgParam)
 getReturnType t@(I.Tfunction (rt,retAttrs) _ ma) = return (tconvert () rt, retAttrs, ma)
 
-instance Conversion (I.AsmCode, I.CallAsmInterface) (Rm A.InlineAsmExp) where
+instance Conversion (I.AsmCode, I.CallAsmInterface I.Gname) (Rm A.InlineAsmExp) where
   convert (I.AsmCode dia s1 s2, I.CallAsmInterface t mse mas aps fa) = 
     do { apsa <- mapM convert aps
        ; (ta,_,_) <- convert t
        ; return (A.InlineAsmExp ta mse mas dia s1 s2 apsa fa)
        }
 
-instance Conversion I.Clause (Rm A.Clause) where
+instance Conversion (I.Clause I.Gname) (Rm A.Clause) where
     convert (I.Catch tv) = convert tv >>= \tv' -> return $ A.ClauseCatch tv'
     convert (I.Filter tc) = convert tc >>= \tc' -> return $ A.ClauseFilter tc'
     convert (I.CcoS tc) = convert tc >>= return . A.ClauseConversion
@@ -506,7 +517,7 @@ instance Conversion I.Clause (Rm A.Clause) where
 instance Conversion I.GlobalOrLocalId (Rm A.GlobalOrLocalId) where
     convert g = return g
 
-instance Conversion I.Minst (Rm A.ComputingInst) where
+instance Conversion (I.Minst I.Gname) (Rm A.ComputingInst) where
   convert mi = 
     let I.Minst cst fn params = unspecializeMinst mi
     in do { fna <- convert (I.FunId fn)
@@ -515,12 +526,13 @@ instance Conversion I.Minst (Rm A.ComputingInst) where
           ; return $ A.ComputingInst Nothing $ A.RhsCall A.TcNon $ A.CallSiteFun Nothing [] cst0 fna apa []
           }
 
-instance Conversion I.Cinst (Rm A.ComputingInst) where
+instance Conversion (I.Cinst I.Gname) (Rm A.ComputingInst) where
   convert cinst = case unspecializeRegisterIntrinsic cinst of
     Just (gid, typ, opds, lhs) -> 
       do { opdsa <- mapM convert opds
          ; let rtTyp = maybe A.Tvoid (\_ -> tconvert () typ) lhs
-         ; return $ A.ComputingInst lhs $ A.RhsCall A.TcNon $ A.CallSiteFun Nothing [] rtTyp (A.FunNameGlobal $ A.GolG gid) opdsa []
+         ; return $ A.ComputingInst lhs $ A.RhsCall A.TcNon $ A.CallSiteFun Nothing [] rtTyp 
+           (A.FunNameGlobal $ A.GolG $ unspecializeGlobalId gid) opdsa []
          }
     Nothing -> 
       case maybe cinst id (unspecializeIntrinsics cinst) of 
@@ -1068,7 +1080,7 @@ instance Conversion I.Cinst (Rm A.ComputingInst) where
         _ -> errorLoc FLC $ show cinst
                                       
 
-instance Conversion (I.FunOperand I.Value) (Rm A.ActualParam) where
+instance Conversion (I.FunOperand (I.Value I.Gname)) (Rm A.ActualParam) where
   convert x = case x of
     I.FunOperandData t pa ma v -> 
       do { va <- convert v 
@@ -1101,7 +1113,7 @@ instance Conversion (I.FunOperand I.Value) (Rm A.ActualParam) where
            (appendAlignment ma (A.PaZeroExt:(fmap unspecializePAttr pa1))) va
          }      
 
-instance Conversion I.MetaOperand (Rm A.ActualParam) where
+instance Conversion (I.MetaOperand I.Gname) (Rm A.ActualParam) where
   convert x = case x of
     I.MetaOperandData t pa1 ma v -> 
       do { va <- convert v
@@ -1109,25 +1121,25 @@ instance Conversion I.MetaOperand (Rm A.ActualParam) where
          }
     I.MetaOperandMeta mc -> Md.liftM (A.ActualParamMeta) (convert mc)
 
-instance Conversion I.Aliasee (Rm A.Const) where
-  convert (I.Aliasee v) = return $ A.C_simple $ A.CpGlobalAddr v
+instance Conversion (I.Aliasee I.Gname) (Rm A.Const) where
+  convert (I.Aliasee v) = return $ A.C_simple $ A.CpGlobalAddr $ unspecializeGlobalId v
   convert (I.AliaseeConversion a) = Md.liftM A.C_conv (convert a)
   convert (I.AliaseeGEP a) = Md.liftM A.C_gep (convert a)
 
 
-convertAliasee :: I.Aliasee -> Rm A.Aliasee 
+convertAliasee :: I.Aliasee I.Gname -> Rm A.Aliasee 
 convertAliasee ae = case ae of
   I.AliaseeTyped t a -> convert a >>= \ax -> return $ A.Aliasee (A.Typed (tconvert () t) ax)
   I.AliaseeConversion a ->  Md.liftM A.AliaseeConversion (convert a)
   I.AliaseeGEP a -> Md.liftM A.AliaseeGetElementPtr (convert a)
 
-instance Conversion I.Prefix (Rm A.Prefix) where
+instance Conversion (I.Prefix I.Gname) (Rm A.Prefix) where
   convert (I.Prefix n) = Md.liftM A.Prefix (convert n)
 
-instance Conversion I.Prologue (Rm A.Prologue) where
+instance Conversion (I.Prologue I.Gname) (Rm A.Prologue) where
   convert (I.Prologue n) = Md.liftM A.Prologue (convert n)
 
-instance Conversion I.TypedConstOrNull (Rm A.TypedConstOrNull) where
+instance Conversion (I.TypedConstOrNull I.Gname) (Rm A.TypedConstOrNull) where
   convert x = case x of
     I.TypedConst tv -> Md.liftM A.TypedConst (convert tv)
     I.UntypedNull -> return A.UntypedNull
@@ -1159,28 +1171,28 @@ instance Conversion (I.FunOperand I.LocalId) (Rm A.FormalParam) where
       return $ A.FormalParamData (tconvert () dt) (appendAlignment ma (A.PaZeroExt:(fmap unspecializePAttr pa))) (A.FexplicitParam fp)
   
 instance Conversion (I.FunSignature I.LocalId) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
-  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
+  convert I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
     do { (ret, attrs, mv) <- getReturnType typ
        ; paras0 <- mapM convert paras
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
        }
          
 instance Conversion (I.FunSignature ()) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
-  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
+  convert I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
     do { (ret, attrs, mv) <- getReturnType typ
        ; paras0 <- mapM convert paras
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
        }
 
-instance Conversion (I.FunSignature I.Value) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, [A.ActualParam])) where
-  convert a@I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
+instance Conversion (I.FunSignature (I.Value I.Gname)) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, [A.ActualParam])) where
+  convert I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
     do { (ret, attrs, mv) <- convert typ
        ; paras0 <- mapM convert paras
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, paras0)
        }
   
 
-instance Conversion I.FunctionInterface (Rm A.FunctionPrototype) where
+instance Conversion (I.FunctionInterface I.Gname) (Rm A.FunctionPrototype) where
   convert (I.FunctionInterface { I.fi_linkage = f0 
                                , I.fi_visibility = f1 
                                , I.fi_dllstorage = f2
@@ -1203,12 +1215,12 @@ instance Conversion I.FunctionInterface (Rm A.FunctionPrototype) where
                                       , A.fp_callConv = f3a
                                       , A.fp_retAttrs = f3b
                                       , A.fp_retType = f3c
-                                      , A.fp_fun_name = f6
+                                      , A.fp_fun_name = unspecializeGlobalId f6
                                       , A.fp_param_list = f3d
                                       , A.fp_addr_naming = f8
                                       , A.fp_fun_attrs = f9
                                       , A.fp_section = f10
-                                      , A.fp_comdat = f11
+                                      , A.fp_comdat = fmap convert_Comdat f11
                                       , A.fp_alignment = f12
                                       , A.fp_gc = f13
                                       , A.fp_prefix = f14a
@@ -1218,7 +1230,7 @@ instance Conversion I.FunctionInterface (Rm A.FunctionPrototype) where
 
 
 
-instance Conversion I.FunctionDeclare (Rm A.FunctionPrototype) where
+instance Conversion (I.FunctionDeclare I.Gname) (Rm A.FunctionPrototype) where
   convert x = case x of
     I.FunctionDeclareData { I.fd_linkage = f0 
                           , I.fd_visibility = f1 
@@ -1243,12 +1255,12 @@ instance Conversion I.FunctionDeclare (Rm A.FunctionPrototype) where
                                         , A.fp_callConv = f3a
                                         , A.fp_retAttrs = f3b
                                         , A.fp_retType = f3c
-                                        , A.fp_fun_name = f6
+                                        , A.fp_fun_name = unspecializeGlobalId f6
                                         , A.fp_param_list = f3d
                                         , A.fp_addr_naming = f8
                                         , A.fp_fun_attrs = f9
                                         , A.fp_section = f10
-                                        , A.fp_comdat = f11
+                                        , A.fp_comdat = fmap convert_Comdat f11
                                         , A.fp_alignment = f12
                                         , A.fp_gc = f13
                                         , A.fp_prefix = f14a
@@ -1270,7 +1282,7 @@ instance Conversion I.FunctionDeclare (Rm A.FunctionPrototype) where
                                         , A.fp_callConv = Nothing
                                         , A.fp_retAttrs = []
                                         , A.fp_retType = (tconvert () f5)
-                                        , A.fp_fun_name = f6
+                                        , A.fp_fun_name = unspecializeGlobalId f6
                                         , A.fp_param_list = A.FormalParamList f7a Nothing
                                         , A.fp_addr_naming = Nothing
                                         , A.fp_fun_attrs = f8
@@ -1284,12 +1296,12 @@ instance Conversion I.FunctionDeclare (Rm A.FunctionPrototype) where
          }
 
 
-instance Conversion I.Pinst (Rm A.PhiInst) where
+instance Conversion (I.Pinst I.Gname) (Rm A.PhiInst) where
   convert (I.Pinst t branches mg) = 
     Md.liftM (A.PhiInst (Just mg) (tconvert () t)) 
     (mapM (pairM convert convert_to_PercentLabel) branches)
 
-instance Conversion I.Tinst (Rm A.TerminatorInst) where
+instance Conversion (I.Tinst I.Gname) (Rm A.TerminatorInst) where
   convert (I.T_ret_void) = return A.RetVoid
   convert (I.T_return tvs) = Md.liftM A.Return (mapM convert tvs)
   convert (I.T_br t) = Md.liftM A.Br (convert_to_TargetLabel t)
@@ -1307,7 +1319,7 @@ instance Conversion I.Tinst (Rm A.TerminatorInst) where
   convert I.T_unreachable = return A.Unreachable
   convert I.T_unwind = return A.Unwind
 
-instance Conversion I.Dbg (Rm A.Dbg) where
+instance Conversion (I.Dbg I.Gname) (Rm A.Dbg) where
   convert (I.Dbg mv mc) = Md.liftM2 A.Dbg (convert mv) (convert mc)
 
 instance Conversion PhiInstWithDbg (Rm A.PhiInstWithDbg) where
@@ -1322,28 +1334,20 @@ instance Conversion MInstWithDbg (Rm A.ComputingInstWithDbg) where
 instance Conversion TerminatorInstWithDbg (Rm A.TerminatorInstWithDbg) where
   convert (TerminatorInstWithDbg term dbgs) = Md.liftM2 A.TerminatorInstWithDbg (convert term) (mapM convert dbgs)
 
-{-    
-instance Conversion I.TlTriple (Rm A.TlTriple) where
-  convert (I.TlTriple x) = return (A.TlTriple x)
-
-instance Conversion I.TlDataLayout (Rm A.TlDataLayout) where
-  convert (I.TlDataLayout x) = return (A.TlDataLayout x)
--}
-
-instance Conversion I.TlAlias (Rm A.TlAlias) where  
-  convert (I.TlAlias  g v dll tlm na l a) = convertAliasee a >>= return . (A.TlAlias g v dll tlm na l)
+instance Conversion (I.TlAlias I.Gname) (Rm A.TlAlias) where
+  convert (I.TlAlias  g v dll tlm na l a) = convertAliasee a >>= return . (A.TlAlias (unspecializeGlobalId g) v dll tlm na l)
   
-instance Conversion I.TlUnamedMd (Rm A.TlUnamedMd) where  
+instance Conversion (I.TlUnamedMd I.Gname) (Rm A.TlUnamedMd) where  
   convert x = let (I.TlUnamedMd s tv) = unspecializeUnamedMd x
               in Md.liftM (A.TlUnamedMd s) (convert tv) 
 
 instance Conversion I.TlNamedMd (Rm A.TlNamedMd) where  
   convert (I.TlNamedMd m ns) = Md.liftM (A.TlNamedMd m) (mapM convert ns)
                                
-instance Conversion I.TlDeclare (Rm A.TlDeclare) where                               
+instance Conversion (I.TlDeclare I.Gname) (Rm A.TlDeclare) where
   convert (I.TlDeclare f) = convert f >>= return . A.TlDeclare
   
-instance Conversion (I.TlDefine a) (Rm A.TlDefine) where
+instance Conversion (I.TlDefine I.Gname ()) (Rm A.TlDefine) where
   convert (I.TlDefine f elbl g) = 
     withFunName (I.fi_fun_name f) $ 
     do { (bl, bm) <- graphToBlocks g
@@ -1357,24 +1361,25 @@ instance Conversion (I.TlDefine a) (Rm A.TlDefine) where
        } -- TODO: this method will NOT emit the new nodes generated by hoopl passes, it should be fixed ASAP.
 
                              
-instance Conversion I.TlIntrinsic (Rm A.TlGlobal) where
+instance Conversion (I.TlIntrinsic I.Gname) (Rm A.TlGlobal) where
   convert x = convert (unspecializeTlIntrinsics x)
 
-instance Conversion I.TlGlobal (Rm A.TlGlobal) where
+instance Conversion (I.TlGlobal I.Gname) (Rm A.TlGlobal) where
   convert x = case x of
     (I.TlGlobalDtype a1 a2 a3 a4 a5 a6 a7 a8 a8a a9 a10 a11 a12 a13) ->
       do { a10a <- maybeM convert a10
-         ; return $ A.TlGlobal (Just a1) a2 a3 a4 a5 a6 (fmap (tconvert ()) a7) 
-           a8 a8a (tconvert () a9) a10a a11 a12 a13
+         ; return $ A.TlGlobal (Just $ unspecializeGlobalId a1) a2 a3 a4 a5 a6 (fmap (tconvert ()) a7) 
+           a8 a8a (tconvert () a9) a10a a11 (fmap convert_Comdat a12) a13
          }
     (I.TlGlobalOpaque a1 a2 a3 a4 a5 a6 a7 a8 a8a a9 a10 a11 a12 a13) ->
       do { a10a <- maybeM convert a10
-         ; return $ A.TlGlobal (Just a1) a2 a3 a4 a5 a6 (fmap (tconvert ()) a7) 
-           a8 a8a (tconvert () a9) a10a a11 a12 a13
+         ; return $ A.TlGlobal (Just $ unspecializeGlobalId a1) a2 a3 a4 a5 a6 (fmap (tconvert ()) a7) 
+           a8 a8a (tconvert () a9) a10a a11 (fmap convert_Comdat a12) a13
          }
+      
+convert_Comdat :: I.Comdat I.Gname -> A.Comdat      
+convert_Comdat (I.Comdat n) = A.Comdat (fmap unspecializeDollarId n)
     
---mapAlignInByte = fmap (\(I.AlignInByte n) -> A.Alignment n)
-
 instance Conversion I.TlTypeDef (Rm A.TlTypeDef) where    
   convert x = case x of
     (I.TlFunTypeDef lid t) -> return (A.TlTypeDef lid (tconvert () t))
@@ -1393,8 +1398,8 @@ instance Conversion I.TlModuleAsm (Rm A.TlModuleAsm) where
 instance Conversion I.TlAttribute (Rm A.TlAttribute) where
   convert (I.TlAttribute n l) = return (A.TlAttribute n l)
   
-instance Conversion I.TlComdat (Rm A.TlComdat) where  
-  convert (I.TlComdat l s) = return (A.TlComdat l s)
+instance Conversion (I.TlComdat I.Gname) (Rm A.TlComdat) where  
+  convert (I.TlComdat l s) = return (A.TlComdat (unspecializeDollarId l) s)
 
     
 type Pblock = (A.BlockLabel, [A.PhiInstWithDbg], [A.ComputingInstWithDbg])
@@ -1408,12 +1413,12 @@ isComment x = case x of
   A.ComputingInstWithComment _ -> True
   _ -> False
 
-data PhiInstWithDbg = PhiInstWithDbg I.Pinst [I.Dbg] deriving (Eq, Ord, Show)
-data CInstWithDbg = CInstWithDbg I.Cinst [I.Dbg] deriving (Eq, Ord, Show)
-data MInstWithDbg = MInstWithDbg I.Minst [I.Dbg] deriving (Eq, Ord, Show)
-data TerminatorInstWithDbg = TerminatorInstWithDbg I.Tinst [I.Dbg] deriving (Eq, Ord, Show)
+data PhiInstWithDbg = PhiInstWithDbg (I.Pinst I.Gname) [I.Dbg I.Gname] deriving (Eq, Ord, Show)
+data CInstWithDbg = CInstWithDbg (I.Cinst I.Gname) [I.Dbg I.Gname] deriving (Eq, Ord, Show)
+data MInstWithDbg = MInstWithDbg (I.Minst I.Gname) [I.Dbg I.Gname] deriving (Eq, Ord, Show)
+data TerminatorInstWithDbg = TerminatorInstWithDbg (I.Tinst I.Gname) [I.Dbg I.Gname] deriving (Eq, Ord, Show)
 
-convertNode :: I.Node a e x -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
+convertNode :: I.Node I.Gname () e x -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
                -> Rm ([A.Block], M.Map A.LabelId A.Block, Maybe Pblock)
 convertNode (I.Lnode a) p = do { (bl, bs, Nothing) <- p
                                ; a' <- convert_to_BlockLabel a
@@ -1449,12 +1454,12 @@ convertNode (I.Tnode a dbgs) p = do { (bl, bs, pb) <- p
                                     }
 convertNode (I.Enode _ _) _ = error "irrefutable:Enode should be converted to LLVM node"
   
-graphToBlocks :: H.Graph (I.Node a) H.C H.C -> Rm ([A.Block], M.Map A.LabelId A.Block)
+graphToBlocks :: H.Graph (I.Node I.Gname ()) H.C H.C -> Rm ([A.Block], M.Map A.LabelId A.Block)
 graphToBlocks g = do { (bl, bs, Nothing) <- H.foldGraphNodes convertNode g (return ([], M.empty, Nothing))
                      ; return (reverse bl, bs)
                      }
 
-toplevel2Ast :: I.Toplevel a -> Rm A.Toplevel
+toplevel2Ast :: I.Toplevel I.Gname () -> Rm A.Toplevel
 toplevel2Ast (I.ToplevelAlias g) = Md.liftM A.ToplevelAlias (convert g)
 toplevel2Ast (I.ToplevelUnamedMd s) = Md.liftM (A.ToplevelUnamedMd) (convert s)
 toplevel2Ast (I.ToplevelNamedMd m) = Md.liftM A.ToplevelNamedMd (convert m) 
@@ -1469,9 +1474,10 @@ toplevel2Ast (I.ToplevelComdat l) = Md.liftM A.ToplevelComdat (convert l)
 toplevel2Ast (I.ToplevelAttribute n) = Md.liftM A.ToplevelAttribute (convert n)
 toplevel2Ast (I.ToplevelIntrinsic n) = Md.liftM A.ToplevelGlobal (convert n)
 
-hirToAsm ::  DataLayoutMetrics dlm => M.Map (A.GlobalId, H.Label) A.LabelId -> I.SpecializedModule dlm a -> A.Module
+hirToAsm ::  DataLayoutMetrics dlm => M.Map (I.Gname, H.Label) A.LabelId -> I.SpecializedModule dlm I.Gname () -> A.Module
 hirToAsm iLm (I.SpecializedModule dlm (I.Module ts)) = 
-  let (A.Module tl) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) (ReaderData iLm (A.GlobalIdNum 0))
+  let (A.Module tl) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) 
+                      (ReaderData iLm (I.Gname (errorLoc FLC $ "<fatal error>")))
       ls = toLayoutSpec dlm
       tt = toTriple dlm
   in A.Module ((A.ToplevelDataLayout $ A.TlDataLayout $ A.DataLayout ls):(A.ToplevelTriple $ A.TlTriple tt):tl)

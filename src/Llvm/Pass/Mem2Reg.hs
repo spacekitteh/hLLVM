@@ -15,13 +15,13 @@ import Debug.Trace
 
 
 -- | TODO: describe in details what this pass is doing
-type Mem2RegFact = Dm.Map LValue (WithTop Value)
+type Mem2RegFact g = Dm.Map LValue (WithTop (Value g))
 
 data LValue = Mem LocalId
             | Ref LocalId
             deriving (Eq, Show, Ord)
 
-mem2RegLattice :: DataflowLattice Mem2RegFact
+mem2RegLattice :: Eq g => DataflowLattice (Mem2RegFact g)
 mem2RegLattice = DataflowLattice { fact_name = "Mem 2 Reg"
                                  , fact_bot = Dm.empty
                                  , fact_join = joinMaps (extendJoinDomain factAdd)
@@ -31,17 +31,17 @@ mem2RegLattice = DataflowLattice { fact_name = "Mem 2 Reg"
       = if new == old then (NoChange, PElem new)
         else (SomeChange, Top)
 
-isReg :: FwdTransfer (Node a) Mem2RegFact
+isReg :: Eq g => FwdTransfer (Node g a) (Mem2RegFact g)
 isReg = mkFTransfer ft
 
-ft :: (Node a) e x -> Mem2RegFact -> Fact x Mem2RegFact
+ft :: Eq g => (Node g a) e x -> Mem2RegFact g -> Fact x (Mem2RegFact g)
 ft (Lnode _) f = f
 ft (Pnode _ _) f = f
 ft (Cnode cinst _) f = cinstft cinst f
 ft n@(Tnode tinst _) f = tinstft n tinst f
 
 
-tinstft :: (Node a) O C -> Tinst -> Mem2RegFact -> Fact C Mem2RegFact
+tinstft :: Eq g => (Node g a) O C -> Tinst g -> Mem2RegFact g -> Fact C (Mem2RegFact g)
 tinstft n term f =  
   let targets = successors n -- targetOf term
   in case targets of
@@ -49,7 +49,7 @@ tinstft n term f =
     l -> mkFactBase mem2RegLattice
          (map (\x -> (x, f)) l)
 
-cinstft :: Cinst -> Mem2RegFact -> Fact O Mem2RegFact
+cinstft :: Cinst g -> Mem2RegFact g -> Fact O (Mem2RegFact g)
 cinstft = undefined
 
 {-
@@ -85,20 +85,20 @@ insert x v1 f | trace ("insert " ++ (show x) ++ "->" ++ (show v1)) False = undef
 #endif
 insert x v1 f = Dm.insert x v1 f
 
-badAss :: Monad m => (Value -> Maybe Value) -> Node a e x -> m (Maybe (Node a e x))
+badAss :: Monad m => (Value g -> Maybe (Value g)) -> Node g a e x -> m (Maybe (Node g a e x))
 badAss f node = return (rwNode f node)
 
 
-mem2Reg :: forall a.forall m . FuelMonad m => FwdRewrite m (Node a) Mem2RegFact
+mem2Reg :: forall g.forall a.forall m . FuelMonad m => FwdRewrite m (Node g a) (Mem2RegFact g)
 mem2Reg = mkFRewrite cp
     where
       -- each node is rewritten to a one node graph.
-      cp :: FuelMonad m => Node a e x -> Mem2RegFact -> m (Maybe (Graph (Node a) e x))
+      cp :: FuelMonad m => Node g a e x -> Mem2RegFact g -> m (Maybe (Graph (Node g a) e x))
       cp node f = do { x <- badAss (lookup f) node
                      ; return $ liftM {-Maybe-} nodeToGraph x
                      }
 
-      lookup :: Mem2RegFact -> Value -> Maybe Value
+      lookup :: Mem2RegFact g -> Value g -> Maybe (Value g)
       lookup f x = do { x' <- case x of
                            Val_ssa s -> Just $ Ref s
                            -- Deref (Pointer (VgOl (GolL s))) -> Just $ Mem $ localIdToLstring s
@@ -111,14 +111,14 @@ mem2Reg = mkFRewrite cp
 
 
 
-mem2RegPass :: forall a. forall m. FuelMonad m => FwdPass m (Node a) Mem2RegFact
+mem2RegPass :: forall g.forall a. forall m. (Eq g, FuelMonad m) => FwdPass m (Node g a) (Mem2RegFact g)
 mem2RegPass = FwdPass { fp_lattice = mem2RegLattice
                       , fp_transfer = isReg
                       , fp_rewrite = mem2Reg
                       }
 
 
-mem2reg :: (CheckpointMonad m, FuelMonad m) => Ds.Set (Dtype, GlobalId) -> Label -> Graph (Node a) C C -> m (Graph (Node a) C C)
+mem2reg :: (CheckpointMonad m, FuelMonad m, Eq g) => Ds.Set (Dtype, g) -> Label -> Graph (Node g a) C C -> m (Graph (Node g a) C C)
 mem2reg _ entry graph =
   do { (graph', _, _) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph
                          (mapSingleton entry (Dm.empty)) -- initFact gs))

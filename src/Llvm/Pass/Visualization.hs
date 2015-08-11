@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies, TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables, GADTs, RecordWildCards, TypeFamilies, TupleSections, RankNTypes #-}
 
 module Llvm.Pass.Visualization where
 import Data.Maybe
@@ -30,20 +30,20 @@ nodes of other shapes if the needs arise.
 
 -}
 
-data VisualPlugin dlm a = VisualPlugin { 
+data VisualPlugin dlm g a = VisualPlugin { 
   dataLayoutMetrics :: dlm
   -- the prefix added before each visualization string, this might be 
   -- needed to avoid naming collision. 
   , visPrefix :: Maybe String
   -- the functions whose instructions should be visualized. 
   -- If the set does not exist, all functions are visualized
-  , includedFunctions :: Maybe (Ds.Set GlobalId) 
-  , visFunctions :: [FunctionDeclare]
-  , captureCinsts :: Cinst -> Ds.Set String -> Ds.Set String
-  , visNodeOO :: TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]
+  , includedFunctions :: Maybe (Ds.Set g)
+  , visFunctions :: [FunctionDeclare g]
+  , captureCinsts :: Cinst g -> Ds.Set String -> Ds.Set String
+  , visNodeOO :: TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O]
   }
 
-sampleVisualPlugin :: DataLayoutMetrics dlm => dlm -> VisualPlugin dlm a
+sampleVisualPlugin :: (DataLayoutMetrics dlm, Ord g, IrPrint g, Show g) => dlm -> VisualPlugin dlm g a
 sampleVisualPlugin dlm = 
   VisualPlugin { dataLayoutMetrics = dlm
                , visPrefix = Just ".visual_"
@@ -82,9 +82,9 @@ visLattice = H.DataflowLattice
               j = Ds.union old new 
               ch = H.changeIf (j /= old)
 
-bwdScan :: H.FuelMonad m => (Cinst -> Ds.Set String -> Ds.Set String) -> H.BwdPass m (Node a) Visualized
+bwdScan :: forall g.forall m.forall a.(Ord g, Show g, IrPrint g, H.FuelMonad m) => (Cinst g -> Ds.Set String -> Ds.Set String) -> H.BwdPass m (Node g a) Visualized
 bwdScan collectString = 
-  let bwdTran :: (Node a) e x -> H.Fact x Visualized -> Visualized
+  let bwdTran :: (Ord g, Show g, IrPrint g) => (Node g a) e x -> H.Fact x Visualized -> Visualized
       bwdTran n@(Tnode _ _) f = let bs = H.successors n
                                 in foldl (\p l -> p `Ds.union` (fromMaybe emptyVisualized $ H.lookupFact l f)) 
                                    emptyVisualized bs
@@ -99,13 +99,15 @@ bwdScan collectString =
                , H.bp_rewrite = H.noBwdRewrite
                }
 
-scanDefine :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m) => VisualPlugin dlm a -> TlDefine a -> m Visualized
+scanDefine :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m, Ord g, Show g, IrPrint g) => 
+              VisualPlugin dlm g a -> TlDefine g a -> m Visualized
 scanDefine visualPlugin (TlDefine fn entry graph) = 
   do { (_, a, b) <- H.analyzeAndRewriteBwd (bwdScan (captureCinsts visualPlugin)) (H.JustC [entry]) graph H.mapEmpty
      ; return (fromMaybe emptyVisualized (H.lookupFact entry a))
      }
   
-scanModule :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m) => VisualPlugin dlm a -> Module a -> m (Ds.Set String)
+scanModule :: (DataLayoutMetrics dlm, CheckpointMonad m, FuelMonad m, Ord g, IrPrint g, Show g) => 
+              VisualPlugin dlm g a -> Module g a -> m (Ds.Set String)
 scanModule visPlugin (Module l) = 
   foldM (\p x -> case x of
             ToplevelDefine def@(TlDefine fn _ _) ->
@@ -117,31 +119,31 @@ scanModule visPlugin (Module l) =
 
 
 {- rewrite this with foldBlock -}
-rwBlockCC :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]) 
-             -> TypeEnv -> Dm.Map String Const -> H.Block (Node a) C C -> H.Block (Node a) C C
+rwBlockCC :: (TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O]) 
+             -> TypeEnv -> Dm.Map String (Const g) -> H.Block (Node g a) C C -> H.Block (Node g a) C C
 rwBlockCC rwNodeOO te mp blk = let (f, m, l) = blockSplit blk 
                                    middles = blockToList m
                                in blockJoin f (blockFromList $ concat $ fmap (rwNodeOO te mp) middles) l
 
-rwBlockCO :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]) 
-             -> TypeEnv -> Dm.Map String Const -> H.Block (Node a) C O -> H.Block (Node a) C O
+rwBlockCO :: (TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O]) 
+             -> TypeEnv -> Dm.Map String (Const g) -> H.Block (Node g a) C O -> H.Block (Node g a) C O
 rwBlockCO rwNodeOO te mp blk = let (f, m) = blockSplitHead blk
                                    middles = blockToList m
                                in blockJoinHead f (blockFromList $ concat $ fmap (rwNodeOO te mp) middles)
 
-rwBlockOO :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O])
-             -> TypeEnv -> Dm.Map String Const -> H.Block (Node a) O O -> H.Block (Node a) O O
+rwBlockOO :: (TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O])
+             -> TypeEnv -> Dm.Map String (Const g) -> H.Block (Node g a) O O -> H.Block (Node g a) O O
 rwBlockOO rwNodeOO te mp blk = let middles = blockToList blk
                                in blockFromList $ concat $ fmap (rwNodeOO te mp) middles
 
-rwBlockOC :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O])
-             -> TypeEnv -> Dm.Map String Const -> H.Block (Node a) O C -> H.Block (Node a) O C
+rwBlockOC :: (TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O])
+             -> TypeEnv -> Dm.Map String (Const g) -> H.Block (Node g a) O C -> H.Block (Node g a) O C
 rwBlockOC rwNodeOO te mp blk = let (m,l) = blockSplitTail blk
                                    middles = blockToList m
                                in blockJoinTail (blockFromList $ concat $ fmap (rwNodeOO te mp) middles) l
 
-rwBlock :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O]) 
-           -> TypeEnv -> Dm.Map String Const -> H.Block (Node a) e x -> H.Block (Node a) e x
+rwBlock :: (TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O]) 
+           -> TypeEnv -> Dm.Map String (Const g) -> H.Block (Node g a) e x -> H.Block (Node g a) e x
 rwBlock rwNodeOO te mp blk = case blk of
   BlockCO _ _ -> rwBlockCO rwNodeOO te mp blk
   BlockCC _ _ _ -> rwBlockCC rwNodeOO te mp blk
@@ -152,14 +154,14 @@ rwBlock rwNodeOO te mp blk = case blk of
   BSnoc _ _ -> rwBlockOO rwNodeOO te mp blk
   BCons _ _ -> rwBlockOO rwNodeOO te mp blk
 
-rwDefine :: (TypeEnv -> Dm.Map String Const -> (Node a) O O  -> [(Node a) O O])
-            -> TypeEnv -> Dm.Map String Const -> TlDefine a -> TlDefine a
+rwDefine :: (TypeEnv -> Dm.Map String (Const g) -> (Node g a) O O  -> [(Node g a) O O])
+            -> TypeEnv -> Dm.Map String (Const g) -> TlDefine g a -> TlDefine g a
 rwDefine rwNodeOO te gmp (TlDefine fn entry graph) = 
   let graph0 = mapGraphBlocks (rwBlock rwNodeOO te gmp) graph
   in TlDefine fn entry graph0
 
 {- this is more correct, because we inherit the DataLayoutMetrics of the input module in the output module -}
-rwModule :: DataLayoutMetrics dlm => VisualPlugin dlm a -> Module a -> Ds.Set String -> Module a
+rwModule :: (DataLayoutMetrics dlm, AbsName g) => VisualPlugin dlm g a -> Module g a -> Ds.Set String -> Module g a
 rwModule visPlugin m@(Module l) duM = 
   let (globals, duC) = stringnize duM
       irCxt = irCxtOfModule m
@@ -173,7 +175,7 @@ rwModule visPlugin m@(Module l) duM =
                   _ -> x
               ) l)
 
-stringnize ::  Ds.Set String  -> ([Toplevel a], Dm.Map String Const)
+stringnize ::  AbsName g => Ds.Set String  -> ([Toplevel g a], Dm.Map String (Const g))
 stringnize mp = 
   let (kvs, tpl) = runSimpleLlvmGlobalGen ".visual_" 0 
                    (mapM (\c -> do { (DefAndRef _ (T _ c0)) <- internalize c
@@ -181,7 +183,7 @@ stringnize mp =
                                    }) (Ds.toList mp))
   in (Dm.elems $ Dm.map llvmDef tpl, Dm.fromList kvs)
 
-visualize :: DataLayoutMetrics dlm => VisualPlugin dlm a -> Module a -> Module a
+visualize :: (DataLayoutMetrics dlm, AbsName g, IrPrint g) => VisualPlugin dlm g a -> Module g a -> Module g a
 visualize visPlugin m = 
   let mp = runSimpleUniqueMonad $ runWithFuel H.infiniteFuel ((scanModule visPlugin m)::H.SimpleFuelMonad (Ds.Set String))
   in rwModule visPlugin m mp

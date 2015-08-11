@@ -16,27 +16,27 @@ data TypeEnv = TypeEnv {typedefs :: M.Map Ci.LocalId Ci.Dtype
                        , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
-data FunCxt = FunCxt { funInterface :: FunctionInterface
-                     , dbgDeclares :: S.Set (Minst, [Dbg])
+data FunCxt g = FunCxt { funInterface :: FunctionInterface g
+                       , dbgDeclares :: S.Set (Minst g, [Dbg g])
+                       } deriving (Eq, Ord, Show)
+
+data GlobalCxt g = GlobalCxt { typeEnv :: TypeEnv
+                             , globals :: M.Map g (TlGlobal g, Ci.Dtype)
+                             , functions :: M.Map g (FunctionDeclare g, Bool)
+                             , alias :: M.Map g (TlAlias g)
+                             , attributes :: M.Map Word32 [FunAttr]
+                             , unamedMetadata :: M.Map Word32 (TlUnamedMd g)
+                             } deriving (Eq, Ord, Show)
+
+data IrCxt g = IrCxt { globalCxt :: GlobalCxt g
+                     , funCxt :: FunCxt g
                      } deriving (Eq, Ord, Show)
-
-data GlobalCxt = GlobalCxt { typeEnv :: TypeEnv
-                           , globals :: M.Map Ci.GlobalId (TlGlobal, Ci.Dtype)
-                           , functions :: M.Map Ci.GlobalId FunctionDeclare
-                           , alias :: M.Map Ci.GlobalId TlAlias
-                           , attributes :: M.Map Word32 [FunAttr]
-                           , unamedMetadata :: M.Map Word32 TlUnamedMd
-                           } deriving (Eq, Ord, Show)
-
-data IrCxt = IrCxt { globalCxt :: GlobalCxt
-                   , funCxt :: FunCxt
-                   } deriving (Eq, Ord, Show)
 
 instance IrPrint TypeEnv where
   printIr (TypeEnv td otd) = text "typedefs:" <+> printIr td
                              $+$ text "opaqueTypedefs:" <+> printIr otd
 
-instance IrPrint GlobalCxt where
+instance IrPrint g => IrPrint (GlobalCxt g) where
   printIr (GlobalCxt te gl fns alias atts um) = text "typeEnv:" <+> printIr te
                                                 $+$ text "globals:" <+> printIr gl
                                                 $+$ text "functions:" <+> printIr fns
@@ -44,14 +44,14 @@ instance IrPrint GlobalCxt where
                                                 $+$ text "attributes:" <+> printIr atts
                                                 $+$ text "unamedMetadata:" <+> printIr um
 
-instance IrPrint FunCxt where
+instance IrPrint g => IrPrint (FunCxt g) where
   printIr (FunCxt fi dbgDeclares) = text "funInterface:" <+> printIr fi
                                     $+$ text "dbgDeclares:" <+> printIr dbgDeclares
 
-instance IrPrint IrCxt where
+instance IrPrint g => IrPrint (IrCxt g) where
   printIr (IrCxt g l) = text "globalCxt:" <+> printIr g $+$ text "funCxt:" <+> printIr l
 
-convert_to_FunctionDeclareType :: FunctionInterface -> FunctionDeclare
+convert_to_FunctionDeclareType :: FunctionInterface g -> FunctionDeclare g
 convert_to_FunctionDeclareType
   FunctionInterface {..} =
     FunctionDeclareData { fd_linkage = fi_linkage
@@ -81,7 +81,7 @@ convert_to_FormalParamType x = case x of
   FunOperandAsRet dt pa ma _ -> FunOperandAsRet dt pa ma ()
 
 
-irCxtOfModule :: Module a -> IrCxt
+irCxtOfModule :: (Show g, Ord g) => Module g a -> IrCxt g
 irCxtOfModule m = 
   IrCxt { globalCxt = globalCxtOfModule m
         , funCxt = FunCxt { funInterface = error "funInterface is not initialized." 
@@ -90,20 +90,20 @@ irCxtOfModule m =
         }
 
 
-funCxtOfTlDefine :: TlDefine a -> FunCxt
+funCxtOfTlDefine :: Ord g => TlDefine g a -> FunCxt g
 funCxtOfTlDefine (TlDefine fi _ graph) = 
   let dbgs = H.foldGraphNodes fld graph S.empty
   in FunCxt { funInterface = fi
             , dbgDeclares = dbgs 
             }
   where
-    fld :: Node a e x -> S.Set (Minst, [Dbg]) -> S.Set (Minst, [Dbg])
+    fld :: Ord g => Node g a e x -> S.Set (Minst g, [Dbg g]) -> S.Set (Minst g, [Dbg g])
     fld n = case n of
       Ci.Mnode m@(M_llvm_dbg_declare _ _) dbgs -> S.insert (m, dbgs) 
       _ -> id
       
       
-globalCxtOfModule :: Module a -> GlobalCxt
+globalCxtOfModule :: (Show g, Ord g) => Module g a -> GlobalCxt g
 globalCxtOfModule (Module tl) =
   let tdefs = fmap (\(ToplevelTypeDef td) -> case td of
                        TlDatTypeDef lhs def -> (lhs, def))
@@ -117,9 +117,9 @@ globalCxtOfModule (Module tl) =
                           _ -> False
                       ) tl
       funs = fmap (\tl -> case tl of
-                      ToplevelDeclare (TlDeclare fp@FunctionDeclareData{..}) -> (fd_fun_name, fp)
+                      ToplevelDeclare (TlDeclare fp@FunctionDeclareData{..}) -> (fd_fun_name, (fp, False))
                       ToplevelDefine (TlDefine fp@FunctionInterface{..} _ _) -> 
-                        (fi_fun_name, convert_to_FunctionDeclareType fp))
+                        (fi_fun_name, (convert_to_FunctionDeclareType fp, True)))
              $ filter (\x -> case x of
                           ToplevelDeclare (TlDeclare FunctionDeclareData{..}) -> True
                           ToplevelDefine{..} -> True
@@ -177,10 +177,10 @@ data SrcInfo = SrcInfo { fileInfo :: FileInfo
 instance IrPrint SrcInfo where                                  
   printIr (SrcInfo f p) = printIr f <> colon <> printIr p
 
-srcInfoMap :: M.Map Word32 TlUnamedMd -> M.Map Word32 SrcInfo
+srcInfoMap :: Show g => M.Map Word32 (TlUnamedMd g) -> M.Map Word32 SrcInfo
 srcInfoMap mdMap = foldl (\mp (w, um) -> maybe mp (\srcInfo -> M.insert w srcInfo mp) (getSrcInfo mdMap w)) M.empty (M.toList mdMap)
 
-localIdSrcInfoMap :: M.Map Word32 TlUnamedMd -> S.Set (Minst, [Dbg]) -> M.Map LocalId SrcInfo
+localIdSrcInfoMap :: Show g => M.Map Word32 (TlUnamedMd g) -> S.Set (Minst g, [Dbg g]) -> M.Map LocalId SrcInfo
 localIdSrcInfoMap mdMap set = 
   foldl (\mp (mi, dbgs) -> 
           case (mi, dbgs) of
@@ -205,14 +205,14 @@ localIdSrcInfoMap mdMap set =
           Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> Just fref
           _ -> Nothing
          
-getFileInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
+getFileInfo :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo
 getFileInfo mdMap fref = case M.lookup fref mdMap of
   Just (TlUnamedMd_DW_file_type _ x) -> case x of
     MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))) -> getFileName mdMap ref
     _ -> errorLoc FLC $ show x
   y -> errorLoc FLC $ show y
 
-getFileInfoFromSubprog :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo             
+getFileInfoFromSubprog :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo
 getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of
   Just (TlUnamedMd_DW_subprogram _ [_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
     getFileInfo mdMap fref
@@ -220,7 +220,7 @@ getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of
     getFileName mdMap fref
   _ -> Nothing
 
-getSrcInfo :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe SrcInfo
+getSrcInfo :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe SrcInfo
 getSrcInfo mdMap n = case M.lookup n mdMap of
   Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [MetaKindedConst (MKtype _) (McSimple (C_int lin))
                                                   ,MetaKindedConst (MKtype _) (McSimple (C_int col))
@@ -230,7 +230,7 @@ getSrcInfo mdMap n = case M.lookup n mdMap of
        }
   _ -> Nothing
   
-getFileName :: M.Map Word32 TlUnamedMd -> Word32 -> Maybe FileInfo
+getFileName :: M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo
 getFileName mdMap ref = case M.lookup ref mdMap of
   Just (TlUnamedMd _ (MetaKindedConst MKmetadata (McStruct [MetaKindedConst MKmetadata (McString (DqString file))
                                                            ,MetaKindedConst MKmetadata (McString (DqString dir))]))) ->

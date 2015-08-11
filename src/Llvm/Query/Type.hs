@@ -218,8 +218,7 @@ getScalarTypeSizeInBits te x =
     ScalarTypeP _ -> SizeInBit 32
 
 
-
-getGetElemtPtrIndexedType :: TypeEnv -> Dtype -> [T (Type ScalarB I) Value] -> Dtype
+getGetElemtPtrIndexedType :: (Eq g, Show g) => TypeEnv -> Dtype -> [T (Type ScalarB I) (Value g)] -> Dtype
 getGetElemtPtrIndexedType te x is = case is of 
   [] -> x
   hd:tl -> case x of
@@ -233,7 +232,7 @@ getGetElemtPtrIndexedType te x is = case is of
          in if tl == [] then ct
             else getGetElemtPtrIndexedType te ct tl
 
-getTypeAtIndex :: Show t => TypeEnv -> Dtype -> T t Const -> Dtype
+getTypeAtIndex :: (Show t, Show g) => TypeEnv -> Dtype -> T t (Const g) -> Dtype
 getTypeAtIndex _ x@(DtypeScalarP (Tpointer _ _)) _ = error $ "does not expect a pointer type: " ++ show x
 getTypeAtIndex te t idx = 
   case (getTypeDef te t) of
@@ -246,7 +245,7 @@ getTypeAtIndex te t idx =
     DtypeVectorP (TvectorP n et) -> ucast et
     x -> errorLoc FLC $ "Invalid indexing of " ++ show x ++ ", idx: " ++ show idx
 
-getTypeAtIndices :: Show t => TypeEnv -> Dtype -> [T t Const] -> Dtype
+getTypeAtIndices :: (Show t, Show g) => TypeEnv -> Dtype -> [T t (Const g)] -> Dtype
 getTypeAtIndices te t indices = case indices of
   [] -> t
   h:tl -> getTypeAtIndices te (getTypeAtIndex te t h) tl
@@ -308,29 +307,29 @@ getPointedType te t = case getTypeDef te (ucast t) of
   _ -> errorLoc FLC $ show t ++ " has no element type"
 
 
-getConstArray :: Dtype -> [T Dtype Const] -> T Dtype Const
+getConstArray :: Dtype -> [T Dtype (Const g)] -> T Dtype (Const g)
 getConstArray t@(DtypeRecordD (Tarray n el)) [] = T t (C_array $ fmap (\x -> TypedConst $ T el C_zeroinitializer) [1..n])
 getConstArray t@(DtypeRecordD (Tarray n el)) l = if or $ fmap (\(T vt _) -> vt /= el) l then error "type mismatch"
                                                  else T t (C_array (fmap TypedConst l))
 getConstArray t _ = error "type mismatch"
 
 
-getTypedConst :: TypeEnv -> (Type ScalarB x -> Const) -> Dtype -> T Dtype Const
+getTypedConst :: TypeEnv -> (Type ScalarB x -> Const g) -> Dtype -> T Dtype (Const g)
 getTypedConst te f t = case (getTypeDef te t) of
   (DtypeRecordD (Tarray n et)) -> let ev = getTypedConst te f et
                                   in T t (C_arrayN n $ TypedConst ev)
   (DtypeRecordD (Tstruct pk ts)) -> let evs = fmap (getTypedConst te f) ts
                                     in T t (C_struct pk (fmap TypedConst evs))
 
-getNullValue :: Type ScalarB x -> Const
+getNullValue :: Type ScalarB x -> Const g
 getNullValue t = case t of
   _ -> C_zeroinitializer
 
-getUndefValue :: Type ScalarB x -> Const
+getUndefValue :: Type ScalarB x -> Const g
 getUndefValue t = case t of
   _ -> C_undef
 
-getGetElementPtr :: T (Type ScalarB P) Const -> [T (Type ScalarB I) Const] -> IsOrIsNot InBounds -> GetElementPtr ScalarB Const Const
+getGetElementPtr :: T (Type ScalarB P) (Const g) -> [T (Type ScalarB I) (Const g)] -> IsOrIsNot InBounds -> GetElementPtr ScalarB (Const g) (Const g)
 getGetElementPtr (T t cv) indices isB = GetElementPtr isB (T t cv) indices
 
 
@@ -364,10 +363,10 @@ instance TypeOf (T (Type ScalarB P) x) Dtype where
 instance TypeOf (T Dtype x) Dtype where
   typeof te (T t _) = Just t
 
-instance TypeOf (FunSignature Value) Dtype where
+instance TypeOf (FunSignature (Value g)) Dtype where
   typeof te (FunSignature { fs_type = typ}) = typeof te typ
     
-instance TypeOf Cinst Dtype where
+instance (Eq g, Show g) => TypeOf (Cinst g) Dtype where
   typeof te x = case x of
     I_alloca{..} -> Just $ ucast $ Tpointer (ucast dtype) 0
     I_load{..} -> let (T (Tpointer et _) _) = pointer
@@ -414,7 +413,7 @@ instance TypeOf Cinst Dtype where
                              in Just $ ucast vt
                                 
     I_extractvalue{..} -> let (T t _) = record
-                          in Just $ getTypeAtIndices te (ucast t) (u32sToTcs windices)
+                          in Just $ getTypeAtIndices te (ucast t) ((u32sToTcs windices)::[T (Type ScalarB I) (Const g)])
                              
     I_insertvalue{..} -> let (T t _) = record
                          in Just $ ucast t
@@ -554,6 +553,7 @@ instance TypeOf Cinst Dtype where
       Rint t _ -> Just $ ucast t
       NearByInt t _ -> Just $ ucast t
       Round t _ -> Just $ ucast t
+    I_llvm_ctpop { dv = T t _ } -> Just $ t  
     _ -> errorLoc FLC $ "unsupported " ++ show x 
     
     
@@ -581,10 +581,10 @@ instance TypeOf CallSiteType Dtype where
       Tfunction (rt,_) _ _ -> typeof te rt
       TnameCodeFunX n -> errorLoc FLC $ "unsupported " ++ show x
 
-instance TypeOf Const Dtype where    
+instance (Eq g, Show g) => TypeOf (Const g) Dtype where    
   typeof te x = case x of
     C_getelementptr b (T bt _) indices -> 
-      let et = getGetElemtPtrIndexedType te (ucast bt) (fmap ucast indices)
+      let et = getGetElemtPtrIndexedType te (ucast bt) ((fmap ucast indices)::[T (Type ScalarB I) (Value g)])
       in Just (ucast $ Tpointer (ucast et) 0)
     C_bitcast _ dt -> Just dt
     C_inttoptr _ dt -> Just $ ucast dt

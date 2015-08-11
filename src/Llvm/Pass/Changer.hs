@@ -1,13 +1,15 @@
+{-# LANGUAGE RankNTypes #-}
 module Llvm.Pass.Changer where
 
 import Llvm.Hir.Data
 
-data Changer = Changer { change_GlobalId :: GlobalId -> GlobalId
-                       , change_LocalId :: LocalId -> LocalId
-                       , change_Label :: Label -> Label
-                       , change_Const :: Const -> Const
-                       } 
+data Changer g h = Changer { change_GlobalId :: g -> h
+                           , change_LocalId :: LocalId -> LocalId
+                           , change_Label :: Label -> Label
+                           , change_Const :: Const h -> Const h
+                           } 
                
+defaultChanger :: Changer g g
 defaultChanger = Changer { change_GlobalId = id 
                          , change_LocalId = id 
                          , change_Label = id 

@@ -25,14 +25,16 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.List (stripPrefix)
 import Llvm.Matcher
+import Llvm.Hir.Target.Linux_Gnu
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
 toStep _ = Nothing
 
+chg :: Cg.Changer I.Gname I.Gname
 chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of 
-                             I.GlobalIdAlphaNum s -> case stripPrefix "llvm." s of
-                               Nothing -> I.GlobalIdAlphaNum (s ++ "_g_")
+                             I.Gname s -> case stripPrefix "llvm." s of
+                               Nothing -> I.Gname (s ++ "_g_")
                                Just _ -> x
                              _ -> x
                         , Cg.change_LocalId = \x -> case x of
@@ -53,7 +55,8 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | Ast2Ir { input :: FilePath, output :: Maybe String }
             | Ir2Ast { input :: FilePath, output :: Maybe String }
             | SizeofVerification { input :: FilePath, output :: Maybe String }              
-            | Pass { input :: FilePath, output :: Maybe String, step :: [String], fuel :: Int }
+            | Pass { input :: FilePath, output :: Maybe String
+                   , step :: [String], fuel :: Int }
             | PhiFixUp { input :: FilePath, output :: Maybe String, fuel :: Int }
             | AstCanonic { input :: FilePath, output :: Maybe String }
             | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
@@ -91,7 +94,8 @@ astcanonic = AstCanonic { input = def &= typ "<INPUT>"
 
 datause = DataUse { input = def &= typ "<INPUT>"
                   , output = outFlags Nothing
-                  , fuel = H.infiniteFuel &= typ "FUEL" &= help "the fuel used to rewrite the code, the default is infiniteFuel"
+                  , fuel = H.infiniteFuel &= typ "FUEL" 
+                           &= help "the fuel used to rewrite the code, the default is infiniteFuel"
                   } &= help "Test DataUsage Pass"
 
 changer = Change { input = def &= typ "<INPUT>"
@@ -156,11 +160,11 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = A.simplify ast
-                                     {-
-                               ; let (I.SpecializedModule _ ir) = mapModule id Nothing ast'
-                                     -- ; let (m, ir) = H.runSimpleUniqueMonad ((Cv.asmToHir ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.Module ()))
+                               ; let (m, I.SpecializedModule _ ir) = 
+                                       H.runSimpleUniqueMonad 
+                                       ((Cv.asmToHir I386_Pc_Linux_Gnu ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.SpecializedModule I386_Pc_Linux_Gnu I.Gname ()))
                                ; writeOutIr ir outh
-                                     -}
+                                     --}
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
@@ -187,7 +191,9 @@ main = do { sel <- cmdArgsRun mode
                                ; outh <- openFileOrStdout ox
                                ; ast <- testParser ix inh
                                ; let ast' = A.simplify ast
-                               ; let ast'' = transformModule2  (\(I.SpecializedModule dlm m) -> (I.SpecializedModule dlm $ Sub.substitute chg m, Sub.substitute chg)) Nothing ast' 
+                               ; let ast'' = transformModule2  
+                                             (\(I.SpecializedModule dlm m) -> 
+                                               (I.SpecializedModule dlm $ Sub.substitute chg m, Sub.substitute chg)) Nothing ast' 
                                ; writeOutLlvm ast'' outh
                                ; hClose inh
                                ; closeFileOrStdout ox outh
@@ -196,7 +202,8 @@ main = do { sel <- cmdArgsRun mode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh
                                   ; let ast' = A.simplify ast
-                                  ; let ast'' = transformModule (\(I.SpecializedModule dlm m) -> I.SpecializedModule dlm $ Vis.visualize (Vis.sampleVisualPlugin dlm) m) Nothing ast'
+                                  ; let ast'' = transformModule (\(I.SpecializedModule dlm m) -> 
+                                                                  I.SpecializedModule dlm $ Vis.visualize (Vis.sampleVisualPlugin dlm) m) Nothing ast'
                                   ; writeOutLlvm ast'' outh
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh
@@ -206,7 +213,7 @@ main = do { sel <- cmdArgsRun mode
                                    ; ast <- testParser ix inh
                                    ; let ast' = A.simplify ast
                                    ; let (srcInfo2, sl2) = mapModule 
-                                                           (\(I.SpecializedModule _ ir@(I.Module ls)) -> -- (m, ir@(I.Module ls)::I.Module I.NOOP) = testAst2Ir ast'
+                                                           (\(I.SpecializedModule _ ir@(I.Module ls)) -> 
                                                              let irCxt = irCxtOfModule ir
                                                                  srcInfo1 = srcInfoMap (unamedMetadata $ globalCxt irCxt)
                                                                  sl = foldl (\p s -> case s of
@@ -240,7 +247,7 @@ main = do { sel <- cmdArgsRun mode
                                                           let ic = irCxtOfModule ir
                                                           in 
                                                            H.runSimpleUniqueMonad $ H.runWithFuel f
-                                                           ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map I.FunctionInterface Du.DataUsage))
+                                                           ((Du.scanModule ir ic) :: H.SimpleFuelMonad (M.Map (I.FunctionInterface I.Gname) (Du.DataUsage I.Gname)))
                                                         ) Nothing ast'
                                   ; writeOutIr liv outh
                                   ; hClose inh

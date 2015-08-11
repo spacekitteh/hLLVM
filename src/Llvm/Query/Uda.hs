@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell,FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell,FlexibleInstances, MultiParamTypeClasses, RankNTypes #-}
 
 #define FLC   (FileLoc $(srcLoc))
 {-
@@ -17,60 +17,61 @@ import Prelude (Show, Eq, Ord, fst, (.), ($), map, maybe, Maybe, (++), show, Boo
 import Debug.Trace
 #endif
 import Llvm.ErrorLoc
+import Data.Either
 
 
-class Uda a where
-  use :: a -> S.Set GlobalOrLocalId
-  def :: a -> S.Set LocalId -- defined ssa variables
+class Uda a g where
+  use :: a -> S.Set (Either LocalId g)
+  def :: g {- a hack to force restricting the type parameter g -} -> a -> S.Set LocalId -- defined ssa variables
   
-  storeTo :: a -> S.Set Value
+  storeTo :: a -> S.Set (Value g)
   storeTo _ = S.empty
   
-  loadFrom :: a -> S.Set Value
+  loadFrom :: a -> S.Set (Value g)
   loadFrom _ = S.empty 
   
-instance Uda Const where
+instance Ord g => Uda (Const g) g where
   use c = case c of
-    C_globalAddr i -> S.insert (GolG i) S.empty
+    C_globalAddr i -> S.insert (Right i) S.empty
     _ -> S.empty
-  def _ = S.empty
+  def _ _ = S.empty
 
-instance (Uda v, Uda idx) => Uda (GetElementPtr s v idx) where
+instance (Ord g, Uda v g,  Uda idx g) => Uda (GetElementPtr s v idx) g where
   use (GetElementPtr _ (T _ ptr) indices) = use ptr `S.union` (foldl (\p e -> S.union p (use e)) S.empty indices)
-  def _ = S.empty
+  def _ _ = S.empty
   
-instance Uda v => Uda (Maybe v) where  
+instance (Ord g, Uda v g) => Uda (Maybe v) g where  
   use x = maybe S.empty use x
-  def x = maybe S.empty def x
+  def g x  = maybe S.empty (def g) x
   storeTo x = maybe S.empty storeTo x
   
-instance Uda v => Uda (T t v) where  
+instance Uda v g => Uda (T t v) g where
   use (T _ x) = use x
-  def (T _ x) = def x
+  def g (T _ x) = def g x
   storeTo (T _ x) = storeTo x
   
-instance Uda LocalId where
-  use x = S.insert (GolL x) S.empty
-  def x = S.insert x S.empty
+instance Ord g => Uda LocalId g where
+  use x = S.insert (Left x) S.empty
+  def g x = S.insert x S.empty
   storeTo x = S.insert (Val_ssa x) S.empty
   loadFrom x = S.insert (Val_ssa x) S.empty
   
-instance Uda Value where
+instance Ord g => Uda (Value g) g where
   use x = case x of
-    Val_ssa l -> S.insert (GolL l) S.empty
+    Val_ssa l -> S.insert (Left l) S.empty
     Val_const c -> use c
   def _ = error $ "cannot happen"
   storeTo x = S.insert x S.empty
   loadFrom x = S.insert x S.empty
  
   
-instance Uda x => Uda [x] where  
+instance (Ord g, Uda x g) => Uda [x] g where  
   use l = S.unions (fmap use l)
-  def l = S.unions (fmap def l)
+  def g l = S.unions (fmap (def g) l)
   storeTo l = S.unions (fmap storeTo l)
   loadFrom l = S.unions (fmap loadFrom l)
   
-instance (Uda a) => Uda (FunOperand a) where  
+instance Uda a g => Uda (FunOperand a) g where  
   use x = case x of
     FunOperandAsRet _ _ _ a -> use a    
     FunOperandData _ _ _ a -> use a
@@ -81,26 +82,26 @@ instance (Uda a) => Uda (FunOperand a) where
     FunOperandAsRet _ _ _ a -> storeTo a
     _ -> S.empty
 
-instance (Uda a) => Uda (FunSignature a) where
+instance (Ord g, Uda a g) => Uda (FunSignature a) g where
   use FunSignature{..} = use fs_params
-  def FunSignature{..} = S.empty
+  def g FunSignature{..} = S.empty
   storeTo FunSignature{..} = storeTo fs_params
   loadFrom FunSignature{..} = S.empty
 
-instance Uda CallFunInterface where
+instance Ord g => Uda (CallFunInterface g) g where
   use CallFunInterface{..} = use cfi_signature 
-  def _ = S.empty
+  def _ _ = S.empty
 
-instance Uda InvokeFunInterface where
+instance Ord g => Uda (InvokeFunInterface g) g where
   use InvokeFunInterface{..} = use ifi_signature
-  def _ = S.empty  
+  def _ _ = S.empty  
 
-instance Uda CallAsmInterface where
+instance Ord g => Uda (CallAsmInterface g) g where
   use CallAsmInterface{..} = use cai_actualParams
-  def _ = S.empty
+  def _ _ = S.empty
 
 
-instance Uda Cinst where 
+instance (Ord g, Show g) => Uda (Cinst g) g where 
   use ci = case ci of
     I_alloca{..} -> use size
     I_load{..} -> use pointer
@@ -214,117 +215,117 @@ instance Uda Cinst where
     I_llvm_memmove{..} -> S.unions [use dest, use src, use len, use align]
     _ -> errorLoc FLC $ "unsupported " ++ show ci
     
-  def ci = case ci of
-    I_alloca{..} -> def result
-    I_load{..} -> def result
-    I_loadatomic{..} -> def result
+  def g ci = case ci of
+    I_alloca{..} -> def g result
+    I_load{..} -> def g result
+    I_loadatomic{..} -> def g result
     I_store{..} -> S.empty
     I_storeatomic{..} -> S.empty
     I_fence{..} -> S.empty
-    I_cmpxchg_I{..} -> def result
-    I_cmpxchg_F{..} -> def result    
-    I_cmpxchg_P{..} -> def result
+    I_cmpxchg_I{..} -> def g result
+    I_cmpxchg_F{..} -> def g result    
+    I_cmpxchg_P{..} -> def g result
     I_atomicrmw{..} -> S.empty
-    I_call_fun{..} -> def call_return
-    I_call_asm{..} -> def call_return
-    I_extractelement_I{..} -> def result
-    I_extractelement_F{..} -> def result    
-    I_extractelement_P{..} -> def result
-    I_insertelement_I{..} -> def result
-    I_insertelement_F{..} -> def result    
-    I_insertelement_P{..} -> def result
-    I_shufflevector_I{..} -> def result
-    I_shufflevector_F{..} -> def result    
-    I_shufflevector_P{..} -> def result    
-    I_extractvalue{..} -> def result
-    I_insertvalue{..} -> def result                          
-    I_va_arg{..} -> def result    
+    I_call_fun{..} -> def g call_return
+    I_call_asm{..} -> def g call_return
+    I_extractelement_I{..} -> def g result
+    I_extractelement_F{..} -> def g result    
+    I_extractelement_P{..} -> def g result
+    I_insertelement_I{..} -> def g result
+    I_insertelement_F{..} -> def g result    
+    I_insertelement_P{..} -> def g result
+    I_shufflevector_I{..} -> def g result
+    I_shufflevector_F{..} -> def g result    
+    I_shufflevector_P{..} -> def g result    
+    I_extractvalue{..} -> def g result
+    I_insertvalue{..} -> def g result                          
+    I_va_arg{..} -> def g result    
     I_llvm_va_start{..} -> S.empty
     I_llvm_va_end{..} -> S.empty
-    I_landingpad _ _ _ _ _ r -> def r
-    I_getelementptr{..} -> def result    
-    I_getelementptr_V{..} -> def result    
-    I_icmp{..} -> def result
-    I_icmp_V{..} -> def result
-    I_fcmp{..} -> def result
-    I_fcmp_V{..} -> def result
+    I_landingpad _ _ _ _ _ r -> def g r
+    I_getelementptr{..} -> def g result    
+    I_getelementptr_V{..} -> def g result    
+    I_icmp{..} -> def g result
+    I_icmp_V{..} -> def g result
+    I_fcmp{..} -> def g result
+    I_fcmp_V{..} -> def g result
 
-    I_add{..} -> def result
-    I_sub{..} -> def result
-    I_mul{..} -> def result
-    I_udiv{..} -> def result
-    I_sdiv{..} -> def result
-    I_urem{..} -> def result
-    I_srem{..} -> def result
-    I_shl{..} -> def result
-    I_lshr{..} -> def result
-    I_ashr{..} -> def result    
-    I_and{..} -> def result    
-    I_or{..} -> def result        
-    I_xor{..} -> def result 
+    I_add{..} -> def g result
+    I_sub{..} -> def g result
+    I_mul{..} -> def g result
+    I_udiv{..} -> def g result
+    I_sdiv{..} -> def g result
+    I_urem{..} -> def g result
+    I_srem{..} -> def g result
+    I_shl{..} -> def g result
+    I_lshr{..} -> def g result
+    I_ashr{..} -> def g result    
+    I_and{..} -> def g result    
+    I_or{..} -> def g result        
+    I_xor{..} -> def g result 
 
-    I_add_V{..} -> def result
-    I_sub_V{..} -> def result
-    I_mul_V{..} -> def result
-    I_udiv_V{..} -> def result
-    I_sdiv_V{..} -> def result
-    I_urem_V{..} -> def result
-    I_srem_V{..} -> def result
-    I_shl_V{..} -> def result
-    I_lshr_V{..} -> def result
-    I_ashr_V{..} -> def result    
-    I_and_V{..} -> def result    
-    I_or_V{..} -> def result        
-    I_xor_V{..} -> def result 
+    I_add_V{..} -> def g result
+    I_sub_V{..} -> def g result
+    I_mul_V{..} -> def g result
+    I_udiv_V{..} -> def g result
+    I_sdiv_V{..} -> def g result
+    I_urem_V{..} -> def g result
+    I_srem_V{..} -> def g result
+    I_shl_V{..} -> def g result
+    I_lshr_V{..} -> def g result
+    I_ashr_V{..} -> def g result    
+    I_and_V{..} -> def g result    
+    I_or_V{..} -> def g result        
+    I_xor_V{..} -> def g result 
     
-    I_fadd{..} -> def result
-    I_fsub{..} -> def result    
-    I_fmul{..} -> def result
-    I_fdiv{..} -> def result    
-    I_frem{..} -> def result        
+    I_fadd{..} -> def g result
+    I_fsub{..} -> def g result    
+    I_fmul{..} -> def g result
+    I_fdiv{..} -> def g result    
+    I_frem{..} -> def g result        
 
-    I_fadd_V{..} -> def result
-    I_fsub_V{..} -> def result    
-    I_fmul_V{..} -> def result
-    I_fdiv_V{..} -> def result    
-    I_frem_V{..} -> def result        
+    I_fadd_V{..} -> def g result
+    I_fsub_V{..} -> def g result    
+    I_fmul_V{..} -> def g result
+    I_fdiv_V{..} -> def g result    
+    I_frem_V{..} -> def g result        
 
 
-    I_trunc{..} -> def result
-    I_zext{..} -> def result
-    I_sext{..} -> def result
-    I_fptrunc{..} -> def result
-    I_fpext{..} -> def result
-    I_fptoui{..} -> def result
-    I_fptosi{..} -> def result
-    I_uitofp{..} -> def result
-    I_ptrtoint{..} -> def result
-    I_inttoptr{..} -> def result
-    I_addrspacecast{..} -> def result
+    I_trunc{..} -> def g result
+    I_zext{..} -> def g result
+    I_sext{..} -> def g result
+    I_fptrunc{..} -> def g result
+    I_fpext{..} -> def g result
+    I_fptoui{..} -> def g result
+    I_fptosi{..} -> def g result
+    I_uitofp{..} -> def g result
+    I_ptrtoint{..} -> def g result
+    I_inttoptr{..} -> def g result
+    I_addrspacecast{..} -> def g result
     
-    I_trunc_V{..} -> def result
-    I_zext_V{..} -> def result
-    I_sext_V{..} -> def result
-    I_fptrunc_V{..} -> def result              
-    I_fpext_V{..} -> def result
-    I_fptoui_V{..} -> def result
-    I_fptosi_V{..} -> def result
-    I_uitofp_V{..} -> def result
-    I_ptrtoint_V{..} -> def result
-    I_inttoptr_V{..} -> def result
-    I_addrspacecast_V{..} -> def result
+    I_trunc_V{..} -> def g result
+    I_zext_V{..} -> def g result
+    I_sext_V{..} -> def g result
+    I_fptrunc_V{..} -> def g result              
+    I_fpext_V{..} -> def g result
+    I_fptoui_V{..} -> def g result
+    I_fptosi_V{..} -> def g result
+    I_uitofp_V{..} -> def g result
+    I_ptrtoint_V{..} -> def g result
+    I_inttoptr_V{..} -> def g result
+    I_addrspacecast_V{..} -> def g result
 
-    I_bitcast{..} -> def result
-    I_bitcast_D{..} -> def result
+    I_bitcast{..} -> def g result
+    I_bitcast_D{..} -> def g result
     
-    I_select_I{..} -> def result
-    I_select_F{..} -> def result
-    I_select_P{..} -> def result
+    I_select_I{..} -> def g result
+    I_select_F{..} -> def g result
+    I_select_P{..} -> def g result
     
-    I_select_VI{..} -> def result
-    I_select_VF{..} -> def result
-    I_select_VP{..} -> def result
-    I_select_First{..} -> def result
+    I_select_VI{..} -> def g result
+    I_select_VF{..} -> def g result
+    I_select_VP{..} -> def g result
+    I_select_First{..} -> def g result
     
     I_llvm_memcpy{..} -> S.empty
     I_llvm_memmove{..} -> S.empty

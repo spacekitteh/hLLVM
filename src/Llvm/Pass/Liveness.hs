@@ -22,7 +22,7 @@ liveLattice = H.DataflowLattice
                 j = new `Ds.union` old
                 ch= H.changeIf (Ds.size j > Ds.size old)
 
-liveness :: H.BwdTransfer (Node a) Live
+liveness :: H.BwdTransfer (Node g a) Live
 liveness = H.mkBTransfer live
   where
     live = undefined
@@ -42,19 +42,19 @@ liveness = H.mkBTransfer live
  -}
 
 
-deadAsstElim :: forall a. forall m. H.FuelMonad m => H.BwdRewrite m (Node a) Live
+deadAsstElim :: forall g.forall a. forall m. H.FuelMonad m => H.BwdRewrite m (Node g a) Live
 deadAsstElim = H.mkBRewrite d
    where
-     d :: Node a e x -> H.Fact x Live -> m (Maybe (H.Graph (Node a) e x))
+     d :: Node g a e x -> H.Fact x Live -> m (Maybe (H.Graph (Node g a) e x))
      d (Cnode n _) live = dead n live
      d _ _ = return Nothing
 
 
-dead :: forall a.forall m. H.FuelMonad m => Cinst -> H.Fact H.O Live -> m (Maybe (H.Graph (Node a) H.O H.O))
+dead :: forall g.forall a.forall m. H.FuelMonad m => Cinst g -> H.Fact H.O Live -> m (Maybe (H.Graph (Node g a) H.O H.O))
 dead ci live = deadCi ci live
 
 
-deadCi :: forall a.forall m. H.FuelMonad m => Cinst -> H.Fact H.O Live -> m (Maybe (H.Graph (Node a) H.O H.O))
+deadCi :: forall g.forall a.forall m. H.FuelMonad m => Cinst g -> H.Fact H.O Live -> m (Maybe (H.Graph (Node g a) H.O H.O))
 deadCi = undefined
 {-
 deadCi (ComputingInst Nothing (RmO m)) live = deadRmo m live
@@ -78,7 +78,7 @@ deadRmo inst live = case inst of
         localIdOfValue _ = Nothing
 -}
 
-isDeclare :: FunPtr -> Bool
+isDeclare :: IrPrint g => FunPtr g -> Bool
 isDeclare (FunId gl) | (render $ printIr gl) == "@llvm.dbg.declare" = True
 isDeclare _ = False
 
@@ -113,13 +113,13 @@ filterOutGlobalId s = Ds.foldl (\a b -> case b of
 
 
 
-dcePass :: forall a. forall m. H.FuelMonad m => H.BwdPass m (Node a) Live
+dcePass :: forall a. forall g.forall m. H.FuelMonad m => H.BwdPass m (Node g a) Live
 dcePass = H.BwdPass { H.bp_lattice = liveLattice
                     , H.bp_transfer = liveness
                     , H.bp_rewrite = deadAsstElim
                     }
 
-dce :: (H.CheckpointMonad m, H.FuelMonad m) => Ds.Set (Dtype, GlobalId) -> Label -> H.Graph (Node a) H.C H.C -> m (H.Graph (Node a) H.C H.C)
+dce :: (H.CheckpointMonad m, H.FuelMonad m) => Ds.Set (Dtype, g) -> Label -> H.Graph (Node g a) H.C H.C -> m (H.Graph (Node g a) H.C H.C)
 dce _ entry graph =
   do { (graph', _, _) <- H.analyzeAndRewriteBwd bwd (H.JustC [entry]) graph
                          H.mapEmpty
