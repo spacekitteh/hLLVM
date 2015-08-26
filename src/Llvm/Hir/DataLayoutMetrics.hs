@@ -23,7 +23,7 @@ class DataLayoutMetrics a where
   matchLayoutSpecAndTriple :: a -> [LayoutSpec] -> TargetTriple -> Bool
   toTriple :: a -> TargetTriple
   toLayoutSpec :: a -> [LayoutSpec]
-  toLayoutSpec x = [DlE $ endianness x 
+  toLayoutSpec x = [DlE $ endianness x
                    ,DlM $ mangling x
                    ,DlP LayoutAddrSpaceUnspecified (sizeOfPtr x 0) (alignOfPtr x 0)
                    ] ++ (fmap (uncurry DlI) $ M.toList $ alignOfIx x)
@@ -50,8 +50,8 @@ class DataLayoutMetrics a where
   alignOfPtr _ _ = AlignMetrics (AlignInBit 64) (Just $ AlignInBit 64)
   
   {- natural stack alignment -}
-  alignOfStack :: a -> StackAlign -- Maybe AlignInBit
-  alignOfStack _ = StackAlignUnspecified -- Nothing
+  alignOfStack :: a -> StackAlign
+  alignOfStack _ = StackAlignUnspecified
   
   {- ix -}
   alignOfIx :: a -> M.Map SizeInBit AlignMetrics

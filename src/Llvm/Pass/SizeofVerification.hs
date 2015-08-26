@@ -19,7 +19,7 @@ import Llvm.Hir.Print
 import Control.Monad (liftM,foldM)
 import Llvm.Query.HirCxt
 import Llvm.Hir.DataLayoutMetrics
-
+import Llvm.Hir.Target
 {- 
 This pass composes a standalone main function to check if hLLVM's type query 
 implementation is equalivent to LLVM's implementation
@@ -94,8 +94,8 @@ stringize mp =
   in (Dm.elems $ Dm.map llvmDef tpls, Dm.fromList kvs)
      
 
-mkVerificationModule :: (DataLayoutMetrics dlm, AbsName g, Ord a) => SpecializedModule dlm g a -> SpecializedModule dlm g a
-mkVerificationModule (SpecializedModule dlm m@(Module l)) = 
+mkVerificationModule :: (AbsName g, Ord a) => SpecializedModule g a -> SpecializedModule g a
+mkVerificationModule (SpecializedModule tg@(Target dlm) m@(Module l)) = 
   let IrCxt{..} = irCxtOfModule m
       vis = H.runSimpleUniqueMonad $ H.runWithFuel H.infiniteFuel ((scanModule m):: H.SimpleFuelMonad Visualized)
       (globals, duC) = stringize vis
@@ -108,7 +108,7 @@ mkVerificationModule (SpecializedModule dlm m@(Module l)) =
                             _ -> True
                         )
                 ) (Ds.toList vis)
-  in SpecializedModule dlm (Module (typeDefs ++ globals
+  in SpecializedModule tg (Module (typeDefs ++ globals
                                     ++ (fmap (ToplevelDeclare . TlDeclare) visFunctions)
                                     ++ [ToplevelDefine $ defineMain $ concat insts]))
 

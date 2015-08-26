@@ -177,6 +177,12 @@ specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   (FunId (Gname gname),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | ((isJust $ stripPrefix "llvm.ctpop." gname) && isJust lhs) -> 
     Just $ I_llvm_ctpop { suffix = fromJust $ stripPrefix "llvm.ctpop." gname, dv = T t1 v, result = fromJust lhs } 
+  (FunId (Gname "llvm.lifetime.start"),
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v1
+                      ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_lifetime_start (T (dcast FLC t1) v1) (T (dcast FLC t2) v2)
+  (FunId (Gname "llvm.lifetime.end"),
+   FunSignature Ccc _ [FunOperandData t1 [] Nothing v1
+                      ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_lifetime_end (T (dcast FLC t1) v1) (T (dcast FLC t2) v2)
   _ -> Nothing
 
 
@@ -282,6 +288,24 @@ unspecializeIntrinsics inst = case inst of
                                                          [(MtypeData t,Nothing)] Nothing) [tvToAp tv] 
                      , cfi_funAttrs = []
                      } (Just r)
+  I_llvm_lifetime_start { objsize = tv1@(T t1 _), pointer = tv2@(T t2 _) } ->
+    Just $ I_call_fun (FunId (Gname $ "llvm.lifetime.start")) 
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                         [(MtypeData $ ucast t1,Nothing)
+                                                         ,(MtypeData $ ucast t2,Nothing)] Nothing) [tvToAp tv1, tvToAp tv2] 
+                     , cfi_funAttrs = []
+                     } Nothing
+  I_llvm_lifetime_end { objsize = tv1@(T t1 _), pointer = tv2@(T t2 _) } ->
+    Just $ I_call_fun (FunId (Gname $ "llvm.lifetime.end")) 
+    CallFunInterface { cfi_tail = TcNon 
+                     , cfi_castType = Nothing
+                     , cfi_signature = FunSignature Ccc (Tfunction (RtypeVoidU Tvoid,[]) 
+                                                         [(MtypeData $ ucast t1,Nothing)
+                                                         ,(MtypeData $ ucast t2,Nothing)] Nothing) [tvToAp tv1, tvToAp tv2] 
+                     , cfi_funAttrs = []
+                     } Nothing
   _ -> Nothing
     
 tvToAp :: Ucast t Dtype => T t (Value g) -> FunOperand (Value g)

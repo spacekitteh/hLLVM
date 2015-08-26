@@ -554,6 +554,8 @@ instance (Eq g, Show g) => TypeOf (Cinst g) Dtype where
       NearByInt t _ -> Just $ ucast t
       Round t _ -> Just $ ucast t
     I_llvm_ctpop { dv = T t _ } -> Just $ t  
+    I_llvm_lifetime_start {..} -> Nothing
+    I_llvm_lifetime_end {..} -> Nothing
     _ -> errorLoc FLC $ "unsupported " ++ show x 
     
     

@@ -23,6 +23,7 @@ import Control.Monad.Reader
 import Llvm.AsmHirConversion.Specialization
 import Llvm.ErrorLoc
 import Llvm.Hir.DataLayoutMetrics
+import Llvm.Hir.Target
 
 class Conversion l1 l2 | l1 -> l2 where
   convert :: l1 -> l2
@@ -1474,8 +1475,8 @@ toplevel2Ast (I.ToplevelComdat l) = Md.liftM A.ToplevelComdat (convert l)
 toplevel2Ast (I.ToplevelAttribute n) = Md.liftM A.ToplevelAttribute (convert n)
 toplevel2Ast (I.ToplevelIntrinsic n) = Md.liftM A.ToplevelGlobal (convert n)
 
-hirToAsm ::  DataLayoutMetrics dlm => M.Map (I.Gname, H.Label) A.LabelId -> I.SpecializedModule dlm I.Gname () -> A.Module
-hirToAsm iLm (I.SpecializedModule dlm (I.Module ts)) = 
+hirToAsm ::  M.Map (I.Gname, H.Label) A.LabelId -> I.SpecializedModule I.Gname () -> A.Module
+hirToAsm iLm (I.SpecializedModule (Target dlm) (I.Module ts)) = 
   let (A.Module tl) = runReader (Md.liftM A.Module (mapM toplevel2Ast ts)) 
                       (ReaderData iLm (I.Gname (errorLoc FLC $ "<fatal error>")))
       ls = toLayoutSpec dlm

@@ -9,12 +9,13 @@ import Llvm.Hir.Data.Module
 import Llvm.Hir.Data.Type
 import Llvm.Hir.Data.Inst
 import Llvm.Hir.Data.Commentor
+import Llvm.Hir.Target
 
 {- 
   SpecializedModule dlm g a 
                      ^  ^ ^
-                     |  |  +- specialized Cnode, it's customized by a consumer
-                     |  +---- specialized GlobalId, it's customized by a consumer
+                     |  |  +- specialized Cnode, it can be customized by a client
+                     |  +---- specialized GlobalId, it can be customized by a client
                      +------- an instance of DataLayoutMetrics to specify 
                               target datalayout and triple 
 
@@ -25,4 +26,4 @@ import Llvm.Hir.Data.Commentor
   Sorry for such a long type instance with multiple type instantiations, but I 
   haven't found a better way to hide them for the default instance. 
 -}
-data SpecializedModule dlm g a = SpecializedModule dlm (Module g a)
+data SpecializedModule g a = SpecializedModule Target (Module g a)

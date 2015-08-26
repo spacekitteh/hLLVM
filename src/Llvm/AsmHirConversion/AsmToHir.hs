@@ -20,6 +20,7 @@ import Control.Monad.Reader
 import Llvm.AsmHirConversion.Specialization
 import Llvm.Hir.DataLayoutMetrics
 import Llvm.AsmHirConversion.MapLabels(compMapping)
+import Llvm.Hir.Target
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: I.Gname
@@ -1851,10 +1852,10 @@ filterOutDataLayoutAndTriple tls =
                                A.ToplevelDataLayout _ -> False
                                _ -> True) tls)
 
-asmToHir :: (Show dlm, DataLayoutMetrics dlm) => dlm -> A.Module -> 
-            H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm I.Gname ())
-asmToHir dlm m@(A.Module ts) = 
-  let (lbMap,_) = H.runSimpleUniqueMonad (compMapping dlm m)
+asmToHir :: Target -> A.Module -> 
+            H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule I.Gname ())
+asmToHir tg@(Target dlm) m@(A.Module ts) = 
+  let (lbMap,_) = H.runSimpleUniqueMonad (compMapping tg m)
   in 
    let ((A.DataLayout dl, tt), ts0) = filterOutDataLayoutAndTriple ts
        td = M.fromList $ A.typeDefOfModule m
@@ -1865,7 +1866,7 @@ asmToHir dlm m@(A.Module ts) =
                                                    _ -> False) ts0
                           ; defs <- mapM toplevel2IrP1 defs0
                           ; l <- mapM (toplevel2IrP2 (M.fromList defs))  ts0
-                          ; return $ I.SpecializedModule dlm $ I.Module l
+                          ; return $ I.SpecializedModule tg $ I.Module l
                           }
                       ) (ReaderData td (I.Gname (errorLoc FLC $ "<fatal error>")) lbMap))
       else 

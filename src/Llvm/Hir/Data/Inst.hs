@@ -69,8 +69,7 @@ data GetElementPtr s v idx = GetElementPtr (IsOrIsNot InBounds) (T (Type s P) v)
                            deriving (Eq,Ord,Show)
 
 data Select s r v = Select (Either (T (Type ScalarB I) v) (T (Type s I) v)) 
-                    (T (Type s r) v) (T (Type s r) v)
-                  deriving (Eq,Ord,Show)
+                    (T (Type s r) v) (T (Type s r) v) deriving (Eq,Ord,Show)
 
 data Icmp s v = Icmp IcmpOp (IntOrPtrType s) v v deriving (Eq,Ord,Show)
 
@@ -78,15 +77,13 @@ data Fcmp s v = Fcmp FcmpOp (Type s F) v v deriving (Eq,Ord,Show)
 
 {- vector operations -}
 data ShuffleVector r v = ShuffleVector (T (Type VectorB r) v) (T (Type VectorB r) v) 
-                         (T (Type VectorB I) v)
-                       deriving (Eq,Ord,Show)
+                         (T (Type VectorB I) v) deriving (Eq,Ord,Show)
 
 data ExtractElement r v = ExtractElement (T (Type VectorB r) v) (T (Type ScalarB I) v)
                         deriving (Eq,Ord,Show)
 
 data InsertElement r v = InsertElement (T (Type VectorB r) v) (T (Type ScalarB r) v) 
-                         (T (Type ScalarB I) v)
-                       deriving (Eq,Ord,Show)
+                         (T (Type ScalarB I) v) deriving (Eq,Ord,Show)
 
 {- aggregate operations -}
 data ExtractValue v = ExtractValue (T (Type RecordB D) v) [Word32] deriving (Eq,Ord,Show)
@@ -123,7 +120,6 @@ data Const g = C_u8 Word8
              | C_arrayN Word64 (TypedConstOrNull g)
              | C_labelId Label
              | C_block g Label
-             -- | C_blockUnresolved g A.PercentLabel 
              | C_add (Maybe NoWrap) (Type ScalarB I) (Const g) (Const g)
              | C_sub (Maybe NoWrap) (Type ScalarB I) (Const g) (Const g)
              | C_mul (Maybe NoWrap) (Type ScalarB I) (Const g) (Const g)
@@ -999,6 +995,12 @@ data Cinst g where {
                   , dv :: T Dtype (Value g)
                   , result :: LocalId
                   } -> Cinst g;
+  I_llvm_lifetime_start :: { objsize :: T (Type ScalarB I) (Value g) 
+                           , pointer :: T (Type ScalarB P) (Value g)
+                           } -> Cinst g;
+  I_llvm_lifetime_end :: { objsize :: T (Type ScalarB I) (Value g)
+                         , pointer :: T (Type ScalarB P) (Value g)
+                         } -> Cinst g;
   } deriving (Eq, Ord, Show)
 
 

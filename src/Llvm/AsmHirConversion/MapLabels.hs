@@ -19,6 +19,7 @@ import Data.Maybe (fromJust)
 import Control.Monad.Reader
 import Llvm.AsmHirConversion.Specialization
 import Llvm.Hir.DataLayoutMetrics
+import Llvm.Hir.Target
 
 data ReaderData = ReaderData  { typedefs :: M.Map A.LocalId A.Type 
                               , funname :: I.Gname
@@ -1841,9 +1842,9 @@ filterOutDataLayoutAndTriple tls =
                                A.ToplevelDataLayout _ -> False
                                _ -> True) tls)
 
-compMapping :: (Show dlm, DataLayoutMetrics dlm) => dlm -> A.Module -> 
-               H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule dlm I.Gname ())
-compMapping dlm m@(A.Module ts) = 
+compMapping :: Target -> A.Module -> 
+               H.SimpleUniqueMonad (IdLabelMap, I.SpecializedModule I.Gname ())
+compMapping tg@(Target dlm) m@(A.Module ts) = 
   let ((A.DataLayout dl, tt), ts0) = filterOutDataLayoutAndTriple ts
       td = M.fromList $ A.typeDefOfModule m
   in if matchLayoutSpecAndTriple dlm dl tt then
@@ -1853,7 +1854,7 @@ compMapping dlm m@(A.Module ts) =
                                                   _ -> False) ts0
                          ; defs <- mapM toplevel2IrP1 defs0
                          ; l <- mapM (toplevel2IrP2 (M.fromList defs))  ts0
-                         ; return $ I.SpecializedModule dlm $ I.Module l
+                         ; return $ I.SpecializedModule tg $ I.Module l
                          }
                      ) (ReaderData td (I.Gname (errorLoc FLC $ "<fatal error>"))))
      else 

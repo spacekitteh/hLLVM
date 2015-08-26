@@ -20,7 +20,7 @@ import Debug.Trace
 -- LabelMapM monad is a CheckingFuelMonad with a data structure IdLabelMap to track
 -- the mapping between LLVM labels and Hoopl labels and the original order LLVM labels
 -- the mapping will be used to convert Hoopl labels back to LLVM labels to make 
--- llvm-as happy
+-- debugging easier.
 -}
 
 data IdLabelMap = IdLabelMap { a2h :: M.Map (I.Gname, A.LabelId) H.Label } deriving (Show)

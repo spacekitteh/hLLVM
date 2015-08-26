@@ -42,7 +42,9 @@ instance DataLayoutMetrics I386_Pc_Linux_Gnu where
 
 
 isI386_Pc_Linux_Gnu :: [A.LayoutSpec] -> A.TargetTriple  -> Bool
-isI386_Pc_Linux_Gnu ls (TargetTriple Arch_i386 (Just Vendor_Pc) (Just Os_Linux) (Just OsEnv_Gnu)) = True
+isI386_Pc_Linux_Gnu ls tt = case tt of
+  (TargetTriple Arch_i386 (Just Vendor_Pc) (Just Os_Linux) (Just OsEnv_Gnu)) -> True
+  _ -> False
 
 
 data X86_64_Pc_Linux_Gnu = X86_64_Pc_Linux_Gnu deriving (Eq, Ord, Show)
@@ -66,7 +68,35 @@ instance DataLayoutMetrics X86_64_Pc_Linux_Gnu where
   mangling _ = ManglingE
 
   matchLayoutSpecAndTriple _ dl tt = isX86_64_Pc_Linux_Gnu dl tt
-  toTriple _ = TargetTriple Arch_i386 (Just Vendor_Pc) (Just Os_Linux) (Just OsEnv_Gnu)
+  toTriple _ = TargetTriple Arch_x86_64 (Just Vendor_Pc) (Just Os_Linux) (Just OsEnv_Gnu)
+
+
+data X86_64_Unknown_Linux_Gnu = X86_64_Unknown_Linux_Gnu deriving (Eq, Ord, Show)
+
+instance DataLayoutMetrics X86_64_Unknown_Linux_Gnu where
+  endianness _ = LittleEndian
+  nativeInts _ = [SizeInBit 8, SizeInBit 16, SizeInBit 32, SizeInBit 64]
+  integers _ = [SizeInBit 1, SizeInBit 8, SizeInBit 16, SizeInBit 32, SizeInBit 64]
+  
+  sizeOfPtr _ _ = SizeInBit 64
+  alignOfPtr _ _ = AlignMetrics (AlignInBit 64) (Just $ AlignInBit 64)
+  
+  alignOfStack _ = StackAlign $ AlignInBit 128
+  
+  alignOfFx _ = M.union (M.fromList [(SizeInBit 64, AlignMetrics (AlignInBit 64) (Just $ AlignInBit 64))
+                                    ,(SizeInBit 80, AlignMetrics (AlignInBit 128) (Just $ AlignInBit 128))
+                                    ])  floatLayoutMetrics  
+  mangling _ = ManglingE
+
+  matchLayoutSpecAndTriple _ dl tt = isX86_64_Pc_Linux_Gnu dl tt
+  toTriple _ = TargetTriple Arch_x86_64 (Just Vendor_Unknown) (Just Os_Linux) (Just OsEnv_Gnu)
+
 
 isX86_64_Pc_Linux_Gnu :: [A.LayoutSpec] -> A.TargetTriple  -> Bool
-isX86_64_Pc_Linux_Gnu ls (TargetTriple Arch_x86_64 (Just Vendor_Pc) (Just Os_Linux) (Just OsEnv_Gnu)) = True
+isX86_64_Pc_Linux_Gnu ls tt = case tt of
+  (TargetTriple Arch_x86_64 v (Just Os_Linux) (Just OsEnv_Gnu)) | v == (Just Vendor_Pc) || v == (Just Vendor_Unknown) -> True
+  _ -> False
+
+
+-- data AFoo = forall a. DataLayoutMetrics a => AFoo a
+

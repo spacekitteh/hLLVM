@@ -871,6 +871,12 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                          , dv = substitute chg dv
                                          , result = cid result
                                          }
+        I_llvm_lifetime_start {..} -> I_llvm_lifetime_start { objsize = substitute chg objsize
+                                                            , pointer = substitute chg pointer
+                                                            }
+        I_llvm_lifetime_end {..} -> I_llvm_lifetime_end { objsize = substitute chg objsize
+                                                        , pointer = substitute chg pointer
+                                                        }                                      
                            {-
   I_llvm_math_f32 :: MathUnaryOp -> Value -> LocalId -> Cinst;
   I_llvm_math_f64 :: MathUnaryOp -> Value -> LocalId -> Cinst;
@@ -996,23 +1002,6 @@ instance Substitutable TlTypeDef g TlTypeDef h  where
 
 instance Substitutable (TlComdat g) g (TlComdat h) h where
   substitute chg (TlComdat lhs v) = TlComdat (substitute chg lhs) v
-
-{-
-instance Substitutable (DollarId g) g (DollarId h) h where
-  substitute chg di = globalId2DollarId ((substitute chg ((dollarIdToGlobalId di))))
-
-dollarIdToGlobalId :: forall g.DollarId g -> GlobalId g
-dollarIdToGlobalId v = case v of
-  DollarIdNum x -> GlobalIdNum x
-  DollarIdAlphaNum x -> GlobalIdAlphaNum x
-  DollarIdDqString x -> GlobalIdDqString x
-
-globalId2DollarId :: forall g.GlobalId g -> DollarId g
-globalId2DollarId v = case v of
-  GlobalIdNum x -> DollarIdNum x
-  GlobalIdAlphaNum x -> DollarIdAlphaNum x
-  GlobalIdDqString x -> DollarIdDqString x
--}
 
 instance Substitutable (Comdat g) g (Comdat h) h where
   substitute chg (Comdat x) = Comdat (substitute chg x)

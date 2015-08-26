@@ -26,6 +26,7 @@ import qualified Data.Set as S
 import Data.List (stripPrefix)
 import Llvm.Matcher
 import Llvm.Hir.Target.Linux_Gnu
+import Llvm.Hir.Target
 
 toStep "mem2reg" = Just Mem2Reg
 toStep "dce" = Just Dce
@@ -162,7 +163,7 @@ main = do { sel <- cmdArgsRun mode
                                ; let ast' = A.simplify ast
                                ; let (m, I.SpecializedModule _ ir) = 
                                        H.runSimpleUniqueMonad 
-                                       ((Cv.asmToHir I386_Pc_Linux_Gnu ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.SpecializedModule I386_Pc_Linux_Gnu I.Gname ()))
+                                       ((Cv.asmToHir (Target I386_Pc_Linux_Gnu) ast')::H.SimpleUniqueMonad (Cv.IdLabelMap, I.SpecializedModule I.Gname ()))
                                ; writeOutIr ir outh
                                      --}
                                ; hClose inh
@@ -202,8 +203,8 @@ main = do { sel <- cmdArgsRun mode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh
                                   ; let ast' = A.simplify ast
-                                  ; let ast'' = transformModule (\(I.SpecializedModule dlm m) -> 
-                                                                  I.SpecializedModule dlm $ Vis.visualize (Vis.sampleVisualPlugin dlm) m) Nothing ast'
+                                  ; let ast'' = transformModule (\(I.SpecializedModule tg@(Target dlm) m) -> 
+                                                                  I.SpecializedModule tg $ Vis.visualize (Vis.sampleVisualPlugin dlm) m) Nothing ast'
                                   ; writeOutLlvm ast'' outh
                                   ; hClose inh
                                   ; closeFileOrStdout ox outh
