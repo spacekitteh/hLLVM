@@ -98,5 +98,29 @@ isX86_64_Pc_Linux_Gnu ls tt = case tt of
   _ -> False
 
 
--- data AFoo = forall a. DataLayoutMetrics a => AFoo a
+data I386_Unknown_FreeBsd = I386_Unknown_FreeBsd deriving (Eq, Ord, Show)
+instance DataLayoutMetrics I386_Unknown_FreeBsd where
+  endianness _ = LittleEndian
+  nativeInts _ = [SizeInBit 8, SizeInBit 16, SizeInBit 32]
+  integers _ = [SizeInBit 1, SizeInBit 8, SizeInBit 16, SizeInBit 32]
+  
+  sizeOfPtr _ _ = SizeInBit 32
+  alignOfPtr _ _ = AlignMetrics (AlignInBit 32) (Just $ AlignInBit 32)
+  
+  alignOfStack _ = StackAlign $ AlignInBit 128
+  
+  alignOfFx _ = M.delete (SizeInBit 128)
+                $ M.union (M.fromList [(SizeInBit 64, AlignMetrics (AlignInBit 32) (Just $ AlignInBit 64))
+                                      ,(SizeInBit 80, AlignMetrics (AlignInBit 32) Nothing)
+                                      ]) floatLayoutMetrics  
+  mangling _ = ManglingE
+
+  matchLayoutSpecAndTriple _ dl tt = isI386_Unknown_FreeBsd dl tt
+  toTriple _ = TargetTriple Arch_i386 (Just Vendor_Unknown) (Just (Os_FreeBsd "10.2")) Nothing
+
+
+isI386_Unknown_FreeBsd :: [A.LayoutSpec] -> A.TargetTriple  -> Bool
+isI386_Unknown_FreeBsd ls tt = case tt of
+  (TargetTriple Arch_i386 (Just Vendor_Unknown) (Just (Os_FreeBsd _)) Nothing) -> True
+  _ -> False
 
