@@ -45,16 +45,6 @@ mapModule f Nothing m = let x = getConverter m
                            Just tf ->  let (_, m1) = tf m
                                        in f m1
                            Nothing -> error $ "unsupported target " ++ show (getDT m)
-{-
-if matchLayoutSpecAndTriple I386_Pc_Linux_Gnu ls tt then
-                             let (_, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir I386_Pc_Linux_Gnu m
-                             in f m1
-                           else if matchLayoutSpecAndTriple X86_64_Pc_Linux_Gnu ls tt then
-                                  let (_, m1) = H.runSimpleUniqueMonad $ Cv.asmToHir X86_64_Pc_Linux_Gnu m
-                                  in f m1
-                           else
-                             error $ "unsupported target" ++ show tt
--}
 
 transformModule :: (I.SpecializedModule I.Gname () -> I.SpecializedModule I.Gname ()) -> Maybe dlm -> A.Module -> A.Module 
 transformModule f Nothing m = transformModule2 (\x -> (f x, id)) Nothing m

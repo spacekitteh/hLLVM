@@ -19,4 +19,6 @@ instance Show Target where
 
 
 targets :: [Target]
-targets = [Target I386_Pc_Linux_Gnu, Target X86_64_Pc_Linux_Gnu, Target X86_64_Unknown_Linux_Gnu]
+targets = [Target I386_Pc_Linux_Gnu, Target X86_64_Pc_Linux_Gnu, Target X86_64_Unknown_Linux_Gnu
+          ,Target I386_Unknown_FreeBsd_10_2
+          ]
