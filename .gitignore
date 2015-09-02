@@ -16,3 +16,7 @@ hoopl-3.10.0.1
 LLVM_3.5_Files
 *.html
 *.tix
+GPATH
+GRTAGS
+GSYMS
+GTAGS
