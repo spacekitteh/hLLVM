@@ -10,6 +10,8 @@ import Data.Maybe
 import Llvm.Hir.DataLayoutMetrics
 import Llvm.Hir.Target.Linux_Gnu
 import Data.List (stripPrefix)
+import qualified Data.Map as M
+import Data.Bits
 
 #define FLC  (FileLoc $(srcLoc))
 
@@ -375,21 +377,111 @@ unspecializeMinst mi = case mi of
 
 specializeUnamedMd :: TlUnamedMd Gname -> TlUnamedMd Gname
 specializeUnamedMd x = case x of
-  (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786473")), mc]))) -> 
-    TlUnamedMd_DW_file_type n mc
-  (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786478"))
-                                                     , m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]))) ->
-    TlUnamedMd_DW_subprogram n [m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17,m18,m19]
-  (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst _ (McSimple (C_int "786443")), m1,m2,m3,m4,m5,m6]))) ->
-    TlUnamedMd_DW_lexical_block n [m1,m2,m3,m4,m5,m6]
+  TlUnamedMd n mc@(MetaKindedConst MKmetadata (McStruct ((MetaKindedConst _ (McSimple (C_int num))):t))) -> 
+    let intNum = read num
+    in 
+    case M.lookup intNum intToTagMap of 
+      Just tag -> TlUnamedMd_Tagged n tag t
+      Nothing -> TlUnamedMd n mc -- errorLoc FLC $ show (intNum, x, intToTagMap)
   _ -> x
 
 unspecializeUnamedMd :: TlUnamedMd Gname -> TlUnamedMd Gname
 unspecializeUnamedMd x = case x of
-  TlUnamedMd_DW_file_type n mc -> 
-    (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct [MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786473")), mc])))
-  TlUnamedMd_DW_subprogram n mcs -> 
-    (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct ([MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786478"))]++mcs))))
-  TlUnamedMd_DW_lexical_block n mcs -> 
-    (TlUnamedMd n (MetaKindedConst MKmetadata (McStruct ([MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int "786443"))]++mcs))))    
+  TlUnamedMd_Tagged n tag lst -> 
+    let h = case M.lookup tag tagToIntMap of
+          Just num -> MetaKindedConst (MKtype $ ucast i32) (McSimple (C_int $ show num))
+          Nothing -> errorLoc FLC $ show tag
+    in TlUnamedMd n (MetaKindedConst MKmetadata (McStruct (h:lst)))
   _ -> x
+
+
+tagToIntMap :: M.Map DW_TAG Word32
+tagToIntMap = M.fromList enumTag
+
+intToTagMap :: M.Map Word32 DW_TAG
+intToTagMap = 
+  M.fromList (fmap (\(x,y) -> (y,x)) enumTag)
+
+           
+enumTag :: [(DW_TAG, Word32)]
+enumTag = fmap (\(k,v)-> (k, 786432 + v))
+          [(DW_TAG_array_type,0x01),
+           (DW_TAG_class_type,0x02),
+           (DW_TAG_entry_point,0x03),
+           (DW_TAG_enumeration_type,0x04),
+           (DW_TAG_formal_parameter,0x05),
+           (DW_TAG_imported_declaration,0x08),
+           (DW_TAG_label,0x0a),
+           (DW_TAG_lexical_block,0x0b),
+           (DW_TAG_member,0x0d),
+           (DW_TAG_pointer_type,0x0f),
+           (DW_TAG_reference_type,0x10),
+           (DW_TAG_compile_unit,0x11),
+           (DW_TAG_string_type,0x12),
+           (DW_TAG_structure_type,0x13),
+           (DW_TAG_subroutine_type,0x15),
+           (DW_TAG_typedef,0x16),
+           (DW_TAG_union_type,0x17),
+           (DW_TAG_unspecified_parameters,0x18),
+           (DW_TAG_variant,0x19),
+           (DW_TAG_common_block,0x1a),
+           (DW_TAG_common_inclusion,0x1b),
+           (DW_TAG_inheritance,0x1c),
+           (DW_TAG_inlined_subroutine,0x1d),
+           (DW_TAG_module,0x1e),
+           (DW_TAG_ptr_to_member_type,0x1f),
+           (DW_TAG_set_type,0x20),
+           (DW_TAG_subrange_type,0x21),
+           (DW_TAG_with_stmt,0x22),
+           (DW_TAG_access_declaration,0x23),
+           (DW_TAG_base_type,0x24),
+           (DW_TAG_catch_block,0x25),
+           (DW_TAG_const_type,0x26),
+           (DW_TAG_constant,0x27),
+           (DW_TAG_enumerator,0x28),
+           (DW_TAG_file_type,0x29),
+           (DW_TAG_friend,0x2a),
+           (DW_TAG_namelist,0x2b),
+           (DW_TAG_namelist_item,0x2c),
+           (DW_TAG_packed_type,0x2d),
+           (DW_TAG_subprogram,0x2e),
+           (DW_TAG_template_type_parameter,0x2f),
+           (DW_TAG_template_value_parameter,0x30),
+           (DW_TAG_thrown_type,0x31),
+           (DW_TAG_try_block,0x32),
+           (DW_TAG_variant_part,0x33),
+           (DW_TAG_variable,0x34),
+           (DW_TAG_volatile_type,0x35),
+           (DW_TAG_dwarf_procedure,0x36),
+           (DW_TAG_restrict_type,0x37),
+           (DW_TAG_interface_type,0x38),
+           (DW_TAG_namespace,0x39),
+           (DW_TAG_imported_module,0x3a),
+           (DW_TAG_unspecified_type,0x3b),
+           (DW_TAG_partial_unit,0x3c),
+           (DW_TAG_imported_unit,0x3d),
+           (DW_TAG_condition,0x3f),
+           (DW_TAG_shared_type,0x40),
+           (DW_TAG_type_unit,0x41),
+           (DW_TAG_rvalue_reference_type,0x42),
+           (DW_TAG_template_alias,0x43),
+           
+           (DW_TAG_coarray_type,0x44),
+           (DW_TAG_generic_subrange,0x45),
+           (DW_TAG_dynamic_type,0x46),
+           
+           (DW_TAG_auto_variable, 0x100),
+           (DW_TAG_arg_variable, 0x101),
+           (DW_TAG_user_base, 0x1000),
+           
+           (DW_TAG_MIPS_loop,0x4081),
+           (DW_TAG_format_label,0x4101),
+           (DW_TAG_function_template,0x4102),
+           (DW_TAG_class_template,0x4103),
+           (DW_TAG_GNU_template_template_param,0x4106),
+           (DW_TAG_GNU_template_parameter_pack,0x4107),
+           (DW_TAG_GNU_formal_parameter_pack,0x4108),
+           (DW_TAG_lo_user,0x4080),
+           (DW_TAG_APPLE_property,0x4200),
+           (DW_TAG_hi_user,0xffff)
+          ]

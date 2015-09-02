@@ -1062,9 +1062,7 @@ instance Substitutable MdNode g MdNode h where
 instance Substitutable (TlUnamedMd g) g (TlUnamedMd h) h where
   substitute chg x = case x of
     TlUnamedMd s mc -> TlUnamedMd s (substitute chg mc)
-    TlUnamedMd_DW_file_type n mc -> TlUnamedMd_DW_file_type n (substitute chg mc)
-    TlUnamedMd_DW_subprogram n mc -> TlUnamedMd_DW_subprogram n (substitute chg mc)
-    TlUnamedMd_DW_lexical_block n mc -> TlUnamedMd_DW_lexical_block n (substitute chg mc)
+    TlUnamedMd_Tagged n tag lst -> TlUnamedMd_Tagged n tag (substitute chg lst)
 
 instance Substitutable (MetaKindedConst g) g (MetaKindedConst h) h where
   substitute chg mk = case mk of

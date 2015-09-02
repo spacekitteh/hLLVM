@@ -137,10 +137,8 @@ globalCxtOfModule (Module tl) =
                        ) tl
       unameMeta = fmap (\(ToplevelUnamedMd um) -> case um of
                            TlUnamedMd n _ -> (n, um)
-                           TlUnamedMd_DW_file_type n _ -> (n, um)
-                           TlUnamedMd_DW_subprogram n _ -> (n, um)
-                           TlUnamedMd_DW_lexical_block n _ -> (n, um)
-                           _ -> errorLoc FLC $ show um)
+                           TlUnamedMd_Tagged n _ _ -> (n, um)
+                       )
                   $ filter (\x -> case x of
                                ToplevelUnamedMd _ -> True
                                _ -> False
@@ -207,16 +205,16 @@ localIdSrcInfoMap mdMap set =
          
 getFileInfo :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo
 getFileInfo mdMap fref = case M.lookup fref mdMap of
-  Just (TlUnamedMd_DW_file_type _ x) -> case x of
+  Just (TlUnamedMd_Tagged _ DW_TAG_file_type [x]) -> case x of
     MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))) -> getFileName mdMap ref
-    _ -> errorLoc FLC $ show x
-  y -> errorLoc FLC $ show y
+    _ -> errorLoc FLC $ show (fref,x)
+  y -> errorLoc FLC $ show (fref,y)
 
 getFileInfoFromSubprog :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo
 getFileInfoFromSubprog mdMap n = case M.lookup n mdMap of
-  Just (TlUnamedMd_DW_subprogram _ [_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
+  Just (TlUnamedMd_Tagged _ DW_TAG_subprogram [_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_]) -> 
     getFileInfo mdMap fref
-  Just (TlUnamedMd_DW_lexical_block _ [MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_]) ->
+  Just (TlUnamedMd_Tagged _ DW_TAG_lexical_block [MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_,_]) ->
     getFileName mdMap fref
   _ -> Nothing
 

@@ -66,13 +66,12 @@ instance IrPrint g => IrPrint (TlAlias g) where
 instance IrPrint g => IrPrint (TlUnamedMd g) where
   printIr x = case x of
     TlUnamedMd s t -> char '!'<>(integer $ fromIntegral s) <+> equals <+> printIr t
-    TlUnamedMd_DW_file_type n mc -> char '!'<>(integer $ fromIntegral n) <+> equals <+> printIr mc
+    TlUnamedMd_Tagged s tag lst -> char '!'<>(integer $ fromIntegral s) <+> equals <+> text (show tag) <+> equals <+> printIr lst
     _ -> text "()"
-      
 
 instance IrPrint TlNamedMd where
-  printIr (TlNamedMd mv nds) = char '!' <> text mv <+> 
-                               equals <+> char '!'<>(braces (hsep $ punctuate comma $ fmap printIr nds))
+  printIr (TlNamedMd mv nds) = 
+    char '!' <> text mv <+> equals <+> char '!'<>(braces (hsep $ punctuate comma $ fmap printIr nds))
 
 instance IrPrint g => IrPrint (TlDeclare g) where
   printIr (TlDeclare fproto) = text "declare" <+> printIr fproto
