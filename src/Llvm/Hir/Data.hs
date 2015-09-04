@@ -7,7 +7,7 @@ module Llvm.Hir.Data (module Llvm.Hir.Data.Module
 
 import Llvm.Hir.Data.Module
 import Llvm.Hir.Data.Type
-import Llvm.Hir.Data.Inst
+import Llvm.Hir.Data.Inst hiding (LocalId)
 import Llvm.Hir.Data.Commentor
 import Llvm.Hir.Target
 

@@ -15,6 +15,15 @@ import Data.Bits
 
 #define FLC  (FileLoc $(srcLoc))
 
+sLid :: A.LocalId -> Lname
+sLid x = case x of
+  A.LocalIdNum x -> errorLoc FLC $ show x
+  A.LocalIdAlphaNum x -> Lname x
+  A.LocalIdDqString x -> Lname x
+  
+unLid :: Lname -> A.LocalId  
+unLid (Lname s) = A.LocalIdDqString s
+
 specializeGlobalId :: A.GlobalId -> Gname
 specializeGlobalId x = case x of
   A.GlobalIdNum v -> errorLoc FLC $ show x
@@ -95,7 +104,7 @@ unspecializeParamAsRetAttr x = case x of
   ParamAsRetAttr -> PaSRet
 
 
-specializeRegisterIntrinsic :: Maybe LocalId -> A.CallSite -> Maybe (Maybe LocalId, MemLen, [A.ActualParam])
+specializeRegisterIntrinsic :: Maybe A.LocalId -> A.CallSite -> Maybe (Maybe A.LocalId, MemLen, [A.ActualParam])
 specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
   (Just r, A.CallSiteFun Nothing [] _ (A.FunNameGlobal (GolG (A.GlobalIdAlphaNum nm))) [m] _) 
     | (nm == "llvm.read_register.i32" || nm == "llvm.read_register.i64") -> 
@@ -111,7 +120,7 @@ specializeRegisterIntrinsic lhs cs = case (lhs, cs) of
       in Just (Nothing, ml, [m,v])
   (_, _) -> Nothing
 
-unspecializeRegisterIntrinsic :: Cinst Gname -> Maybe (Gname, Type ScalarB I, [MetaOperand Gname], Maybe LocalId)
+unspecializeRegisterIntrinsic :: Cinst Gname -> Maybe (Gname, Type ScalarB I, [MetaOperand Gname], Maybe Lname)
 unspecializeRegisterIntrinsic cinst = case cinst of
   I_llvm_read_register mLen mc r ->
     let (nm, typ) = case mLen of
@@ -126,7 +135,7 @@ unspecializeRegisterIntrinsic cinst = case cinst of
   _ -> Nothing
 
 
-specializeCallSite :: Maybe LocalId -> FunPtr Gname -> CallFunInterface Gname -> Maybe (Cinst Gname)
+specializeCallSite :: Maybe Lname -> FunPtr Gname -> CallFunInterface Gname -> Maybe (Cinst Gname)
 specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
   (FunId (Gname "llvm.va_start"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v]) | isNothing lhs -> 
@@ -181,10 +190,12 @@ specializeCallSite lhs fptr csi = case (fptr, cfi_signature csi) of
     Just $ I_llvm_ctpop { suffix = fromJust $ stripPrefix "llvm.ctpop." gname, dv = T t1 v, result = fromJust lhs } 
   (FunId (Gname "llvm.lifetime.start"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v1
-                      ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_lifetime_start (T (dcast FLC t1) v1) (T (dcast FLC t2) v2)
+                      ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> 
+    Just $ I_llvm_lifetime_start (T (dcast FLC t1) v1) (T (dcast FLC t2) v2)
   (FunId (Gname "llvm.lifetime.end"),
    FunSignature Ccc _ [FunOperandData t1 [] Nothing v1
-                      ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> Just $ I_llvm_lifetime_end (T (dcast FLC t1) v1) (T (dcast FLC t2) v2)
+                      ,FunOperandData t2 [] Nothing v2]) | isNothing lhs -> 
+    Just $ I_llvm_lifetime_end (T (dcast FLC t1) v1) (T (dcast FLC t2) v2)
   _ -> Nothing
 
 
@@ -382,7 +393,7 @@ specializeUnamedMd x = case x of
     in 
     case M.lookup intNum intToTagMap of 
       Just tag -> TlUnamedMd_Tagged n tag t
-      Nothing -> TlUnamedMd n mc -- errorLoc FLC $ show (intNum, x, intToTagMap)
+      Nothing -> TlUnamedMd n mc
   _ -> x
 
 unspecializeUnamedMd :: TlUnamedMd Gname -> TlUnamedMd Gname

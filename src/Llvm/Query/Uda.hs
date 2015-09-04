@@ -21,8 +21,8 @@ import Data.Either
 
 
 class Uda a g where
-  use :: a -> S.Set (Either LocalId g)
-  def :: g {- a hack to force restricting the type parameter g -} -> a -> S.Set LocalId -- defined ssa variables
+  use :: a -> S.Set (Either Lname g)
+  def :: g {- a hack to force restricting the type parameter g -} -> a -> S.Set Lname -- defined ssa variables
   
   storeTo :: a -> S.Set (Value g)
   storeTo _ = S.empty
@@ -50,7 +50,7 @@ instance Uda v g => Uda (T t v) g where
   def g (T _ x) = def g x
   storeTo (T _ x) = storeTo x
   
-instance Ord g => Uda LocalId g where
+instance Ord g => Uda Lname g where
   use x = S.insert (Left x) S.empty
   def g x = S.insert x S.empty
   storeTo x = S.insert (Val_ssa x) S.empty

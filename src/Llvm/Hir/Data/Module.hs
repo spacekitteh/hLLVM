@@ -198,9 +198,9 @@ data TlGlobal g = TlGlobalDtype { tlg_lhs :: g
                                  , tlg_alignment :: (Maybe Ci.AlignInByte)
                                  } deriving (Eq, Ord, Show)
 
-data TlTypeDef = TlDatTypeDef Ci.LocalId Ci.Dtype
-               | TlOpqTypeDef Ci.LocalId (Ci.Type OpaqueB D)
-               | TlFunTypeDef Ci.LocalId (Ci.Type CodeFunB X) deriving (Eq, Ord, Show)
+data TlTypeDef = TlDatTypeDef Ci.Lname Ci.Dtype
+               | TlOpqTypeDef Ci.Lname (Ci.Type OpaqueB D)
+               | TlFunTypeDef Ci.Lname (Ci.Type CodeFunB X) deriving (Eq, Ord, Show)
 
 data TlDepLibs = TlDepLibs [Ci.DqString] deriving (Eq, Ord, Show)
 

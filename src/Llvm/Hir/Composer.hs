@@ -52,7 +52,7 @@ x86_fp80 = TpX86Fp80
 isInbounds :: IsOrIsNot InBounds
 isInbounds = Is InBounds
 
-iload :: T (Type ScalarB P) (Value g) -> LocalId -> Cinst g
+iload :: T (Type ScalarB P) (Value g) -> Lname -> Cinst g
 iload p r = I_load (IsNot Volatile) p Nothing Nothing Nothing Nothing r
 
 istore :: T Dtype (Value g) -> T (Type ScalarB P) (Value g) -> Cinst g
@@ -95,7 +95,7 @@ icallcmd fname params = I_call_fun (FunId fname)
                                          , cfi_funAttrs = [] 
                                          } Nothing
 
-icallfun :: g -> [(Dtype, Value g)] -> Dtype -> LocalId -> Cinst g
+icallfun :: g -> [(Dtype, Value g)] -> Dtype -> Lname -> Cinst g
 icallfun fname params retType rid = 
   let funType = Tfunction (ucast retType, []) (fmap (\x -> (MtypeData $ fst x, Nothing)) params) Nothing
   in 

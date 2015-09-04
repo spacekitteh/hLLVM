@@ -197,10 +197,10 @@ getScalarTypeSizeInBits te x =
       TpX86Mmx -> SizeInBit 64
       TnameScalarI _ -> let td = getTypeDef te (ucast x)
                         in getScalarTypeSizeInBits te (dcast FLC td)
-      TquoteNameScalarI _ -> let td = getTypeDef te (ucast x)
+{-      TquoteNameScalarI _ -> let td = getTypeDef te (ucast x)
                              in getScalarTypeSizeInBits te (dcast FLC td)
       TnoScalarI _ -> let td = getTypeDef te (ucast x)
-                      in getScalarTypeSizeInBits te (dcast FLC td)
+                      in getScalarTypeSizeInBits te (dcast FLC td) -}
     ScalarTypeF e -> case e of
       TpF n -> SizeInBit $ fromIntegral n
       TpHalf -> SizeInBit 16
@@ -211,10 +211,6 @@ getScalarTypeSizeInBits te x =
       TpPpcFp128 -> SizeInBit 128
       TnameScalarF _ -> let td = getTypeDef te (ucast x)
                         in getScalarTypeSizeInBits te (dcast FLC td)
-      TquoteNameScalarF _ -> let td = getTypeDef te (ucast x)
-                             in getScalarTypeSizeInBits te (dcast FLC td)
-      TnoScalarF _ -> let td = getTypeDef te (ucast x)
-                      in getScalarTypeSizeInBits te (dcast FLC td)
     ScalarTypeP _ -> SizeInBit 32
 
 
@@ -226,8 +222,6 @@ getGetElemtPtrIndexedType te x is = case is of
                                     else getGetElemtPtrIndexedType te (dcast FLC et) tl
     DtypeScalarP (TnameScalarP _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is
     DtypeRecordD (TnameRecordD _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is
-    DtypeRecordD (TquoteNameRecordD _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is    
-    DtypeRecordD (TnoRecordD _) -> getGetElemtPtrIndexedType te (getTypeDef te x) is
     _ -> let ct = getTypeAtIndex te x (castTypedValueToTypedConst hd)
          in if tl == [] then ct
             else getGetElemtPtrIndexedType te ct tl
@@ -250,49 +244,26 @@ getTypeAtIndices te t indices = case indices of
   [] -> t
   h:tl -> getTypeAtIndices te (getTypeAtIndex te t h) tl
   
-getTypeByTname :: String -> M.Map LocalId Dtype -> Maybe Dtype
-getTypeByTname tn mp = M.lookup (LocalIdAlphaNum tn) mp
-
-getTypeByTquoteName :: String -> M.Map LocalId Dtype -> Maybe Dtype
-getTypeByTquoteName tn mp = M.lookup (LocalIdDqString tn) mp
-
-getTypeByTno :: Word32 -> M.Map LocalId Dtype -> Maybe Dtype
-getTypeByTno n mp = M.lookup (LocalIdNum n) mp
-
+getTypeByTname :: String -> M.Map Lname Dtype -> Maybe Dtype
+getTypeByTname tn mp = M.lookup (Lname tn) mp
 
 getTypeDef :: TypeEnv -> Dtype -> Dtype
 getTypeDef TypeEnv{..} t = case t of
   DtypeRecordD (TnameRecordD n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs)
-  DtypeRecordD (TquoteNameRecordD n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeRecordD (TnoRecordD n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeRecordD _ -> t
   DtypeScalarI (TnameScalarI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeScalarI (TquoteNameScalarI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeScalarI (TnoScalarI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeScalarI _ -> t
   DtypeScalarP (TnameScalarP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeScalarP (TquoteNameScalarP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)   
-  DtypeScalarP (TnoScalarP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeScalarP _ -> t   
   DtypeScalarF (TnameScalarF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeScalarF (TquoteNameScalarF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeScalarF (TnoScalarF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeScalarF _ -> t
   DtypeVectorI (TnameVectorI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeVectorI (TquoteNameVectorI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeVectorI (TnoVectorI n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeVectorI _ -> t  
   DtypeVectorP (TnameVectorP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeVectorP (TquoteNameVectorP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeVectorP (TnoVectorP n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeVectorP _ -> t  
   DtypeVectorF (TnameVectorF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs) 
-  DtypeVectorF (TquoteNameVectorF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeVectorF (TnoVectorF n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeVectorF _ -> t  
   DtypeFirstClassD (Tfirst_class_name n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTname n typedefs)
-  DtypeFirstClassD (Tfirst_class_quoteName n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTquoteName n typedefs)
-  DtypeFirstClassD (Tfirst_class_no n) -> maybe (errorLoc FLC $ show t ++ " is not defined.") id (getTypeByTno n typedefs)
   DtypeFirstClassD _ -> t
 
 getElementType :: TypeEnv -> Dtype -> Dtype
@@ -329,7 +300,8 @@ getUndefValue :: Type ScalarB x -> Const g
 getUndefValue t = case t of
   _ -> C_undef
 
-getGetElementPtr :: T (Type ScalarB P) (Const g) -> [T (Type ScalarB I) (Const g)] -> IsOrIsNot InBounds -> GetElementPtr ScalarB (Const g) (Const g)
+getGetElementPtr :: T (Type ScalarB P) (Const g) -> [T (Type ScalarB I) (Const g)] 
+                    -> IsOrIsNot InBounds -> GetElementPtr ScalarB (Const g) (Const g)
 getGetElementPtr (T t cv) indices isB = GetElementPtr isB (T t cv) indices
 
 
@@ -583,7 +555,7 @@ instance TypeOf CallSiteType Dtype where
       Tfunction (rt,_) _ _ -> typeof te rt
       TnameCodeFunX n -> errorLoc FLC $ "unsupported " ++ show x
 
-instance (Eq g, Show g) => TypeOf (Const g) Dtype where    
+instance (Eq g, Show g) => TypeOf (Const g) Dtype where
   typeof te x = case x of
     C_getelementptr b (T bt _) indices -> 
       let et = getGetElemtPtrIndexedType te (ucast bt) ((fmap ucast indices)::[T (Type ScalarB I) (Value g)])

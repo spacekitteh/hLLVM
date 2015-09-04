@@ -57,26 +57,24 @@ instance Error e => MonadReader r (Context s r e) where
   
 
 data CodeCache g ad = CodeCache { insts :: [Node g ad O O]
-                                , usedLhs :: S.Set LocalId
+                                , usedLhs :: S.Set Lname
                                 } deriving (Eq, Ord, Show)
 
-type Cc g ad a = Context (CodeCache g ad) LocalId String a
+type Cc g ad a = Context (CodeCache g ad) Lname String a
 
 
-newLocalId :: LocalId -> String -> LocalId
+newLocalId :: Lname -> String -> Lname
 newLocalId l suffix = case l of
-  LocalIdNum n -> LocalIdDqString ((show n) ++ suffix)
-  LocalIdAlphaNum s -> LocalIdDqString (s ++ suffix)
-  LocalIdDqString s -> LocalIdDqString (s ++ suffix)
+  Lname n -> Lname (n ++ suffix)
 
-getLocalBase :: Mangle g => g -> LocalId
-getLocalBase g = LocalIdDqString $ "@" ++ mangle g
+getLocalBase :: Mangle g => g -> Lname
+getLocalBase g = Lname $ "@" ++ mangle g
 
         
-baseOf :: (IrPrint g, Mangle g) => Value g -> LocalId
+baseOf :: (IrPrint g, Mangle g) => Value g -> Lname
 baseOf nb = case nb of
   Val_ssa s -> s
-  Val_const c -> LocalIdDqString $ mangle c 
+  Val_const c -> Lname $ mangle c 
 
 useBase :: (IrPrint g, Mangle g) => Value g -> Cc g ad a -> Cc g ad a
 useBase nb cca = local (\_ -> baseOf nb) cca
@@ -90,12 +88,12 @@ newCInst inst = newNode (Cnode inst [])
 newPInst :: Pinst g -> Cc g ad ()
 newPInst inst = newNode (Pnode inst [])
 
-new :: String -> (LocalId -> Node g ad O O) -> Cc g ad LocalId
+new :: String -> (Lname -> Node g ad O O) -> Cc g ad Lname
 new rhsPrefix partialInst = 
   do { s <- get
      ; bs <- ask
      ; if bs == unspecifiedBase then
-         return $ LocalIdDqString "irrefutable error:the new value base name is not specified"
+         return $ Lname "irrefutable error:the new value base name is not specified"
        else do { lhs <- if rhsPrefix == "" then return $ newLocalId bs "rhsPrefix is an empty string"
                         else let x = newLocalId bs rhsPrefix
                              in if S.member x (usedLhs s) 
@@ -106,15 +104,10 @@ new rhsPrefix partialInst =
                }
      }
 
-{-
-nativeNewValue :: String -> (LocalId -> Cinst g) -> Cc g ad (Value g)
-nativeNewValue rhsPrefix partialInst  = liftM Val_ssa (new rhsPrefix (\x -> Cnode (partialInst x) []))
--}
-  
-newValue :: String -> (LocalId -> Cinst g) -> Cc g ad (Value g)
+newValue :: String -> (Lname -> Cinst g) -> Cc g ad (Value g)
 newValue rhsPrefix partialInst = liftM Val_ssa (new rhsPrefix (\x -> Cnode (partialInst x) []))
 
-newPhiValue :: String -> (LocalId -> Pinst g) -> Cc g ad (Value g)
+newPhiValue :: String -> (Lname -> Pinst g) -> Cc g ad (Value g)
 newPhiValue rhsPrefix partialPhi = liftM Val_ssa (new rhsPrefix (\x -> Pnode (partialPhi x) []))
 
 newNode :: Node g ad O O -> Cc g ad ()
@@ -123,8 +116,8 @@ newNode n = modify (\cc@CodeCache{..} -> cc { insts = n:insts })
 theEnd :: Cc g ad ()
 theEnd = return ()
 
-unspecifiedBase :: LocalId
-unspecifiedBase = LocalIdDqString "base is not specified"
+unspecifiedBase :: Lname
+unspecifiedBase = Lname "base is not specified"
 
 emitNodes :: Cc g ad a -> [Node g ad O O]
 emitNodes cca = fst (emitAll cca)

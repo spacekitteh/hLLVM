@@ -828,7 +828,7 @@ convert_MetaConst :: A.MetaConst -> MM (I.MetaConst I.Gname)
 convert_MetaConst (A.McStruct c) = Md.liftM I.McStruct (mapM convert_MetaKindedConst c)
 convert_MetaConst (A.McString s) = return $ I.McString s
 convert_MetaConst (A.McMdRef n) = Md.liftM I.McMdRef (convert_MdRef n)
-convert_MetaConst (A.McSsa i) = return $ I.McSsa i
+convert_MetaConst (A.McSsa i) = return $ I.McSsa (sLid i)
 convert_MetaConst (A.McSimple sc) = Md.liftM I.McSimple (convert_Const sc)
 
 convert_MetaKindedConst :: A.MetaKindedConst -> MM (I.MetaKindedConst I.Gname)
@@ -847,7 +847,7 @@ convert_FunPtr fn =
   case fn of
     A.FunNameGlobal g -> case g of
       A.GolG g0 -> return $ I.FunId $ specializeGlobalId g0
-      A.GolL l0 -> return $ I.FunSsa l0
+      A.GolL l0 -> return $ I.FunSsa (sLid l0)
     A.FunNameBitcast tv t ->
       do { mp <- typeDefs
          ; (I.T st c) <- convert_to_DtypedConst tv
@@ -870,7 +870,7 @@ convert_FunId x = errorLoc FLC $ show x
 
 
 convert_Value :: A.Value -> MM (I.Value I.Gname)
-convert_Value (A.Val_local a) = return $ I.Val_ssa a
+convert_Value (A.Val_local a) = return $ I.Val_ssa (sLid a)
 convert_Value (A.Val_const a) = Md.liftM I.Val_const (convert_Const a)
 
 convert_to_Minst :: A.CallSite -> MM (Maybe (I.Minst I.Gname))
@@ -965,33 +965,33 @@ convert_Expr_CInst (Just lhs, A.ExprGetElementPtr c) =
   do { mp <- typeDefs
      ; if getElemPtrIsTvector mp c then 
          do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr_V convert_Value convert_Value c
-            ; return $ I.I_getelementptr_V b t idx lhs
+            ; return $ I.I_getelementptr_V b t idx (sLid lhs)
             }
        else 
          do { (I.GetElementPtr b t idx) <- convert_to_GetElementPtr convert_Value convert_Value c
-            ; return $ I.I_getelementptr b t idx lhs
+            ; return $ I.I_getelementptr b t idx (sLid lhs)
             }
      }
 convert_Expr_CInst (Just lhs, A.ExprIcmp a@(A.Icmp _ t _ _)) = 
   do { mp <- typeDefs
      ; if isTvector mp t then 
          do { (I.Icmp op ta v1a v2a) <- convert_to_Icmp_V convert_Value a
-            ; return $ I.I_icmp_V op ta v1a v2a lhs
+            ; return $ I.I_icmp_V op ta v1a v2a (sLid lhs)
             }
        else 
          do { (I.Icmp op ta v1a v2a) <- convert_to_Icmp convert_Value a
-            ; return $ I.I_icmp op ta v1a v2a lhs
+            ; return $ I.I_icmp op ta v1a v2a (sLid lhs)
             }
      }
 convert_Expr_CInst (Just lhs, A.ExprFcmp a@(A.Fcmp _ t _ _)) = 
   do { mp <- typeDefs
      ; if isTvector mp t then 
          do { (I.Fcmp op ta v1a v2a) <- convert_to_Fcmp_V convert_Value a
-            ; return $ I.I_fcmp_V op ta v1a v2a lhs
+            ; return $ I.I_fcmp_V op ta v1a v2a (sLid lhs)
             }
        else 
          do { (I.Fcmp op ta v1a v2a) <- convert_to_Fcmp convert_Value a
-            ; return $ I.I_fcmp op ta v1a v2a lhs
+            ; return $ I.I_fcmp op ta v1a v2a (sLid lhs)
             }
      }
 convert_Expr_CInst (Just lhs, A.ExprBinExpr (A.Ie a@(A.IbinExpr _ _ t _ _))) = 
@@ -999,37 +999,37 @@ convert_Expr_CInst (Just lhs, A.ExprBinExpr (A.Ie a@(A.IbinExpr _ _ t _ _))) =
      ; if not $ isTvector mp t then 
          do { x <- convert_to_Binexp convert_Value a 
             ; let y = case x of
-                    Add n ta v1a v2a -> I.I_add n ta v1a v2a lhs
-                    Sub n ta v1a v2a -> I.I_sub n ta v1a v2a lhs 
-                    Mul n ta v1a v2a -> I.I_mul n ta v1a v2a lhs
-                    Udiv n ta v1a v2a -> I.I_udiv n ta v1a v2a lhs
-                    Sdiv n ta v1a v2a -> I.I_sdiv n ta v1a v2a lhs
-                    Urem ta v1a v2a -> I.I_urem ta v1a v2a lhs
-                    Srem ta v1a v2a -> I.I_srem ta v1a v2a lhs
-                    Shl n ta v1a v2a -> I.I_shl n ta v1a v2a lhs
-                    Lshr n ta v1a v2a -> I.I_lshr n ta v1a v2a lhs
-                    Ashr n ta v1a v2a -> I.I_ashr n ta v1a v2a lhs
-                    And ta v1a v2a -> I.I_and ta v1a v2a lhs
-                    Or ta v1a v2a -> I.I_or ta v1a v2a lhs
-                    Xor ta v1a v2a -> I.I_xor ta v1a v2a lhs
+                    Add n ta v1a v2a -> I.I_add n ta v1a v2a (sLid lhs)
+                    Sub n ta v1a v2a -> I.I_sub n ta v1a v2a (sLid lhs) 
+                    Mul n ta v1a v2a -> I.I_mul n ta v1a v2a (sLid lhs)
+                    Udiv n ta v1a v2a -> I.I_udiv n ta v1a v2a (sLid lhs)
+                    Sdiv n ta v1a v2a -> I.I_sdiv n ta v1a v2a (sLid lhs)
+                    Urem ta v1a v2a -> I.I_urem ta v1a v2a (sLid lhs)
+                    Srem ta v1a v2a -> I.I_srem ta v1a v2a (sLid lhs)
+                    Shl n ta v1a v2a -> I.I_shl n ta v1a v2a (sLid lhs)
+                    Lshr n ta v1a v2a -> I.I_lshr n ta v1a v2a (sLid lhs)
+                    Ashr n ta v1a v2a -> I.I_ashr n ta v1a v2a (sLid lhs)
+                    And ta v1a v2a -> I.I_and ta v1a v2a (sLid lhs)
+                    Or ta v1a v2a -> I.I_or ta v1a v2a (sLid lhs)
+                    Xor ta v1a v2a -> I.I_xor ta v1a v2a (sLid lhs)
             ; return y 
             }
        else 
          do { x <- convert_to_Binexp_V convert_Value a 
             ; let y = case x of
-                    Add n ta v1a v2a -> I.I_add_V n ta v1a v2a lhs
-                    Sub n ta v1a v2a -> I.I_sub_V n ta v1a v2a lhs
-                    Mul n ta v1a v2a -> I.I_mul_V n ta v1a v2a lhs
-                    Udiv n ta v1a v2a -> I.I_udiv_V n ta v1a v2a lhs
-                    Sdiv n ta v1a v2a -> I.I_sdiv_V n ta v1a v2a lhs
-                    Urem ta v1a v2a -> I.I_urem_V ta v1a v2a lhs
-                    Srem ta v1a v2a -> I.I_srem_V ta v1a v2a lhs
-                    Shl n ta v1a v2a -> I.I_shl_V n ta v1a v2a lhs
-                    Lshr n ta v1a v2a -> I.I_lshr_V n ta v1a v2a lhs
-                    Ashr n ta v1a v2a -> I.I_ashr_V n ta v1a v2a lhs
-                    And ta v1a v2a -> I.I_and_V ta v1a v2a lhs
-                    Or ta v1a v2a -> I.I_or_V ta v1a v2a lhs
-                    Xor ta v1a v2a -> I.I_xor_V ta v1a v2a lhs
+                    Add n ta v1a v2a -> I.I_add_V n ta v1a v2a (sLid lhs)
+                    Sub n ta v1a v2a -> I.I_sub_V n ta v1a v2a (sLid lhs)
+                    Mul n ta v1a v2a -> I.I_mul_V n ta v1a v2a (sLid lhs)
+                    Udiv n ta v1a v2a -> I.I_udiv_V n ta v1a v2a (sLid lhs)
+                    Sdiv n ta v1a v2a -> I.I_sdiv_V n ta v1a v2a (sLid lhs)
+                    Urem ta v1a v2a -> I.I_urem_V ta v1a v2a (sLid lhs)
+                    Srem ta v1a v2a -> I.I_srem_V ta v1a v2a (sLid lhs)
+                    Shl n ta v1a v2a -> I.I_shl_V n ta v1a v2a (sLid lhs)
+                    Lshr n ta v1a v2a -> I.I_lshr_V n ta v1a v2a (sLid lhs)
+                    Ashr n ta v1a v2a -> I.I_ashr_V n ta v1a v2a (sLid lhs)
+                    And ta v1a v2a -> I.I_and_V ta v1a v2a (sLid lhs)
+                    Or ta v1a v2a -> I.I_or_V ta v1a v2a (sLid lhs)
+                    Xor ta v1a v2a -> I.I_xor_V ta v1a v2a (sLid lhs)
             ; return y 
             }
      }
@@ -1038,21 +1038,21 @@ convert_Expr_CInst (Just lhs, A.ExprBinExpr (A.Fe a@(A.FbinExpr _ _ t _ _))) =
      ; if not $ isTvector mp t then 
        do { x <- convert_to_FBinexp convert_Value a
           ; let y = case x of
-                  Fadd n ta v1a v2a -> I.I_fadd n ta v1a v2a lhs
-                  Fsub n ta v1a v2a -> I.I_fsub n ta v1a v2a lhs
-                  Fmul n ta v1a v2a -> I.I_fmul n ta v1a v2a lhs
-                  Fdiv n ta v1a v2a -> I.I_fdiv n ta v1a v2a lhs
-                  Frem n ta v1a v2a -> I.I_frem n ta v1a v2a lhs
+                  Fadd n ta v1a v2a -> I.I_fadd n ta v1a v2a (sLid lhs)
+                  Fsub n ta v1a v2a -> I.I_fsub n ta v1a v2a (sLid lhs)
+                  Fmul n ta v1a v2a -> I.I_fmul n ta v1a v2a (sLid lhs)
+                  Fdiv n ta v1a v2a -> I.I_fdiv n ta v1a v2a (sLid lhs)
+                  Frem n ta v1a v2a -> I.I_frem n ta v1a v2a (sLid lhs)
           ; return y 
           }
      else
        do { x <- convert_to_FBinexp_V convert_Value a
           ; let y = case x of
-                  Fadd n ta v1a v2a -> I.I_fadd_V n ta v1a v2a lhs
-                  Fsub n ta v1a v2a -> I.I_fsub_V n ta v1a v2a lhs
-                  Fmul n ta v1a v2a -> I.I_fmul_V n ta v1a v2a lhs
-                  Fdiv n ta v1a v2a -> I.I_fdiv_V n ta v1a v2a lhs
-                  Frem n ta v1a v2a -> I.I_frem_V n ta v1a v2a lhs
+                  Fadd n ta v1a v2a -> I.I_fadd_V n ta v1a v2a (sLid lhs)
+                  Fsub n ta v1a v2a -> I.I_fsub_V n ta v1a v2a (sLid lhs)
+                  Fmul n ta v1a v2a -> I.I_fmul_V n ta v1a v2a (sLid lhs)
+                  Fdiv n ta v1a v2a -> I.I_fdiv_V n ta v1a v2a (sLid lhs)
+                  Frem n ta v1a v2a -> I.I_frem_V n ta v1a v2a (sLid lhs)
           ; return y
           }
    }
@@ -1061,41 +1061,41 @@ convert_Expr_CInst (Just lhs, A.ExprConversion a) =
      ; if not $ conversionIsTvector mp a then 
          do { x <- convert_to_Conversion convert_Value a
             ; let y = case x of
-                   I.Trunc tv dt -> I.I_trunc tv dt lhs
-                   I.Zext tv dt -> I.I_zext tv dt lhs
-                   I.Sext tv dt -> I.I_sext tv dt lhs
-                   I.FpTrunc tv dt -> I.I_fptrunc tv dt lhs
-                   I.FpExt tv dt -> I.I_fpext tv dt lhs
-                   I.FpToUi tv dt -> I.I_fptoui tv dt lhs
-                   I.FpToSi tv dt -> I.I_fptosi tv dt lhs
-                   I.UiToFp tv dt -> I.I_uitofp tv dt lhs
-                   I.SiToFp tv dt -> I.I_sitofp tv dt lhs
-                   I.PtrToInt tv dt -> I.I_ptrtoint tv dt lhs
-                   I.IntToPtr tv dt -> I.I_inttoptr tv dt lhs
+                   I.Trunc tv dt -> I.I_trunc tv dt (sLid lhs)
+                   I.Zext tv dt -> I.I_zext tv dt (sLid lhs)
+                   I.Sext tv dt -> I.I_sext tv dt (sLid lhs)
+                   I.FpTrunc tv dt -> I.I_fptrunc tv dt (sLid lhs)
+                   I.FpExt tv dt -> I.I_fpext tv dt (sLid lhs)
+                   I.FpToUi tv dt -> I.I_fptoui tv dt (sLid lhs)
+                   I.FpToSi tv dt -> I.I_fptosi tv dt (sLid lhs)
+                   I.UiToFp tv dt -> I.I_uitofp tv dt (sLid lhs)
+                   I.SiToFp tv dt -> I.I_sitofp tv dt (sLid lhs)
+                   I.PtrToInt tv dt -> I.I_ptrtoint tv dt (sLid lhs)
+                   I.IntToPtr tv dt -> I.I_inttoptr tv dt (sLid lhs)
                    I.Bitcast tv@(I.T st v) dt -> case (st, dt) of
-                     (I.DtypeScalarP sta, I.DtypeScalarP dta) -> I.I_bitcast (I.T sta v) dta lhs
-                     (_,_) -> I.I_bitcast_D tv dt lhs
-                   I.AddrSpaceCast tv dt -> I.I_addrspacecast tv dt lhs
+                     (I.DtypeScalarP sta, I.DtypeScalarP dta) -> I.I_bitcast (I.T sta v) dta (sLid lhs)
+                     (_,_) -> I.I_bitcast_D tv dt (sLid lhs)
+                   I.AddrSpaceCast tv dt -> I.I_addrspacecast tv dt (sLid lhs)
            ; return y 
            }
        else 
          do { x <- convert_to_Conversion_V convert_Value a
             ; let y = case x of
-                   I.Trunc tv dt -> I.I_trunc_V tv dt lhs
-                   I.Zext tv dt -> I.I_zext_V tv dt lhs
-                   I.Sext tv dt -> I.I_sext_V tv dt lhs
-                   I.FpTrunc tv dt -> I.I_fptrunc_V tv dt lhs
-                   I.FpExt tv dt -> I.I_fpext_V tv dt lhs
-                   I.FpToUi tv dt -> I.I_fptoui_V tv dt lhs
-                   I.FpToSi tv dt -> I.I_fptosi_V tv dt lhs
-                   I.UiToFp tv dt -> I.I_uitofp_V tv dt lhs
-                   I.SiToFp tv dt -> I.I_sitofp_V tv dt lhs
-                   I.PtrToInt tv dt -> I.I_ptrtoint_V tv dt lhs
-                   I.IntToPtr tv dt -> I.I_inttoptr_V tv dt lhs
+                   I.Trunc tv dt -> I.I_trunc_V tv dt (sLid lhs)
+                   I.Zext tv dt -> I.I_zext_V tv dt (sLid lhs)
+                   I.Sext tv dt -> I.I_sext_V tv dt (sLid lhs)
+                   I.FpTrunc tv dt -> I.I_fptrunc_V tv dt (sLid lhs)
+                   I.FpExt tv dt -> I.I_fpext_V tv dt (sLid lhs)
+                   I.FpToUi tv dt -> I.I_fptoui_V tv dt (sLid lhs)
+                   I.FpToSi tv dt -> I.I_fptosi_V tv dt (sLid lhs)
+                   I.UiToFp tv dt -> I.I_uitofp_V tv dt (sLid lhs)
+                   I.SiToFp tv dt -> I.I_sitofp_V tv dt (sLid lhs)
+                   I.PtrToInt tv dt -> I.I_ptrtoint_V tv dt (sLid lhs)
+                   I.IntToPtr tv dt -> I.I_inttoptr_V tv dt (sLid lhs)
                    I.Bitcast tv@(I.T st v) dt -> case (st, dt) of
-                     (I.DtypeScalarP sta, I.DtypeScalarP dta) -> I.I_bitcast (I.T sta v) dta lhs
-                     (_,_) -> I.I_bitcast_D tv dt lhs
-                   I.AddrSpaceCast tv dt -> I.I_addrspacecast_V tv dt lhs
+                     (I.DtypeScalarP sta, I.DtypeScalarP dta) -> I.I_bitcast (I.T sta v) dta (sLid lhs)
+                     (_,_) -> I.I_bitcast_D tv dt (sLid lhs)
+                   I.AddrSpaceCast tv dt -> I.I_addrspacecast_V tv dt (sLid lhs)
            ; return y
            }
      }
@@ -1103,25 +1103,25 @@ convert_Expr_CInst (Just lhs, A.ExprSelect a@(A.Select _ (A.Typed t _) _)) =
   do { mp <- typeDefs
      ; case matchType mp t of
        Tk_ScalarI -> do { (I.Select (Left cnd) t f) <- convert_to_Select_I convert_Value a
-                        ; return $ I.I_select_I cnd t f lhs
+                        ; return $ I.I_select_I cnd t f (sLid lhs)
                         }
        Tk_ScalarF -> do { (I.Select (Left cnd) t f) <- convert_to_Select_F convert_Value a
-                        ; return $ I.I_select_F cnd t f lhs
+                        ; return $ I.I_select_F cnd t f (sLid lhs)
                         }
        Tk_ScalarP -> do { (I.Select (Left cnd) t f) <- convert_to_Select_P convert_Value a
-                        ; return $ I.I_select_P cnd t f lhs
+                        ; return $ I.I_select_P cnd t f (sLid lhs)
                         }
        Tk_RecordD -> do { (I.Select (Left cnd) t f) <- convert_to_Select_Record convert_Value a
-                        ; return $ I.I_select_First cnd t f lhs
+                        ; return $ I.I_select_First cnd t f (sLid lhs)
                         }
        Tk_VectorI -> do { (I.Select cnd t f) <- convert_to_Select_VI convert_Value a
-                        ; return $ I.I_select_VI cnd t f lhs
+                        ; return $ I.I_select_VI cnd t f (sLid lhs)
                         }
        Tk_VectorF -> do { (I.Select cnd t f) <- convert_to_Select_VF convert_Value a
-                        ; return $ I.I_select_VF cnd t f lhs
+                        ; return $ I.I_select_VF cnd t f (sLid lhs)
                         }
        Tk_VectorP -> do { (I.Select cnd t f) <- convert_to_Select_VP convert_Value a
-                        ; return $ I.I_select_VP cnd t f lhs
+                        ; return $ I.I_select_VP cnd t f (sLid lhs)
                         }
      }
 
@@ -1132,15 +1132,15 @@ convert_MemOp (mlhs, c) = case (mlhs, c) of
     do { mp <- typeDefs
        ; ti <- convert_Type_Dtype FLC t
        ; mtvi <- maybeM (convert_to_TypedValue_SI FLC) mtv
-       ; return (I.I_alloca mar ti mtvi ma lhs)
+       ; return (I.I_alloca mar ti mtvi ma (sLid lhs))
        }
   (Just lhs, A.Load atom (A.Pointer tv) aa nonterm inv nonul) -> 
     do { tvi <- convert_to_TypedAddrValue FLC tv
-       ; return (I.I_load atom tvi aa nonterm inv nonul lhs)
+       ; return (I.I_load atom tvi aa nonterm inv nonul (sLid lhs))
        }
   (Just lhs, A.LoadAtomic  at v (A.Pointer tv) aa) -> 
     do { tvi <- convert_to_TypedAddrValue FLC tv
-       ; return (I.I_loadatomic at v tvi aa lhs)
+       ; return (I.I_loadatomic at v tvi aa (sLid lhs))
        }
   (Nothing, A.Store atom tv1 (A.Pointer tv2) aa nt) -> 
     do { tv1a <- convert_to_DtypedValue tv1
@@ -1159,21 +1159,21 @@ convert_MemOp (mlhs, c) = case (mlhs, c) of
        ; case matchType mp t2 of
          Tk_ScalarI -> do { tv2a <- convert_to_TypedValue_SI FLC tv2
                           ; tv3a <- convert_to_TypedValue_SI FLC tv3
-                          ; return $ I.I_cmpxchg_I wk b1 tv1a tv2a tv3a b2 mf ff lhs
+                          ; return $ I.I_cmpxchg_I wk b1 tv1a tv2a tv3a b2 mf ff (sLid lhs)
                           }
          Tk_ScalarF -> do { tv2a <- convert_to_TypedValue_SF FLC tv2
                           ; tv3a <- convert_to_TypedValue_SF FLC tv3
-                          ; return $ I.I_cmpxchg_F wk b1 tv1a tv2a tv3a b2 mf ff lhs
+                          ; return $ I.I_cmpxchg_F wk b1 tv1a tv2a tv3a b2 mf ff (sLid lhs)
                           }
          Tk_ScalarP -> do { tv2a <- convert_to_TypedValue_SP FLC tv2
                           ; tv3a <- convert_to_TypedValue_SP FLC tv3
-                          ; return $ I.I_cmpxchg_P wk b1 tv1a tv2a tv3a b2 mf ff lhs
+                          ; return $ I.I_cmpxchg_P wk b1 tv1a tv2a tv3a b2 mf ff (sLid lhs)
                           }
        }
   (Just lhs, A.AtomicRmw b1 op (A.Pointer tv1) tv2 b2 mf) -> 
     do { tv1a <- convert_to_TypedAddrValue FLC tv1
        ; tv2a <- convert_to_TypedValue_SI FLC tv2
-       ; return $ I.I_atomicrmw b1 op tv1a tv2a b2 mf lhs
+       ; return $ I.I_atomicrmw b1 op tv1a tv2a b2 mf (sLid lhs)
        }
   (_,_) -> error $ "AstIrConversion:irrefutable lhs:" ++ show mlhs ++ " rhs:" ++ show c
 
@@ -1214,11 +1214,12 @@ convert_to_TypedValue_SP lc (A.Typed t v) = do { mp <- typeDefs
                                                }
 
 convert_to_TypedAddrValue :: FileLoc -> A.Typed A.Value -> MM (I.T (I.Type I.ScalarB I.P) (I.Value I.Gname))
-convert_to_TypedAddrValue lc (A.Typed t v) = do { mp <- typeDefs
-                                                ; let (ti::I.Type I.ScalarB I.P) = dcast lc ((tconvert mp t)::I.Utype)
-                                                ; vi <- convert_Value v
-                                                ; return $ I.T ti vi
-                                                }
+convert_to_TypedAddrValue lc (A.Typed t v) = 
+  do { mp <- typeDefs
+     ; let (ti::I.Type I.ScalarB I.P) = dcast lc ((tconvert mp t)::I.Utype)
+     ; vi <- convert_Value v
+     ; return $ I.T ti vi
+     }
 
 convert_Type_Dtype :: FileLoc -> A.Type -> MM I.Dtype
 convert_Type_Dtype lc t = do { mp <- typeDefs
@@ -1231,17 +1232,19 @@ convert_Rhs (mlhs, A.RhsMemOp c) = Md.liftM (\x -> I.Cnode x []) (convert_MemOp 
 convert_Rhs (mlhs, A.RhsExpr e) = Md.liftM (\x -> I.Cnode x []) (convert_Expr_CInst (mlhs, e))
 convert_Rhs (lhs, A.RhsCall b cs) = 
   case specializeRegisterIntrinsic lhs cs of
-    Just (Just r, ml, [m]) -> do { ma <- convert_MetaParam m 
-                                 ; case ma of
-                                   I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_read_register ml mc r) []
-                                   _ -> errorLoc FLC $ show ma
-                                 }
-    Just (Nothing, ml, [m,v]) -> do { ma <- convert_MetaParam m
-                                    ; (I.FunOperandData _ _ _ va) <- convert_ActualParam v
-                                    ; case ma of
-                                      I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_write_register ml mc va) []
-                                      _ -> errorLoc FLC $ show ma
-                                    }
+    Just (Just r, ml, [m]) -> 
+      do { ma <- convert_MetaParam m 
+         ; case ma of
+           I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_read_register ml mc (sLid r)) []
+           _ -> errorLoc FLC $ show ma
+         }
+    Just (Nothing, ml, [m,v]) -> 
+      do { ma <- convert_MetaParam m
+         ; (I.FunOperandData _ _ _ va) <- convert_ActualParam v
+         ; case ma of
+           I.MetaOperandMeta mc -> return $ I.Cnode (I.I_llvm_write_register ml mc va) []
+           _ -> errorLoc FLC $ show ma
+         }
     Nothing -> 
       do { mc <- convert_to_Minst cs
          ; case mc of
@@ -1250,72 +1253,73 @@ convert_Rhs (lhs, A.RhsCall b cs) =
            Nothing -> 
              Md.liftM (\x -> I.Cnode x []) $ 
              do { (isvoid, fnptr, csi) <- convert_to_CallFunInterface b cs
-                ; return $ maybe (I.I_call_fun fnptr csi lhs) id (specializeCallSite lhs fnptr csi)
+                ; return $ maybe 
+                  (I.I_call_fun fnptr csi (fmap sLid lhs)) id (specializeCallSite (fmap sLid lhs) fnptr csi)
                 }
          }
 convert_Rhs (lhs, A.RhsInlineAsm cs) = 
   Md.liftM (\x -> I.Cnode x []) $ 
   do { (isvoid, asm, csi) <- convert_to_CallAsmInterface cs
-     ; return $ I.I_call_asm asm csi lhs
+     ; return $ I.I_call_asm asm csi (fmap sLid lhs)
      }
 convert_Rhs (Just lhs, A.RhsVaArg (A.VaArg tv t)) = 
   do { tvi <- convert_to_DtypedValue tv
      ; ti <- convert_Type_Dtype FLC t
-     ; return (I.Cnode (I.I_va_arg tvi ti lhs) [])
+     ; return (I.Cnode (I.I_va_arg tvi ti (sLid lhs)) [])
      }
 convert_Rhs (Just lhs, A.RhsLandingPad (A.LandingPad t1 t2 pf b cs)) = 
   do { pfi <- convert_FunPtr pf
      ; csi <- mapM convert_Clause cs
      ; t1i <- convert_Type_Dtype FLC t1
      ; t2i <- convert_Type_Dtype FLC t2
-     ; return (I.Cnode (I.I_landingpad t1i t2i pfi b csi lhs) [])
+     ; return (I.Cnode (I.I_landingpad t1i t2i pfi b csi (sLid lhs)) [])
      }
 convert_Rhs (Just lhs, A.RhsExtractElement a@(A.ExtractElement (A.Typed t1 _) _)) = 
   do { mp <- typeDefs
      ; case matchType mp t1 of
        Tk_VectorI -> do { (I.ExtractElement vec idx) <- convert_to_ExtractElement_I convert_Value a
-                        ; return (I.Cnode (I.I_extractelement_I vec idx lhs) [])
+                        ; return (I.Cnode (I.I_extractelement_I vec idx (sLid lhs)) [])
                         }
        Tk_VectorF -> do { (I.ExtractElement vec idx) <- convert_to_ExtractElement_F convert_Value a
-                        ; return (I.Cnode (I.I_extractelement_F vec idx lhs) [])
+                        ; return (I.Cnode (I.I_extractelement_F vec idx (sLid lhs)) [])
                         }
        Tk_VectorP -> do { (I.ExtractElement vec idx) <- convert_to_ExtractElement_P convert_Value a
-                        ; return (I.Cnode (I.I_extractelement_P vec idx lhs) [])
+                        ; return (I.Cnode (I.I_extractelement_P vec idx (sLid lhs)) [])
                         }
      }
 convert_Rhs (Just lhs, A.RhsInsertElement a@(A.InsertElement (A.Typed t1 _) _ _)) = 
   do { mp <- typeDefs
      ; case matchType mp t1 of
        Tk_VectorI -> do { (I.InsertElement vec val idx) <- convert_to_InsertElement_I convert_Value a
-                        ; return (I.Cnode (I.I_insertelement_I vec val idx lhs) [])
+                        ; return (I.Cnode (I.I_insertelement_I vec val idx (sLid lhs)) [])
                         }
        Tk_VectorF -> do { (I.InsertElement vec val idx) <- convert_to_InsertElement_F convert_Value a
-                        ; return (I.Cnode (I.I_insertelement_F vec val idx lhs) [])
+                        ; return (I.Cnode (I.I_insertelement_F vec val idx (sLid lhs)) [])
                         }
        Tk_VectorP -> do { (I.InsertElement vec val idx) <- convert_to_InsertElement_P convert_Value a
-                        ; return (I.Cnode (I.I_insertelement_P vec val idx lhs) [])
+                        ; return (I.Cnode (I.I_insertelement_P vec val idx (sLid lhs)) [])
                         }
      }
 convert_Rhs (Just lhs, A.RhsShuffleVector a@(A.ShuffleVector (A.Typed t _) _ _)) = 
   do { mp <- typeDefs
      ; case matchType mp t of
        Tk_VectorI -> do { (I.ShuffleVector tv1a tv2a tv3a) <- convert_to_ShuffleVector_I convert_Value a
-                        ; return (I.Cnode (I.I_shufflevector_I tv1a tv2a tv3a lhs) [])
+                        ; return (I.Cnode (I.I_shufflevector_I tv1a tv2a tv3a (sLid lhs)) [])
                         }
        Tk_VectorF -> do { (I.ShuffleVector tv1a tv2a tv3a) <- convert_to_ShuffleVector_F convert_Value a
-                        ; return (I.Cnode (I.I_shufflevector_F tv1a tv2a tv3a lhs) [])
+                        ; return (I.Cnode (I.I_shufflevector_F tv1a tv2a tv3a (sLid lhs)) [])
                         }
        Tk_VectorP -> do { (I.ShuffleVector tv1a tv2a tv3a) <- convert_to_ShuffleVector_P convert_Value a
-                        ; return (I.Cnode (I.I_shufflevector_P tv1a tv2a tv3a lhs) [])
+                        ; return (I.Cnode (I.I_shufflevector_P tv1a tv2a tv3a (sLid lhs)) [])
                         }
      }
 convert_Rhs (Just lhs, A.RhsExtractValue a) = 
   do { (I.ExtractValue blocka idxa) <- convert_to_ExtractValue convert_Value a
-     ; return (I.Cnode (I.I_extractvalue blocka idxa lhs) [])
+     ; return (I.Cnode (I.I_extractvalue blocka idxa (sLid lhs)) [])
      }
 convert_Rhs (Just lhs, A.RhsInsertValue a) = 
   do { (I.InsertValue blocka va idxa) <- convert_to_InsertValue convert_Value a
-     ; return (I.Cnode (I.I_insertvalue blocka va idxa lhs) [])
+     ; return (I.Cnode (I.I_insertvalue blocka va idxa (sLid lhs)) [])
      }
 convert_Rhs (lhs,rhs) =  errorLoc FLC $ "AstIrConversion:irrefutable error lhs:" ++ show lhs ++ " rhs:" ++ show rhs
 
@@ -1551,7 +1555,7 @@ convert_FunctionDeclareType  (A.FunctionPrototype { A.fp_linkage = f0
                                         }
        }
 
-convert_to_FunParam :: A.FormalParam -> MM (I.FunOperand I.LocalId)
+convert_to_FunParam :: A.FormalParam -> MM (I.FunOperand I.Lname)
 convert_to_FunParam x = 
   do { mp <- typeDefs
      ; case x of
@@ -1559,15 +1563,15 @@ convert_to_FunParam x =
          let (palist, bl) = stripOffPa pa sRetByValSignExtZeroExtAlignPreds
          in case bl of
            [Just _,  Nothing, Nothing, Nothing, pa] -> 
-             return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+             return $ I.FunOperandAsRet (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) (sLid fp)
            [Nothing, Just _,  Nothing, Nothing, pa] -> 
-             return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+             return $ I.FunOperandByVal (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) (sLid fp)
            [Nothing, Nothing,  Just _,  Nothing, pa] -> 
-             return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+             return $ I.FunOperandExt I.Sign (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) (sLid fp)
            [Nothing, Nothing, Nothing, Just _,  pa] -> 
-             return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+             return $ I.FunOperandExt I.Zero (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) (sLid fp)
            [Nothing, Nothing, Nothing, Nothing, pa] -> 
-             return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) fp
+             return $ I.FunOperandData (dcast FLC ((tconvert mp dt)::I.Utype)) palist (mapPaAlign pa) (sLid fp)
            _ -> errorLoc FLC $ show bl
        (A.FormalParamData _ _ A.FimplicitParam) -> 
          errorLoc FLC "implicit param should be normalized in AsmSimplification"
@@ -1610,7 +1614,7 @@ convert_PhiInst phi@(A.PhiInst mg t branches) =
              I.UtypeRecordD e -> dcast FLC (squeeze FLC e)
              _ -> dcast FLC ta 
      ; case mg of 
-       Just lhs -> return $ I.Pinst tab (fmap (\x -> (fst x, snd x)) branchesa) lhs
+       Just lhs -> return $ I.Pinst tab (fmap (\x -> (fst x, snd x)) branchesa) (sLid lhs)
        Nothing -> errorLoc FLC $ "unused phi" ++ show phi
      }
 
@@ -1636,13 +1640,13 @@ convert_TerminatorInst (A.Invoke mg cs t f) =
   do { (_, fptr, csa) <- convert_to_InvokeFunInterface cs
      ; ta <- convert_TargetLabel t
      ; fa <- convert_TargetLabel f
-     ; return $ I.T_invoke fptr csa ta fa mg
+     ; return $ I.T_invoke fptr csa ta fa (fmap sLid mg)
      }
 convert_TerminatorInst (A.InvokeInlineAsm mg cs t f) = 
   do { (_, asm, csa) <- convert_to_CallAsmInterface cs
      ; ta <- convert_TargetLabel t
      ; fa <- convert_TargetLabel f
-     ; return $ I.T_invoke_asm asm csa ta fa mg
+     ; return $ I.T_invoke_asm asm csa ta fa (fmap sLid mg)
      }  
 convert_TerminatorInst (A.Resume tv) = Md.liftM I.T_resume (convert_to_DtypedValue tv)
 convert_TerminatorInst A.Unreachable = return I.T_unreachable
@@ -1775,9 +1779,9 @@ convert_TlTypeDef (A.TlTypeDef lid t) =
   do { mp <- typeDefs
      ; let (ta::I.Utype) = tconvert mp t
      ; case ta of
-       I.UtypeFunX _ -> return (I.TlFunTypeDef lid (dcast FLC ta))
-       I.UtypeOpaqueD _-> return (I.TlOpqTypeDef lid (dcast FLC ta))
-       _ -> return (I.TlDatTypeDef lid (dcast FLC ((tconvert mp t)::I.Utype)))
+       I.UtypeFunX _ -> return (I.TlFunTypeDef (sLid lid) (dcast FLC ta))
+       I.UtypeOpaqueD _-> return (I.TlOpqTypeDef (sLid lid) (dcast FLC ta))
+       _ -> return (I.TlDatTypeDef (sLid lid) (dcast FLC ((tconvert mp t)::I.Utype)))
      }
   
 convert_TlDepLibs :: A.TlDepLibs -> MM I.TlDepLibs

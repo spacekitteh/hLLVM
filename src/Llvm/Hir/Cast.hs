@@ -57,7 +57,7 @@ instance Cvalue Word64 where
 class Rvalue x where
   toRvalue :: x -> Value g
 
-instance Rvalue LocalId where
+instance Rvalue Lname where 
   toRvalue = Val_ssa
 
 
@@ -175,8 +175,6 @@ instance Ucast (Type s r) Utype where
     Tfirst_class_array _ _ -> UtypeFirstClassD x
     Tfirst_class_struct _ _ -> UtypeFirstClassD x
     Tfirst_class_name _ -> UtypeFirstClassD x
-    Tfirst_class_quoteName _ -> UtypeFirstClassD x    
-    Tfirst_class_no _ -> UtypeFirstClassD x    
     
     Tarray _ _ -> UtypeRecordD x
     Tstruct _ _ -> UtypeRecordD x
@@ -189,44 +187,18 @@ instance Ucast (Type s r) Utype where
 
     {- Scalar -}
     TnameScalarI _ -> UtypeScalarI x
-    TquoteNameScalarI _ -> UtypeScalarI x
-    TnoScalarI _ -> UtypeScalarI x
-
     TnameScalarF _ -> UtypeScalarF x
-    TquoteNameScalarF _ -> UtypeScalarF x
-    TnoScalarF _ -> UtypeScalarF x
-
     TnameScalarP _ -> UtypeScalarP x
-    TquoteNameScalarP _ -> UtypeScalarP x
-    TnoScalarP _ -> UtypeScalarP x
-
     {- Vector -}
     TnameVectorI _ -> UtypeVectorI x
-    TquoteNameVectorI _ -> UtypeVectorI x
-    TnoVectorI _ -> UtypeVectorI x
-
     TnameVectorF _ -> UtypeVectorF x
-    TquoteNameVectorF _ -> UtypeVectorF x
-    TnoVectorF _ -> UtypeVectorF x
-
     TnameVectorP _ -> UtypeVectorP x
-    TquoteNameVectorP _ -> UtypeVectorP x
-    TnoVectorP _ -> UtypeVectorP x
-
     {- Large -}
     TnameRecordD _ -> UtypeRecordD x
-    TquoteNameRecordD _ -> UtypeRecordD x
-    TnoRecordD _ -> UtypeRecordD x
-
     {- Code -}
     TnameCodeFunX _ -> UtypeFunX x
-    TquoteNameCodeFunX _ -> UtypeFunX x
-    TnoCodeFunX _ -> UtypeFunX x
-
     {- Opaque -}
     TnameOpaqueD _ -> UtypeOpaqueD x
-    TquoteNameOpaqueD _ -> UtypeOpaqueD x
-    TnoOpaqueD _ -> UtypeOpaqueD x
 
 instance Dcast Utype (Type ScalarB I) where
   dcast lc e = case e of
@@ -647,19 +619,11 @@ instance Ucast (Type VectorB P) (IntOrPtrType VectorB) where
   ucast x = let (x1::Utype) = ucast x
             in dcast (FileLoc "irrefutable") x1
 
-{-
-instance Ucast (Value g) (Value g) where
-  ucast = id
--}
-
 squeeze :: FileLoc -> Type RecordB D -> Type FirstClassB D
 squeeze loc x = case x of
   Tstruct pk dl -> Tfirst_class_struct pk (fmap (dcast loc) dl)
   Tarray n el -> Tfirst_class_array n (dcast loc el)
   TnameRecordD e -> Tfirst_class_name e
-  TquoteNameRecordD e -> Tfirst_class_quoteName e
-  TnoRecordD e -> Tfirst_class_no e
-
 
 uc :: Ucast a b => a -> b
 uc x = ucast x

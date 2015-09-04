@@ -39,8 +39,8 @@ chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of
                                Just _ -> x
                              _ -> x
                         , Cg.change_LocalId = \x -> case x of
-                             I.LocalIdAlphaNum s -> case stripPrefix "llvm." s of
-                               Nothing -> I.LocalIdAlphaNum (s ++ "_l_")
+                             I.Lname s -> case stripPrefix "llvm." s of
+                               Nothing -> I.Lname (s ++ "_l_")
                                Just _ -> x
                              _ -> x
                         }

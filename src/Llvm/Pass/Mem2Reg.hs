@@ -17,8 +17,8 @@ import Debug.Trace
 -- | TODO: describe in details what this pass is doing
 type Mem2RegFact g = Dm.Map LValue (WithTop (Value g))
 
-data LValue = Mem LocalId
-            | Ref LocalId
+data LValue = Mem Lname
+            | Ref Lname
             deriving (Eq, Show, Ord)
 
 mem2RegLattice :: Eq g => DataflowLattice (Mem2RegFact g)
@@ -56,7 +56,7 @@ cinstft = undefined
 cinstft (ComputingInstWithDbg (ComputingInst lhs rhs) _) f = cinstft' lhs rhs f
 
 
-cinstft' :: Maybe GlobalOrLocalId -> Rhs -> Mem2RegFact -> Fact O Mem2RegFact
+cinstft' :: Maybe GlobalOrLname -> Rhs -> Mem2RegFact -> Fact O Mem2RegFact
 cinstft' lhs (RmO m) f = memOp lhs m f
 cinstft' lhs (Re (Ev tv)) f = maybe f (\a -> let TypedData _ v = tv in
                                         case a of
@@ -66,7 +66,7 @@ cinstft' _ (Re _) f = f
 cinstft' _ _ f = f
 
 
-memOp :: Maybe GlobalOrLocalId -> MemOp -> Mem2RegFact -> Fact O Mem2RegFact
+memOp :: Maybe GlobalOrLname -> MemOp -> Mem2RegFact -> Fact O Mem2RegFact
 memOp (Just (GolL lhs)) (Allocate _ _ Nothing _) f = insert (Mem $ localIdToLstring lhs) Top f
 memOp _ (Store _ (TypedData _ v1) (TypedData _ (Pointer (VgOl (GolL ptr)))) _ _) f =
     let x = Mem $ localIdToLstring ptr

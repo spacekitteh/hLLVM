@@ -87,8 +87,8 @@ instance (IrPrint g, Mangle g) => Mangle (FunPtr g) where
     Fun_null -> "f.null"
     Fun_undef -> "f.undef"
 
-instance Mangle LocalId where
-  mangle t = render $ printIr t
+instance Mangle Lname where  
+  mangle (Lname t) = replaceDq t
 
 instance Mangle ScalarType where
   mangle t = case t of
@@ -183,44 +183,18 @@ instance Mangle (Type s r) where
     Tfunction (rt,atts) tp mv -> "F_" ++ mangle rt ++ mangle atts ++ "_" ++ mangle tp ++ "_" ++ mangle mv
     {- Scalar -}
     TnameScalarI s -> show s
-    TquoteNameScalarI s -> show s
-    TnoScalarI n -> show n
-
     TnameScalarF s -> show s
-    TquoteNameScalarF s -> show s
-    TnoScalarF n -> show n
-
     TnameScalarP s -> show s
-    TquoteNameScalarP s -> show s
-    TnoScalarP n -> show n
-
     {- Vector -}
     TnameVectorI s -> show s
-    TquoteNameVectorI s -> show s
-    TnoVectorI n -> show n
-
     TnameVectorF s -> show s
-    TquoteNameVectorF s -> show s
-    TnoVectorF n -> show n
-
     TnameVectorP s -> show s
-    TquoteNameVectorP s -> show s
-    TnoVectorP n -> show n
-
     {- Large -}
     TnameRecordD s -> show s
-    TquoteNameRecordD s -> show s
-    TnoRecordD n -> show n
-
     {- Code -}
     TnameCodeFunX s -> show s
-    TquoteNameCodeFunX s -> show s
-    TnoCodeFunX n -> show n
-
     {- Opaque -}
     TnameOpaqueD s -> show s
-    TquoteNameOpaqueD s -> show s
-    TnoOpaqueD n -> show n
     
     Topaque_struct pk l -> "os_" ++ mangle pk ++ "_" ++ mangle l
     Topaque_array n e -> "oa_" ++ mangle n ++ "_" ++ show e 
@@ -228,8 +202,6 @@ instance Mangle (Type s r) where
     Tfirst_class_array n e -> "1ca_" ++ mangle n ++ " " ++ mangle e
     Tfirst_class_struct pk l -> "1cs_" ++ mangle pk ++ " " ++ mangle l
     Tfirst_class_name s -> show s
-    Tfirst_class_quoteName s -> show s
-    Tfirst_class_no s -> show s
 
 instance Mangle () where
   mangle () = ""

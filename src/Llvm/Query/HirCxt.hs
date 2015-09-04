@@ -12,8 +12,8 @@ import qualified Compiler.Hoopl as H
 import Llvm.Query.Conversion (strToApInt)
 import Llvm.ErrorLoc
 
-data TypeEnv = TypeEnv {typedefs :: M.Map Ci.LocalId Ci.Dtype
-                       , opaqueTypeDefs :: M.Map Ci.LocalId (Ci.Type OpaqueB D)
+data TypeEnv = TypeEnv {typedefs :: M.Map Ci.Lname Ci.Dtype
+                       , opaqueTypeDefs :: M.Map Ci.Lname (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
 data FunCxt g = FunCxt { funInterface :: FunctionInterface g
@@ -69,12 +69,12 @@ convert_to_FunctionDeclareType
                         , fd_prologue = fi_prologue
                         }
 
-convert_to_FormalParamTypeList :: FunSignature LocalId -> FunSignature ()
+convert_to_FormalParamTypeList :: FunSignature Lname -> FunSignature ()
 convert_to_FormalParamTypeList FunSignature{..} = 
   FunSignature fs_callConv fs_type (fmap convert_to_FormalParamType fs_params)
 
 
-convert_to_FormalParamType :: FunOperand LocalId -> FunOperand ()
+convert_to_FormalParamType :: FunOperand Lname -> FunOperand ()
 convert_to_FormalParamType x = case x of
   FunOperandData dt pas ma _ -> FunOperandData dt pas ma ()
   FunOperandByVal dt pas ma _ -> FunOperandByVal dt pas ma ()
@@ -176,15 +176,18 @@ instance IrPrint SrcInfo where
   printIr (SrcInfo f p) = printIr f <> colon <> printIr p
 
 srcInfoMap :: Show g => M.Map Word32 (TlUnamedMd g) -> M.Map Word32 SrcInfo
-srcInfoMap mdMap = foldl (\mp (w, um) -> maybe mp (\srcInfo -> M.insert w srcInfo mp) (getSrcInfo mdMap w)) M.empty (M.toList mdMap)
+srcInfoMap mdMap = 
+  foldl (\mp (w, um) -> maybe mp (\srcInfo -> M.insert w srcInfo mp) (getSrcInfo mdMap w)) 
+  M.empty (M.toList mdMap)
 
-localIdSrcInfoMap :: Show g => M.Map Word32 (TlUnamedMd g) -> S.Set (Minst g, [Dbg g]) -> M.Map LocalId SrcInfo
+localIdSrcInfoMap :: Show g => M.Map Word32 (TlUnamedMd g) -> S.Set (Minst g, [Dbg g]) -> M.Map Lname SrcInfo
 localIdSrcInfoMap mdMap set = 
   foldl (\mp (mi, dbgs) -> 
           case (mi, dbgs) of
-            (M_llvm_dbg_declare (MetaOperandMeta m1) (MetaOperandMeta m2), [Dbg (MdRefName (MdName "dbg")) (McMdRef (MdRefNode (MdNode n)))]) -> 
+            (M_llvm_dbg_declare (MetaOperandMeta m1) (MetaOperandMeta m2), [Dbg (MdRefName (MdName "dbg")) 
+                                                                            (McMdRef (MdRefNode (MdNode n)))]) -> 
               maybe mp (\(lid, srcInfo) -> M.insert lid srcInfo mp) 
-              $ do { lid <- getLocalId m1
+              $ do { lid <- getLname m1
                    ; mf <- getMdRef m2
                    ; fref <- getFileRef mf
                    ; finfo <- getFileInfo mdMap fref 
@@ -193,7 +196,7 @@ localIdSrcInfoMap mdMap set =
                    }
             (_,_) -> mp
         ) M.empty (S.toList set)
-  where getLocalId m = case m of
+  where getLname m = case m of
           MetaKindedConst MKmetadata (McStruct [MetaKindedConst (MKtype _) (McSsa lid)]) -> Just lid
           _ -> Nothing
         getMdRef m = case m of
@@ -208,6 +211,9 @@ getFileInfo mdMap fref = case M.lookup fref mdMap of
   Just (TlUnamedMd_Tagged _ DW_TAG_file_type [x]) -> case x of
     MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))) -> getFileName mdMap ref
     _ -> errorLoc FLC $ show (fref,x)
+  Just (TlUnamedMd_Tagged _ DW_TAG_namespace [fileRef,_,_,_]) -> case fileRef of
+    MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref))) -> getFileName mdMap ref
+    _ -> errorLoc FLC $ show (fref,fileRef)
   y -> errorLoc FLC $ show (fref,y)
 
 getFileInfoFromSubprog :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo

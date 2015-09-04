@@ -58,7 +58,8 @@ instance Substitutable v g w h => Substitutable (Select s r v) g (Select s r w) 
   substitute chg (Select cnd t f) =
     Select (substitute chg cnd) (substitute chg t) (substitute chg f)
 
-instance (Substitutable v g w h, Substitutable idx g ldx h) => Substitutable (GetElementPtr s v idx) g (GetElementPtr s w ldx) h where
+instance (Substitutable v g w h, Substitutable idx g ldx h) 
+         => Substitutable (GetElementPtr s v idx) g (GetElementPtr s w ldx) h where
   substitute chg (GetElementPtr b base indices) =
     GetElementPtr b (substitute chg base) (substitute chg indices)
 
@@ -268,7 +269,7 @@ instance Substitutable a g b h => Substitutable (TlDefine g a) g (TlDefine h b) 
   substitute chg (TlDefine fp e g) =
     TlDefine (substitute chg fp) e (H.mapGraph (substitute chg) g)
 
-instance Substitutable LocalId g LocalId h where
+instance Substitutable Lname g Lname h where
   substitute chg = change_LocalId chg
 
 instance Substitutable (Pinst g) g (Pinst h) h where
@@ -953,11 +954,6 @@ instance Substitutable a g b h => Substitutable (FunOperand a) g (FunOperand b) 
     FunOperandByVal dt pa ma v -> FunOperandByVal dt pa ma (substitute chg v)
     FunOperandLabel t pa ma v -> FunOperandLabel t pa ma (substitute chg v)
     FunOperandAsRet dt pa ma v -> FunOperandAsRet dt pa ma (substitute chg v)
-
-instance Substitutable Fparam g Fparam h where
-  substitute chg fp = case fp of
-    FimplicitParam -> fp
-    FexplicitParam x -> FexplicitParam (substitute chg x)
 
 instance Substitutable (Dbg g) g (Dbg h) h where
   substitute chg (Dbg mv mc) = Dbg mv (substitute chg mc)

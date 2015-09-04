@@ -137,11 +137,6 @@ instance (IrPrint g, IrPrint a) => IrPrint (Toplevel g a) where
 instance (IrPrint g, IrPrint a) => IrPrint (Module g a) where
   printIr (Module tops) = fcat $ fmap printIr tops
 
-{-
-instance (Show dlm, IrPrint g, IrPrint a) => IrPrint (SpecializedModule dlm g a) where
-  printIr (SpecializedModule dlm m) = text (show dlm) <+> printIr m
--}
-
 instance (IrPrint g, IrPrint a) => IrPrint (Node g a e x) where
   printIr (Lnode lbl) = printIr lbl
   printIr (Pnode i dbgs) = commaSepList $ (printIr i):(fmap printIr dbgs)
@@ -413,6 +408,8 @@ instance IrPrint g => IrPrint (Value g) where
   printIr (Val_ssa i) = printIr i
   printIr (Val_const c) = printIr c
 
+instance IrPrint Lname where
+  printIr (Lname s) = quotes $ text s
 
 instance IrPrint g => IrPrint (TypedConstOrNull g) where
   printIr (TypedConst tc) = printIr tc
@@ -762,40 +759,14 @@ instance IrPrint (Type s x) where
                                       Unpacked -> (empty, empty)
                                 in start <+> braces (hsep $ punctuate comma $ fmap printIr ts) <+> end
     Tfirst_class_name s -> char '%' <> text s
-    Tfirst_class_quoteName s -> char '%' <> (doubleQuotes $ text s)
-    Tfirst_class_no i -> char '%' <> integral i
-
     TnameScalarI s -> char '%' <> text s
-    TquoteNameScalarI s -> char '%'<> (doubleQuotes $ text s)
-    TnoScalarI i -> char '%'<> integral i
-
     TnameScalarF s -> char '%' <> text s
-    TquoteNameScalarF s -> char '%'<> (doubleQuotes $ text s)
-    TnoScalarF i -> char '%'<> integral i
-
     TnameScalarP s -> char '%' <> text s
-    TquoteNameScalarP s -> char '%'<> (doubleQuotes $ text s)
-    TnoScalarP i -> char '%'<> integral i
-
     TnameVectorI s -> char '%' <> text s
-    TquoteNameVectorI s -> char '%'<> (doubleQuotes $ text s)
-    TnoVectorI i -> char '%'<> integral i
-
     TnameVectorF s -> char '%' <> text s
-    TquoteNameVectorF s -> char '%'<> (doubleQuotes $ text s)
-    TnoVectorF i -> char '%'<> integral i
-
     TnameVectorP s -> char '%' <> text s
-    TquoteNameVectorP s -> char '%'<> (doubleQuotes $ text s)
-    TnoVectorP i -> char '%'<> integral i
-
     TnameRecordD s -> char '%' <> text s
-    TquoteNameRecordD s -> char '%'<> (doubleQuotes $ text s)
-    TnoRecordD i -> char '%'<> integral i
-
     TnameCodeFunX s -> char '%' <> text s
-    TquoteNameCodeFunX s -> char '%'<> (doubleQuotes $ text s)
-    TnoCodeFunX i -> char '%'<> integral i
 
     Tarray i t -> brackets (integral i <+> char 'x' <+> printIr t)
     TvectorI i t -> char '<' <> integral i <+> char 'x' <+> printIr t <> char '>'
@@ -813,8 +784,6 @@ instance IrPrint (Type s x) where
                            in start <+> braces (hsep $ punctuate comma $ fmap printIr ts) <+> end
     Topaque_array i t -> brackets (integral i <+> char 'x' <+> printIr t)
     TnameOpaqueD s -> char '%' <> text s
-    TquoteNameOpaqueD s -> char '%' <> text s
-    TnoOpaqueD s -> char '%' <> integral s
       
 instance IrPrint MetaFunParam where      
   printIr (MetaFunParam e lv) = printIr e <+> printIr lv

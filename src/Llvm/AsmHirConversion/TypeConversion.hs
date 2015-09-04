@@ -169,25 +169,25 @@ instance TypeConversion MP A.Type I.Utype where
     Tk_CodeFunX -> ucast $ I.TnameCodeFunX s
     Tk_Opaque -> ucast $ I.TnameOpaqueD s
   tconvert mp tn@(A.TquoteName s) = case getTk mp (castTnameToLocalId tn) of 
-    Tk_ScalarI -> ucast $ I.TquoteNameScalarI s
-    Tk_ScalarF -> ucast $ I.TquoteNameScalarF s    
-    Tk_ScalarP -> ucast $ I.TquoteNameScalarP s    
-    Tk_VectorI -> ucast $ I.TquoteNameVectorI s
-    Tk_VectorF -> ucast $ I.TquoteNameVectorF s    
-    Tk_VectorP -> ucast $ I.TquoteNameVectorP s    
-    Tk_RecordD -> ucast $ I.TquoteNameRecordD s
-    Tk_CodeFunX -> ucast $ I.TquoteNameCodeFunX s
-    Tk_Opaque -> ucast $ I.TquoteNameOpaqueD s    
+    Tk_ScalarI -> ucast $ I.TnameScalarI s
+    Tk_ScalarF -> ucast $ I.TnameScalarF s    
+    Tk_ScalarP -> ucast $ I.TnameScalarP s    
+    Tk_VectorI -> ucast $ I.TnameVectorI s
+    Tk_VectorF -> ucast $ I.TnameVectorF s    
+    Tk_VectorP -> ucast $ I.TnameVectorP s    
+    Tk_RecordD -> ucast $ I.TnameRecordD s
+    Tk_CodeFunX -> ucast $ I.TnameCodeFunX s
+    Tk_Opaque -> ucast $ I.TnameOpaqueD s    
   tconvert mp tn@(A.Tno s) = case getTk mp (castTnameToLocalId tn) of 
-    Tk_ScalarI -> ucast $ I.TnoScalarI s
-    Tk_ScalarF -> ucast $ I.TnoScalarF s    
-    Tk_ScalarP -> ucast $ I.TnoScalarP s    
-    Tk_VectorI -> ucast $ I.TnoVectorI s
-    Tk_VectorF -> ucast $ I.TnoVectorF s
-    Tk_VectorP -> ucast $ I.TnoVectorP s
-    Tk_RecordD -> ucast $ I.TnoRecordD s
-    Tk_CodeFunX -> ucast $ I.TnoCodeFunX s
-    Tk_Opaque -> ucast $ I.TnoOpaqueD s
+    Tk_ScalarI -> ucast $ I.TnameScalarI $ show s
+    Tk_ScalarF -> ucast $ I.TnameScalarF $ show s
+    Tk_ScalarP -> ucast $ I.TnameScalarP $ show s
+    Tk_VectorI -> ucast $ I.TnameVectorI $ show s
+    Tk_VectorF -> ucast $ I.TnameVectorF $ show s
+    Tk_VectorP -> ucast $ I.TnameVectorP $ show s
+    Tk_RecordD -> ucast $ I.TnameRecordD $ show s
+    Tk_CodeFunX -> ucast $ I.TnameCodeFunX $ show s
+    Tk_Opaque -> ucast $ I.TnameOpaqueD $ show s
   tconvert mp (A.Tfunction rt (A.TypeParamList tp mv) fa) = 
     let rt1 = dcast FLC ((tconvert mp rt)::I.Utype)
     in I.UtypeFunX (I.Tfunction (rt1,[]) (fmap (\x -> (x, Nothing)) $ tconvert mp tp) mv)
@@ -233,9 +233,7 @@ instance TypeConversion () (I.Type s r) A.Type where
     I.Tfirst_class_array n dt -> A.Tarray n (tconvert () dt)
     I.Tfirst_class_struct p dts -> A.Tstruct p (fmap (tconvert ()) dts)
     
-    I.Tfirst_class_no n -> A.Tno n
-    I.Tfirst_class_name s -> A.Tname s
-    I.Tfirst_class_quoteName s -> A.TquoteName s
+    I.Tfirst_class_name s -> A.TquoteName s
 
     I.Topaque_struct p dts -> A.Tstruct p (fmap (either (tconvert()) (tconvert ())) dts)
     I.Topaque_array n dt -> A.Tarray n (tconvert () dt)
@@ -245,41 +243,15 @@ instance TypeConversion () (I.Type s r) A.Type where
     I.TvectorP n dt -> A.Tvector n (tconvert () dt)    
     I.Tvoid -> A.Tvoid
     
-    I.TnoScalarI n -> A.Tno n
-    I.TnameScalarI s -> A.Tname s
-    I.TquoteNameScalarI s -> A.TquoteName s
-    
-    I.TnoScalarF n -> A.Tno n
-    I.TnameScalarF s -> A.Tname s
-    I.TquoteNameScalarF s -> A.TquoteName s
-
-    I.TnoScalarP n -> A.Tno n
-    I.TnameScalarP s -> A.Tname s
-    I.TquoteNameScalarP s -> A.TquoteName s
-
-    I.TnoVectorI n -> A.Tno n
-    I.TnameVectorI s -> A.Tname s
-    I.TquoteNameVectorI s -> A.TquoteName s
-    
-    I.TnoVectorF n -> A.Tno n
-    I.TnameVectorF s -> A.Tname s
-    I.TquoteNameVectorF s -> A.TquoteName s
-
-    I.TnoVectorP n -> A.Tno n
-    I.TnameVectorP s -> A.Tname s
-    I.TquoteNameVectorP s -> A.TquoteName s
-
-    I.TnoRecordD n -> A.Tno n
-    I.TnameRecordD s -> A.Tname s
-    I.TquoteNameRecordD s -> A.TquoteName s
-    
-    I.TnoCodeFunX n -> A.Tno n
-    I.TnameCodeFunX s -> A.Tname s
-    I.TquoteNameCodeFunX s -> A.TquoteName s
-
-    I.TnoOpaqueD n -> A.Tno n
-    I.TnameOpaqueD s -> A.Tname s
-    I.TquoteNameOpaqueD s -> A.TquoteName s
+    I.TnameScalarI s -> A.TquoteName s
+    I.TnameScalarF s -> A.TquoteName s
+    I.TnameScalarP s -> A.TquoteName s
+    I.TnameVectorI s -> A.TquoteName s
+    I.TnameVectorF s -> A.TquoteName s
+    I.TnameVectorP s -> A.TquoteName s
+    I.TnameRecordD s -> A.TquoteName s
+    I.TnameCodeFunX s -> A.TquoteName s
+    I.TnameOpaqueD s -> A.TquoteName s
 
     I.Tfunction (rt,_) tp ma -> 
       A.Tfunction (tconvert () rt) (A.TypeParamList (tconvert () $ fmap fst tp) ma) []

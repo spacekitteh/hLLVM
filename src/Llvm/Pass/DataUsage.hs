@@ -34,32 +34,32 @@ data Summary g = Summary
   { -- | The addresses that store function parameters that are pointers
     addrs_storing_ptr_params :: S.Set (Value g)
   -- | The local addresses that store pointer parameters
-  , stack_addrs_storing_ptr_params :: S.Set LocalId
+  , stack_addrs_storing_ptr_params :: S.Set Lname
   -- | An address is captured if it's stored on stack or heap
   , addrs_captured :: S.Set (Value g)
   -- | An address of a local variable is stored on stack or heap
-  , stack_addrs_captured :: S.Set LocalId
+  , stack_addrs_captured :: S.Set Lname
   -- | The stack or heap addresses that store another addresses
   , addrs_storing_ptrs :: S.Set (Value g)
   -- | The addresses of local variables that stores another addresses
-  , stack_addrs_storing_ptrs :: S.Set LocalId
+  , stack_addrs_storing_ptrs :: S.Set Lname
   -- | The addresses are passed to va_start
   , addrs_passed_to_va_start :: S.Set (Value g)
   -- | The addresses of a local variables that are passed to va_start
-  , stack_addrs_passed_to_va_start :: S.Set LocalId
+  , stack_addrs_passed_to_va_start :: S.Set Lname
   -- | The addresses of all stores
   , addrs_storing_values :: S.Set (Value g)
   -- | The addresses of local variable that store values
-  , stack_addrs_storing_values :: S.Set LocalId
+  , stack_addrs_storing_values :: S.Set Lname
   -- | The addresses that are involved in pointer arithmatic
   , addrs_involving_pointer_arithmatic :: S.Set (Value g)
   -- | The stack addresses that are involved in pointer arithmatic
-  , stack_addrs_involving_pointer_arithmatic :: S.Set LocalId
+  , stack_addrs_involving_pointer_arithmatic :: S.Set Lname
   -- | The constants used in a function
   , constants :: S.Set (Const g)
   -- | The values used as pointers
   , addrs :: S.Set (Value g)
-  , stack_addrs :: S.Set LocalId
+  , stack_addrs :: S.Set Lname
   -- | The call function info set
   , callFunInfoSet :: S.Set (FunPtr g, CallFunInterface g)
   , invokeFunInfoSet :: S.Set (FunPtr g, InvokeFunInterface g)
@@ -67,11 +67,11 @@ data Summary g = Summary
   } deriving (Eq, Ord, Show)
                                       
 data DuFact g = DuFact { summary :: Summary g
-                       , liveness :: S.Set LocalId
+                       , liveness :: S.Set Lname
                        } deriving (Eq, Ord, Show)
                                   
 data DataUsage g = DataUsage { usageSummary :: Summary g
-                             , livenessFact :: LabelMap (S.Set LocalId)
+                             , livenessFact :: LabelMap (S.Set Lname)
                              } deriving (Eq, Ord, Show)
                                         
                                         
@@ -86,7 +86,7 @@ addAddrStoringPtrParam :: Ord g => Value g -> DuFact g -> DuFact g
 addAddrStoringPtrParam v du@DuFact{ summary = ds@Summary {..} } =
   du { summary = ds {addrs_storing_ptr_params = S.insert v addrs_storing_ptr_params} }
 
-addStackAddrStoringPtrParam :: LocalId -> DuFact g -> DuFact g
+addStackAddrStoringPtrParam :: Lname -> DuFact g -> DuFact g
 addStackAddrStoringPtrParam v du@DuFact{ summary = ds@Summary {..} } =
   du { summary = ds {stack_addrs_storing_ptr_params = S.insert v stack_addrs_storing_ptr_params} }
 
@@ -94,7 +94,7 @@ addAddrCaptured :: Ord g => Value g -> DuFact g -> DuFact g
 addAddrCaptured v du@DuFact{ summary = ds@Summary{..} } =
   du { summary = ds { addrs_captured = S.insert v addrs_captured } }
 
-addStackAddrCaptured :: LocalId -> DuFact g -> DuFact g
+addStackAddrCaptured :: Lname -> DuFact g -> DuFact g
 addStackAddrCaptured v du@DuFact{ summary = ds@Summary{..} } =
   du { summary = ds {stack_addrs_captured = S.insert v stack_addrs_captured } }
 
@@ -102,7 +102,7 @@ addAddrStoringPtr :: Ord g => Value g -> DuFact g -> DuFact g
 addAddrStoringPtr v du@DuFact{ summary = ds@Summary{..} } =
   du { summary = ds {addrs_storing_ptrs = S.insert v addrs_storing_ptrs }}
 
-addStackAddrStoringPtr :: LocalId -> DuFact g -> DuFact g
+addStackAddrStoringPtr :: Lname -> DuFact g -> DuFact g
 addStackAddrStoringPtr v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {stack_addrs_storing_ptrs = S.insert v stack_addrs_storing_ptrs }}
 
@@ -110,7 +110,7 @@ addAddrPassedToVaStart :: Ord g => Value g -> DuFact g -> DuFact g
 addAddrPassedToVaStart v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {addrs_passed_to_va_start = S.insert v addrs_passed_to_va_start }}
 
-addStackAddrPassedToVaStart :: LocalId -> DuFact g -> DuFact g
+addStackAddrPassedToVaStart :: Lname -> DuFact g -> DuFact g
 addStackAddrPassedToVaStart v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {stack_addrs_passed_to_va_start = S.insert v stack_addrs_passed_to_va_start }}
 
@@ -118,7 +118,7 @@ addAddrStoringValue :: Ord g => Value g -> DuFact g -> DuFact g
 addAddrStoringValue v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {addrs_storing_values = S.insert v addrs_storing_values }}
 
-addStackAddrStoringValue :: LocalId -> DuFact g -> DuFact g
+addStackAddrStoringValue :: Lname -> DuFact g -> DuFact g
 addStackAddrStoringValue v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {stack_addrs_storing_values = S.insert v stack_addrs_storing_values }}
 
@@ -126,7 +126,7 @@ addAddr :: Ord g => Value g -> DuFact g -> DuFact g
 addAddr v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {addrs = S.insert v addrs}}
 
-addStackAddr :: LocalId -> DuFact g -> DuFact g
+addStackAddr :: Lname -> DuFact g -> DuFact g
 addStackAddr v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {stack_addrs = S.insert v stack_addrs }}
 
@@ -134,7 +134,7 @@ addAddrInvolvingPtrArithm :: Ord g => Value g -> DuFact g -> DuFact g
 addAddrInvolvingPtrArithm v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {addrs_involving_pointer_arithmatic = S.insert v addrs_involving_pointer_arithmatic }}
 
-addStackAddrInvolvingPtrArithm :: LocalId -> DuFact g -> DuFact g
+addStackAddrInvolvingPtrArithm :: Lname -> DuFact g -> DuFact g
 addStackAddrInvolvingPtrArithm v du@DuFact{ summary = ds@Summary{..}} =
   du { summary = ds {stack_addrs_involving_pointer_arithmatic = S.insert v stack_addrs_involving_pointer_arithmatic }}
 
@@ -172,7 +172,7 @@ addLive (Val_ssa lid) du@DuFact{..} =
     du { liveness = S.insert lid liveness }
 addLive _ du = du
 
-killLive :: Ord g => LocalId -> DuFact g -> DuFact g
+killLive :: Ord g => Lname -> DuFact g -> DuFact g
 killLive lid du@DuFact{..} = 
   if S.member lid liveness then
     du { liveness = S.delete lid liveness }
@@ -218,15 +218,15 @@ applyToEither fl fr (Right x) du = fr x du
 bubbleUp :: Ord x => x -> x -> S.Set x -> S.Set x
 bubbleUp dest src s = if S.member dest s then S.insert src s else s
 
-filterAlloca :: Ord g => LocalId -> (Summary g -> S.Set (Value g)) 
-                -> (LocalId -> DuFact g -> DuFact g) -> DuFact g -> DuFact g
+filterAlloca :: Ord g => Lname -> (Summary g -> S.Set (Value g)) 
+                -> (Lname -> DuFact g -> DuFact g) -> DuFact g -> DuFact g
 filterAlloca ssa src addf du = if S.member (Val_ssa ssa) (src $ summary du) then addf ssa du else du
 
 bubbleUp2 :: Ord g => Value g -> (Summary g -> S.Set (Value g)) 
              -> Value g -> (Value g -> DuFact g -> DuFact g) -> DuFact g -> DuFact g
 bubbleUp2 dest setf src addf du = if S.member dest (setf $ summary du) then addf src du else du
 
-propogateUpPtrUsage :: Ord g => LocalId -> Value g -> DuFact g -> DuFact g
+propogateUpPtrUsage :: Ord g => Lname -> Value g -> DuFact g -> DuFact g
 propogateUpPtrUsage dest src du =
   bubbleUp2 (Val_ssa dest) addrs_storing_ptr_params src addAddrStoringPtrParam
   $ bubbleUp2 (Val_ssa dest) addrs_captured src addAddrCaptured
@@ -326,13 +326,13 @@ sUnion s1 s2 = if S.isSubsetOf s1 s2 then
                               ) l r
 
 bwdScan :: forall g.forall a.forall m. (Show g, Ord g, Show a, DataUsageUpdator g a, H.FuelMonad m) => 
-           S.Set LocalId -> H.BwdPass m (Node g a) (DuFact g)
+           S.Set Lname -> H.BwdPass m (Node g a) (DuFact g)
 bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                  , H.bp_transfer = H.mkBTransfer (bwdTran formalParams)
                                  , H.bp_rewrite = H.noBwdRewrite
                                  }
   where
-    bwdTran :: (Show g, Ord g) => S.Set LocalId -> Node g a e x -> H.Fact x (DuFact g) -> DuFact g
+    bwdTran :: (Show g, Ord g) => S.Set Lname -> Node g a e x -> H.Fact x (DuFact g) -> DuFact g
     bwdTran fp n f = case n of
       Tnode tinst _ ->
         let f0 = foldl' (\p l -> p `unionDuFact` (fromMaybe emptyDuFact $ H.lookupFact l f)) 
@@ -709,7 +709,7 @@ bwdScan formalParams = H.BwdPass { H.bp_lattice = usageLattice
                                                  _ -> p
                                               ) S.empty ls
 
-scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => S.Set LocalId 
+scanGraph :: (H.CheckpointMonad m, H.FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => S.Set Lname 
              -> Label -> H.Graph (Node g a) H.C H.C -> m (DataUsage g)
 scanGraph fm entry graph =
   do { (_, a, _) <- H.analyzeAndRewriteBwd (bwdScan fm) (H.JustC [entry]) graph H.mapEmpty
@@ -723,7 +723,7 @@ scanGraph fm entry graph =
 scanDefine :: (CheckpointMonad m, FuelMonad m, Show g, Ord g, Show a, DataUsageUpdator g a) => IrCxt g 
               -> TlDefine g a -> m (DataUsage g)
 scanDefine s (TlDefine fn entry graph) = scanGraph formalParamIds entry graph
-  where formalParamIds :: S.Set LocalId
+  where formalParamIds :: S.Set Lname
         formalParamIds = let FunSignature { fs_params = r} = fi_signature fn
                          in foldl' (\p x -> case x of
                                       FunOperandAsRet (DtypeScalarP _)  _ _ v -> S.insert v p
