@@ -364,6 +364,8 @@ instance AsmPrint Toplevel where
     hsep [text "attributes", char '#' <> (integral n), equals, braces (hsep $ fmap toLlvm l)]
   toLlvm (ToplevelComdat (TlComdat l c)) = 
     hsep [toLlvm l, equals, text "comdat", toLlvm c]
+  toLlvm (ToplevelComment s) = foldl (\p e -> p $+$ (char ';' <+> text e)) empty s
+  
 
 instance AsmPrint TlUnamedMd where
   toLlvm (TlUnamedMd lhs rhs) = char '!' <> (integer $ fromIntegral lhs) <+> equals <+> toLlvm rhs

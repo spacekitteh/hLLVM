@@ -496,3 +496,41 @@ enumTag = fmap (\(k,v)-> (k, 786432 + v))
            (DW_TAG_APPLE_property,0x4200),
            (DW_TAG_hi_user,0xffff)
           ]
+
+
+specializeDeclareIntrinsic :: TlDeclare Gname -> Maybe TlDeclareIntrinsic
+specializeDeclareIntrinsic (TlDeclare fd) = case fd of
+  FunctionDeclareData { fd_fun_name = fname 
+                      , fd_signature = sig
+                      , fd_fun_attrs = attrs
+                      } -> 
+    if isIntrinsic fname then
+      Just $ TlDeclareIntrinsic $ IntrinsicDeclareData sig fname attrs
+    else
+      Nothing
+  FunctionDeclareMeta {..} -> Nothing
+  where isIntrinsic (Gname g) = isJust $ stripPrefix "llvm." g
+          
+
+unspecializeDeclareIntrinsic :: TlDeclareIntrinsic -> TlDeclare Gname
+unspecializeDeclareIntrinsic (TlDeclareIntrinsic fd) = case fd of
+  IntrinsicDeclareData { id_fun_name = fname 
+                       , id_signature = sig
+                       , id_fun_attrs = attrs
+                       } -> 
+    TlDeclare $ FunctionDeclareData { fd_linkage = Nothing
+                                    , fd_visibility = Nothing
+                                    , fd_dllstorage = Nothing
+                                    , fd_signature = sig 
+                                    , fd_fun_name = fname 
+                                    , fd_addr_naming = Nothing
+                                    , fd_fun_attrs = attrs 
+                                    , fd_section = Nothing
+                                    , fd_alignment = Nothing
+                                    , fd_gc = Nothing
+                                    , fd_prefix = Nothing
+                                    , fd_prologue = Nothing
+                                    , fd_comdat = Nothing
+                                    }
+  
+          

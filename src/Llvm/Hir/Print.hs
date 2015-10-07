@@ -76,6 +76,9 @@ instance IrPrint TlNamedMd where
 instance IrPrint g => IrPrint (TlDeclare g) where
   printIr (TlDeclare fproto) = text "declare" <+> printIr fproto
 
+instance IrPrint TlDeclareIntrinsic where
+  printIr (TlDeclareIntrinsic fproto) = text "declareintrinsic" <+> printIr fproto
+
 instance (IrPrint g, IrPrint a) => IrPrint (TlDefine g a) where
   printIr (TlDefine fproto entry graph) = text "define" <+> printIr fproto $$
                                           text "; the entry label is" <+>
@@ -124,6 +127,7 @@ instance (IrPrint g, IrPrint a) => IrPrint (Toplevel g a) where
   printIr (ToplevelUnamedMd x) = printIr x
   printIr (ToplevelNamedMd x) = printIr x
   printIr (ToplevelDeclare x) = printIr x
+  printIr (ToplevelDeclareIntrinsic x) = printIr x
   printIr (ToplevelDefine x) = printIr x
   printIr (ToplevelGlobal x) = printIr x
   printIr (ToplevelTypeDef x) = printIr x
@@ -725,6 +729,10 @@ instance IrPrint g => IrPrint (FunctionDeclare g) where
   printIr (FunctionDeclareMeta fhName attrs rtype metakinds) =
     hsep [printIr fhName, printIr attrs, printIr rtype, printIr metakinds]
 
+instance IrPrint IntrinsicDeclare where
+  printIr (IntrinsicDeclareData fhSig fhName fhAttr1) =
+    hsep [printIr fhSig, printIr fhName, hsep $ fmap printIr fhAttr1]
+
 
 instance IrPrint MetaKind where
   printIr a = case a of
@@ -788,8 +796,10 @@ instance IrPrint (Type s x) where
 instance IrPrint MetaFunParam where      
   printIr (MetaFunParam e lv) = printIr e <+> printIr lv
 
+{-
 instance IrPrint TypeParamList where
   printIr (TypeParamList params b) = parens (commaSepNonEmpty ((fmap printIr params) ++ [maybe empty printIr b]))
+-}
 
 instance IrPrint Utype where
   printIr x = case x of

@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleInstances, GADTs
-, RecordWildCards, FunctionalDependencies #-}
+, RecordWildCards, FunctionalDependencies, CPP, TemplateHaskell #-}
 
 module Llvm.Hir.Cast where
 import Llvm.Hir.Data.Inst
@@ -7,6 +7,8 @@ import Llvm.Hir.Data.Type
 import Llvm.Hir.Data.Module
 import Data.Int
 import Llvm.ErrorLoc
+
+#define FLC (FileLoc $(srcLoc))
 
 {- 
 
@@ -631,5 +633,98 @@ uc x = ucast x
 dc :: Dcast a b => FileLoc -> String -> a -> b
 dc lc s x = dcast lc x
 
+mapUtype :: (Type CodeFunB X -> Type CodeFunB X) -> Dtype -> Dtype
+mapUtype f x = case x of
+  DtypeScalarI n -> x
+  DtypeScalarF n -> x
+  DtypeScalarP n -> DtypeScalarP $ mapType f n
+  DtypeVectorI n -> x
+  DtypeVectorF n -> x
+  DtypeVectorP n -> DtypeVectorP $ mapType f n
+  DtypeFirstClassD n -> DtypeFirstClassD $ mapType f n
+  DtypeRecordD n -> DtypeRecordD $ mapType f n
 
+mapEtype :: (Type CodeFunB X -> Type CodeFunB X) -> Etype -> Etype
+mapEtype f x = case x of
+  EtypeScalarI n -> x
+  EtypeScalarF n -> x
+  EtypeScalarP n -> EtypeScalarP $ mapType f n
+  EtypeVectorI n -> x
+  EtypeVectorF n -> x
+  EtypeVectorP n -> EtypeVectorP $ mapType f n
+  EtypeFirstClassD n ->  EtypeFirstClassD $ mapType f n
+  EtypeRecordD n -> EtypeRecordD $ mapType f n
+  EtypeOpaqueD n -> x
+  EtypeFunX n -> EtypeFunX $ mapType f n
 
+mapRtype :: (Type CodeFunB X -> Type CodeFunB X) -> Rtype -> Rtype
+mapRtype f x = case x of
+  RtypeScalarI n -> x
+  RtypeScalarF n -> x
+  RtypeScalarP n -> RtypeScalarP $ mapType f n
+  RtypeVectorI n -> x
+  RtypeVectorF n -> x
+  RtypeVectorP n -> RtypeVectorP $ mapType f n
+  RtypeFirstClassD n -> RtypeFirstClassD $ mapType f n
+  RtypeRecordD n -> RtypeRecordD $ mapType f n
+  RtypeVoidU n -> x
+
+mapMtype :: (Type CodeFunB X -> Type CodeFunB X) -> Mtype -> Mtype
+mapMtype f x = case x of
+  MtypeAsRet n -> MtypeAsRet (mapUtype f n)
+  MtypeData n -> MtypeData (mapUtype f n)
+  MtypeByVal n -> MtypeByVal (mapUtype f n)
+  MtypeExt e n -> MtypeExt e (mapUtype f n)
+  MtypeLabel ft -> MtypeLabel ft
+
+mapStype :: (Type CodeFunB X -> Type CodeFunB X) -> ScalarType -> ScalarType
+mapStype f x = case x of
+  ScalarTypeI n -> x
+  ScalarTypeF n -> x
+  ScalarTypeP n -> ScalarTypeP $ mapType f n
+
+mapType :: (Type CodeFunB X -> Type CodeFunB X) -> Type s r -> Type s r
+mapType f x = case x of
+    TpI n -> x
+    TpF n -> x
+    TpV n -> x
+    Tvoid -> x
+    TpHalf -> x
+    TpFloat -> x
+    TpDouble -> x
+    TpFp128 -> x
+    TpX86Fp80 -> x
+    TpPpcFp128 -> x
+    TpX86Mmx -> x
+    TpNull -> x
+    TpLabel -> x
+    Topaque -> x
+    Tarray n d -> Tarray n (mapUtype f d)
+    TvectorI n d -> x      
+    TvectorF n d -> x
+    TvectorP n d -> TvectorP n (mapType f d)
+    Tstruct p ds -> Tstruct p (fmap (mapUtype f) ds)
+    Tpointer e as -> Tpointer (mapEtype f e) as
+    Tfunction (rt,ra) tp mv -> 
+      let t = Tfunction (mapRtype f rt, ra) (fmap (\(mt, ma) -> (mapMtype f mt, ma)) tp) mv
+      in f t
+    {- Scalar -}
+    TnameScalarI s -> x
+    TnameScalarF s -> x
+    TnameScalarP s -> x
+    {- Vector -}
+    TnameVectorI s -> x
+    TnameVectorF s -> x
+    TnameVectorP s -> x
+    {- Large -}
+    TnameRecordD s -> x
+    {- Code -}
+    TnameCodeFunX s -> x
+    {- Opaque -}
+    TnameOpaqueD s -> x
+    Topaque_struct pk l -> x
+    Topaque_array n e -> x
+
+    Tfirst_class_array n e -> Tfirst_class_array n (mapStype f e)
+    Tfirst_class_struct pk l -> Tfirst_class_struct pk (fmap (mapStype f) l)
+    Tfirst_class_name s -> x

@@ -303,6 +303,7 @@ data Toplevel = ToplevelTriple TlTriple
               | ToplevelModuleAsm TlModuleAsm
               | ToplevelAttribute TlAttribute
               | ToplevelComdat TlComdat
+              | ToplevelComment [String]
               deriving (Eq, Ord, Show)
 
 

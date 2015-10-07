@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RecordWildCards #-}
+{-# LANGUAGE GADTs, RecordWildCards,ExistentialQuantification #-}
 module Llvm.Hir.Data.Module
     (module Llvm.Hir.Data.Module
     , module Llvm.Hir.Data.Inst
@@ -17,6 +17,7 @@ data Toplevel g a = ToplevelAlias (TlAlias g)
                   | ToplevelUnamedMd (TlUnamedMd g)
                   | ToplevelNamedMd TlNamedMd
                   | ToplevelDeclare (TlDeclare g)
+                  | ToplevelDeclareIntrinsic TlDeclareIntrinsic
                   | ToplevelDefine (TlDefine g a)
                   | ToplevelGlobal (TlGlobal g)
                   | ToplevelTypeDef TlTypeDef
@@ -26,6 +27,9 @@ data Toplevel g a = ToplevelAlias (TlAlias g)
                   | ToplevelAttribute TlAttribute
                   | ToplevelComdat (TlComdat g)
                   | ToplevelIntrinsic (TlIntrinsic g)
+                  | ToplevelComment TlComment
+                    
+data TlComment = forall s.Commentor s => TlComment s 
 
 data TlIntrinsic g = TlIntrinsic_llvm_used { tli_type :: Type RecordB D
                                            , tli_const :: Const g
@@ -157,10 +161,16 @@ data FunctionDeclare g = FunctionDeclareData { fd_linkage :: Maybe Linkage
                                              , fd_fun_attrs :: [FunAttr]
                                              , fd_retType :: Rtype
                                              , fd_metakinds :: [Either MetaKind Dtype]
-                                             }
-                       deriving (Eq,Ord,Show)
+                                             } deriving (Eq,Ord,Show)
                                                   
 data TlDeclare g = TlDeclare (FunctionDeclare g) deriving (Eq)
+
+data IntrinsicDeclare = IntrinsicDeclareData { id_signature :: FunSignature ()
+                                             , id_fun_name :: Gname
+                                             , id_fun_attrs :: [FunAttr]
+                                             } deriving (Eq,Ord,Show)
+
+data TlDeclareIntrinsic = TlDeclareIntrinsic IntrinsicDeclare deriving (Eq, Show)
 
 type NOOP = ()
 
@@ -239,7 +249,8 @@ data Node g a e x where
   Pnode  :: Ci.Pinst g -> [Dbg g] -> Node g a H.O H.O
   -- | Cnode, Computation nodes, it can be anyway between Lnode(+ Possibly Pnodes) and Tnode
   Cnode  :: Ci.Cinst g -> [Dbg g] -> Node g a H.O H.O
-  -- | Mnode, Metadata nodes, dataflow analysis can refer to, but should not depend on, the information in Metadata nodes
+  -- | Mnode, Metadata nodes, dataflow analysis can refer to, but should not depend on
+  -- | , the information in Metadata nodes
   Mnode :: Ci.Minst g -> [Dbg g] -> Node g a H.O H.O
   -- | It's handy if we can communicate some decisions or changes made by
   -- | dataflow analyses/transformations back as comments, so I create this

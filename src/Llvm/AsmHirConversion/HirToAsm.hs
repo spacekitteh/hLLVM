@@ -1189,7 +1189,7 @@ instance Conversion (I.FunOperand I.Lname) (Rm A.FormalParam) where
 instance Conversion (I.FunSignature I.Lname) (Rm (Maybe A.CallConv, [A.ParamAttr], A.Type, A.FormalParamList)) where
   convert I.FunSignature { I.fs_callConv = cc, I.fs_type = typ, I.fs_params = paras } =
     do { (ret, attrs, mv) <- getReturnType typ
-       ; paras0 <- mapM convert paras
+       ; paras0 <- mapM convert paras -- TODO : check the paramter types match fs_type
        ; return (Just cc, fmap unspecializeRetAttr attrs, ret, A.FormalParamList paras0 mv)
        }
          
@@ -1363,6 +1363,9 @@ instance Conversion I.TlNamedMd (Rm A.TlNamedMd) where
 instance Conversion (I.TlDeclare I.Gname) (Rm A.TlDeclare) where
   convert (I.TlDeclare f) = convert f >>= return . A.TlDeclare
   
+instance Conversion I.TlDeclareIntrinsic (Rm A.TlDeclare) where
+  convert f = convert (unspecializeDeclareIntrinsic f) 
+
 instance Conversion (I.TlDefine I.Gname ()) (Rm A.TlDefine) where
   convert (I.TlDefine f elbl g) = 
     withFunName (I.fi_fun_name f) $ 
@@ -1417,7 +1420,9 @@ instance Conversion I.TlAttribute (Rm A.TlAttribute) where
 instance Conversion (I.TlComdat I.Gname) (Rm A.TlComdat) where  
   convert (I.TlComdat l s) = return (A.TlComdat (unspecializeDollarId l) s)
 
-    
+instance Conversion I.TlComment (Rm [String]) where  
+  convert (I.TlComment a) = return (I.commentize a)
+
 type Pblock = (A.BlockLabel, [A.PhiInstWithDbg], [A.ComputingInstWithDbg])
 
 getLabelId :: A.BlockLabel -> A.LabelId
@@ -1480,6 +1485,7 @@ toplevel2Ast (I.ToplevelAlias g) = Md.liftM A.ToplevelAlias (convert g)
 toplevel2Ast (I.ToplevelUnamedMd s) = Md.liftM (A.ToplevelUnamedMd) (convert s)
 toplevel2Ast (I.ToplevelNamedMd m) = Md.liftM A.ToplevelNamedMd (convert m) 
 toplevel2Ast (I.ToplevelDeclare f) = Md.liftM A.ToplevelDeclare (convert f)
+toplevel2Ast (I.ToplevelDeclareIntrinsic f) = Md.liftM A.ToplevelDeclare (convert f)
 toplevel2Ast (I.ToplevelDefine f) = Md.liftM A.ToplevelDefine (convert f)
 toplevel2Ast (I.ToplevelGlobal s) = Md.liftM A.ToplevelGlobal (convert s)
 toplevel2Ast (I.ToplevelTypeDef t) = Md.liftM A.ToplevelTypeDef (convert t)
@@ -1489,6 +1495,7 @@ toplevel2Ast (I.ToplevelModuleAsm q) = Md.liftM A.ToplevelModuleAsm (convert q)
 toplevel2Ast (I.ToplevelComdat l) = Md.liftM A.ToplevelComdat (convert l)
 toplevel2Ast (I.ToplevelAttribute n) = Md.liftM A.ToplevelAttribute (convert n)
 toplevel2Ast (I.ToplevelIntrinsic n) = Md.liftM A.ToplevelGlobal (convert n)
+toplevel2Ast (I.ToplevelComment n) = Md.liftM A.ToplevelComment (convert n)
 
 hirToAsm ::  M.Map (I.Gname, H.Label) A.LabelId -> I.SpecializedModule I.Gname () -> A.Module
 hirToAsm iLm (I.SpecializedModule (Target dlm) (I.Module ts)) = 

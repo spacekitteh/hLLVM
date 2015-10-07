@@ -127,8 +127,10 @@ instance Mangle Packing where
 instance Mangle VarArgParam where
   mangle _ = "Z"
   
+{-
 instance Mangle TypeParamList where
   mangle (TypeParamList l va) = "(" ++ mangle l ++ mangle va ++ ")"
+-}
 
 instance Mangle FunAttr where
   mangle x = render $ printIr x

@@ -1825,7 +1825,13 @@ toplevel2IrP2 :: M.Map A.FunctionPrototype (I.Toplevel I.Gname ()) -> A.Toplevel
 toplevel2IrP2 _ (A.ToplevelAlias q) = Md.liftM I.ToplevelAlias (convert_TlAlias q)
 toplevel2IrP2 _ (A.ToplevelUnamedMd s) = Md.liftM I.ToplevelUnamedMd (convert_TlUnamedMd s)
 toplevel2IrP2 _ (A.ToplevelNamedMd m) = Md.liftM I.ToplevelNamedMd (convert_TlNamedMd m)
-toplevel2IrP2 _ (A.ToplevelDeclare f) = Md.liftM I.ToplevelDeclare (convert_TlDeclare f)
+toplevel2IrP2 _ (A.ToplevelDeclare f) = 
+  do { fx <- convert_TlDeclare f
+     ; case specializeDeclareIntrinsic fx of
+       Just fy -> return $ I.ToplevelDeclareIntrinsic fy
+       Nothing -> return $ I.ToplevelDeclare fx
+     }
+
 toplevel2IrP2 mp (A.ToplevelDefine (A.TlDefine fp _)) = return $ fromJust $ M.lookup fp mp 
 toplevel2IrP2 _ (A.ToplevelGlobal g) = do { tlg <- convert_TlGlobal g  
                                           ; case specializeTlGlobal tlg of

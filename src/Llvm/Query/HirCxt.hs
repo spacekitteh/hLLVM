@@ -12,7 +12,7 @@ import qualified Compiler.Hoopl as H
 import Llvm.Query.Conversion (strToApInt)
 import Llvm.ErrorLoc
 
-data TypeEnv = TypeEnv {typedefs :: M.Map Ci.Lname Ci.Dtype
+data TypeEnv = TypeEnv { typedefs :: M.Map Ci.Lname Ci.Dtype
                        , opaqueTypeDefs :: M.Map Ci.Lname (Ci.Type OpaqueB D)
                        } deriving (Eq, Ord, Show)
 
@@ -29,7 +29,7 @@ data GlobalCxt g = GlobalCxt { typeEnv :: TypeEnv
                              } deriving (Eq, Ord, Show)
 
 data IrCxt g = IrCxt { globalCxt :: GlobalCxt g
-                     , funCxt :: FunCxt g
+                     , funCxt :: Maybe (FunCxt g)
                      } deriving (Eq, Ord, Show)
 
 instance IrPrint TypeEnv where
@@ -77,16 +77,17 @@ convert_to_FormalParamTypeList FunSignature{..} =
 convert_to_FormalParamType :: FunOperand Lname -> FunOperand ()
 convert_to_FormalParamType x = case x of
   FunOperandData dt pas ma _ -> FunOperandData dt pas ma ()
+  FunOperandExt ext dt pas ma _ -> FunOperandExt ext dt pas ma ()
+  FunOperandAsRet dt pa ma _ -> FunOperandAsRet dt pa ma ()  
   FunOperandByVal dt pas ma _ -> FunOperandByVal dt pas ma ()
-  FunOperandAsRet dt pa ma _ -> FunOperandAsRet dt pa ma ()
+  FunOperandLabel dt pas ma _ -> FunOperandLabel dt pas ma () 
+  _ -> errorLoc FLC $ show x
 
 
 irCxtOfModule :: (Show g, Ord g) => Module g a -> IrCxt g
 irCxtOfModule m = 
   IrCxt { globalCxt = globalCxtOfModule m
-        , funCxt = FunCxt { funInterface = error "funInterface is not initialized." 
-                          , dbgDeclares = error "dbgDeclare is not initialized."
-                          }
+        , funCxt = Nothing
         }
 
 
@@ -203,7 +204,8 @@ localIdSrcInfoMap mdMap set =
           MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode mf))) -> Just mf
           _ -> Nothing
         getFileRef num = case M.lookup num mdMap of
-          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) -> Just fref
+          Just (TlUnamedMd _ (MetaKindedConst _ (McStruct [_,_,_,MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode fref))),_,_,_,_]))) 
+            -> Just fref
           _ -> Nothing
          
 getFileInfo :: Show g => M.Map Word32 (TlUnamedMd g) -> Word32 -> Maybe FileInfo
@@ -240,3 +242,16 @@ getFileName mdMap ref = case M.lookup ref mdMap of
                                                            ,MetaKindedConst MKmetadata (McString (DqString dir))]))) ->
     Just $ FileInfo dir file 
   _ -> Nothing
+  
+  
+getCompileUnitName :: Show g => M.Map Word32 (TlUnamedMd g) -> Maybe FileInfo  
+getCompileUnitName mdMap =  
+  case filter (\x -> case x of
+                  TlUnamedMd_Tagged _ tag _ -> tag == DW_TAG_compile_unit
+                  TlUnamedMd _ _ -> False
+              ) $ M.elems mdMap of
+    [TlUnamedMd_Tagged _ DW_TAG_compile_unit 
+     ((MetaKindedConst MKmetadata (McMdRef (MdRefNode (MdNode ref)))):tl)] -> getFileName mdMap ref 
+    [x] -> errorLoc FLC $ show x
+    _ -> Nothing
+  

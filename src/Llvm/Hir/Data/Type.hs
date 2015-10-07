@@ -234,7 +234,7 @@ instance Ord (Type s r) where
 
     (_,_) -> compare (show x1) (show x2)
 
-data TypeParamList = TypeParamList [Dtype] (Maybe VarArgParam) deriving (Eq,Ord,Show)
+-- data TypeParamList = TypeParamList [Dtype] (Maybe VarArgParam) deriving (Eq,Ord,Show)
 
 
 type AddrSpace = Word32
@@ -324,4 +324,3 @@ data ScalarType = ScalarTypeI (Type ScalarB I)
 data IntOrPtrType s = IntOrPtrTypeI (Type s I)
                     | IntOrPtrTypeP (Type s P)
                     deriving (Eq, Ord, Show)
-

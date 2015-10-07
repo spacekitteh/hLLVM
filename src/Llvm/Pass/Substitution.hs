@@ -1,6 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GADTs, TemplateHaskell, CPP #-}
-{-# LANGUAGE RecordWildCards,  TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses, Rank2Types #-}
+{-# LANGUAGE RecordWildCards,  TypeSynonymInstances, FlexibleInstances
+    , MultiParamTypeClasses
+    , Rank2Types, FlexibleContexts, UndecidableInstances, ScopedTypeVariables #-}
 module Llvm.Pass.Substitution where
 
 import Llvm.ErrorLoc
@@ -13,11 +15,13 @@ import Prelude hiding (succ)
 import qualified Compiler.Hoopl as H
 
 import Llvm.Hir.Data
+import Llvm.Hir.Cast
 import Llvm.Query.Type
 import Llvm.Util.Monadic (maybeM)
 import Debug.Trace
 import Control.Monad
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Llvm.Pass.Changer
 
@@ -34,7 +38,11 @@ instance Substitutable a g b h => Substitutable [a] g [b] h where
 instance Substitutable () g () h where
   substitute chg l = ()
 
-instance (Substitutable a g x h, Substitutable b g y h) => Substitutable (Either a b) g (Either x y) h where
+instance Substitutable g g h h where
+  substitute chg = change_GlobalId chg
+
+instance (Substitutable a g x h, Substitutable b g y h) 
+         => Substitutable (Either a b) g (Either x y) h where
   substitute chg (Left a) = Left $ substitute chg a
   substitute chg (Right a) = Right $ substitute chg a
 
@@ -43,7 +51,7 @@ instance (Substitutable a g x h, Substitutable b g y h) => Substitutable (a, b) 
 
 instance Substitutable (TypedConstOrNull g) g (TypedConstOrNull h) h where
   substitute chg@Changer{..} x = case x of
-    TypedConst (T dt c) -> TypedConst (T dt (substitute chg c))
+    TypedConst (T dt c) -> TypedConst (T (substitute chg dt) (substitute chg c))
     UntypedNull -> UntypedNull
 
 instance Substitutable (Value g) g (Value h) h where
@@ -51,6 +59,39 @@ instance Substitutable (Value g) g (Value h) h where
     Val_ssa lid -> Val_ssa $ substitute chg lid
     Val_const c -> Val_const $ substitute chg c
 
+instance Substitutable (IntOrPtrType s) g (IntOrPtrType s) h where
+  substitute chg it = case it of
+    IntOrPtrTypeI t -> IntOrPtrTypeI (substitute chg t)
+    IntOrPtrTypeP t -> IntOrPtrTypeP (substitute chg t)
+    
+instance Substitutable Dtype g Dtype h where
+  substitute chg@Changer{..} d = 
+    let (u::Utype) = ucast d
+    in dcast FLC ((substitute chg u)::Utype)
+  
+instance Substitutable Rtype g Rtype h where
+  substitute chg@Changer{..} d = 
+    let (u::Utype) = ucast d
+    in dcast FLC ((substitute chg u)::Utype)
+
+instance Substitutable Utype g Utype h where
+  substitute chg@Changer{..} d = case d of
+    UtypeScalarI x -> UtypeScalarI (mapType change_Ftype x)
+    UtypeScalarF x -> UtypeScalarF (mapType change_Ftype x)
+    UtypeScalarP x -> UtypeScalarP (mapType change_Ftype x)
+    UtypeVectorI x -> UtypeVectorI (mapType change_Ftype x)
+    UtypeVectorF x -> UtypeVectorF (mapType change_Ftype x)
+    UtypeVectorP x -> UtypeVectorP (mapType change_Ftype x)    
+    UtypeFirstClassD x -> UtypeFirstClassD (mapType change_Ftype x)
+    UtypeRecordD x -> UtypeRecordD (mapType change_Ftype x)
+    UtypeOpaqueD x -> UtypeOpaqueD (mapType change_Ftype x)
+    UtypeVoidU x -> UtypeVoidU (mapType change_Ftype x)
+    UtypeFunX x -> UtypeFunX (mapType change_Ftype x)
+    UtypeLabelX x -> UtypeLabelX (mapType change_Ftype x)
+
+instance Substitutable (Type s r) g (Type s r) h where
+  substitute chg@Changer{..} d = mapType change_Ftype d
+ 
 instance Substitutable Label g Label h where
   substitute _ = id
 
@@ -65,17 +106,18 @@ instance (Substitutable v g w h, Substitutable idx g ldx h)
 
 instance Substitutable v g w h => Substitutable (Icmp s v) g (Icmp s w) h where
   substitute chg (Icmp op t v1 v2) =
-    Icmp op t (substitute chg v1) (substitute chg v2)
+    Icmp op (substitute chg t) (substitute chg v1) (substitute chg v2)
 
 instance Substitutable v g w h => Substitutable (Fcmp s v) g (Fcmp s w) h where
   substitute chg (Fcmp op t v1 v2) =
-    Fcmp op t (substitute chg v1) (substitute chg v2)
+    Fcmp op (substitute chg t) (substitute chg v1) (substitute chg v2)
 
 instance Substitutable v g w h => Substitutable (ShuffleVector r v) g (ShuffleVector r w) h where
   substitute chg (ShuffleVector v1 v2 i) =
     ShuffleVector (substitute chg v1) (substitute chg v2) (substitute chg i)
 
-instance Substitutable v g w h => Substitutable (ExtractElement r v) g (ExtractElement r w) h where
+instance (Substitutable (Type VectorB r) g (Type VectorB r) h, Substitutable v g w h) 
+         => Substitutable (ExtractElement r v) g (ExtractElement r w) h where
   substitute chg (ExtractElement v i) =
     ExtractElement (substitute chg v) (substitute chg i)
 
@@ -164,37 +206,37 @@ instance Substitutable (Const g) g (Const h) h where
           C_fdiv_V n t c1 c2 -> change2c (C_fdiv_V n t) c1 c2
           C_frem_V n t c1 c2 -> change2c (C_frem_V n t) c1 c2
 
-          C_trunc tc tdest -> C_trunc (substitute chg tc) tdest
-          C_zext tc tdest -> C_zext (substitute chg tc) tdest
-          C_sext tc tdest -> C_sext (substitute chg tc) tdest
-          C_fptrunc tc tdest -> C_fptrunc (substitute chg tc) tdest
-          C_fpext tc tdest -> C_fpext (substitute chg tc) tdest
-          C_fptoui tc tdest -> C_fptoui (substitute chg tc) tdest
-          C_fptosi tc tdest -> C_fptosi (substitute chg tc) tdest
-          C_uitofp tc tdest -> C_uitofp (substitute chg tc) tdest
-          C_sitofp tc tdest -> C_sitofp (substitute chg tc) tdest
-          C_ptrtoint tc tdest -> C_ptrtoint (substitute chg tc) tdest
-          C_inttoptr tc tdest -> C_inttoptr (substitute chg tc) tdest
-          C_bitcast tc tdest -> C_bitcast (substitute chg tc) tdest
-          C_addrspacecast tc tdest -> C_addrspacecast (substitute chg tc) tdest
+          C_trunc tc tdest -> C_trunc (substitute chg tc) (substitute chg tdest)
+          C_zext tc tdest -> C_zext (substitute chg tc) (substitute chg tdest)
+          C_sext tc tdest -> C_sext (substitute chg tc) (substitute chg tdest)
+          C_fptrunc tc tdest -> C_fptrunc (substitute chg tc) (substitute chg tdest)
+          C_fpext tc tdest -> C_fpext (substitute chg tc) (substitute chg tdest)
+          C_fptoui tc tdest -> C_fptoui (substitute chg tc) (substitute chg tdest)
+          C_fptosi tc tdest -> C_fptosi (substitute chg tc) (substitute chg tdest)
+          C_uitofp tc tdest -> C_uitofp (substitute chg tc) (substitute chg tdest)
+          C_sitofp tc tdest -> C_sitofp (substitute chg tc) (substitute chg tdest)
+          C_ptrtoint tc tdest -> C_ptrtoint (substitute chg tc) (substitute chg tdest)
+          C_inttoptr tc tdest -> C_inttoptr (substitute chg tc) (substitute chg tdest)
+          C_bitcast tc tdest -> C_bitcast (substitute chg tc) (substitute chg tdest)
+          C_addrspacecast tc tdest -> C_addrspacecast (substitute chg tc) (substitute chg tdest)
 
-          C_trunc_V tc tdest -> C_trunc_V (substitute chg tc) tdest
-          C_zext_V tc tdest -> C_zext_V (substitute chg tc) tdest
-          C_sext_V tc tdest -> C_sext_V (substitute chg tc) tdest
-          C_fptrunc_V tc tdest -> C_fptrunc_V (substitute chg tc) tdest
-          C_fpext_V tc tdest -> C_fpext_V (substitute chg tc) tdest
-          C_fptoui_V tc tdest -> C_fptoui_V (substitute chg tc) tdest
-          C_fptosi_V tc tdest -> C_fptosi_V (substitute chg tc) tdest
-          C_uitofp_V tc tdest -> C_uitofp_V (substitute chg tc) tdest
-          C_sitofp_V tc tdest -> C_sitofp_V (substitute chg tc) tdest
-          C_ptrtoint_V tc tdest -> C_ptrtoint_V (substitute chg tc) tdest
-          C_inttoptr_V tc tdest -> C_inttoptr_V (substitute chg tc) tdest
-          C_addrspacecast_V tc tdest -> C_addrspacecast_V (substitute chg tc) tdest
+          C_trunc_V tc tdest -> C_trunc_V (substitute chg tc) (substitute chg tdest)
+          C_zext_V tc tdest -> C_zext_V (substitute chg tc) (substitute chg tdest)
+          C_sext_V tc tdest -> C_sext_V (substitute chg tc) (substitute chg tdest)
+          C_fptrunc_V tc tdest -> C_fptrunc_V (substitute chg tc) (substitute chg tdest)
+          C_fpext_V tc tdest -> C_fpext_V (substitute chg tc) (substitute chg tdest)
+          C_fptoui_V tc tdest -> C_fptoui_V (substitute chg tc) (substitute chg tdest)
+          C_fptosi_V tc tdest -> C_fptosi_V (substitute chg tc) (substitute chg tdest)
+          C_uitofp_V tc tdest -> C_uitofp_V (substitute chg tc) (substitute chg tdest)
+          C_sitofp_V tc tdest -> C_sitofp_V (substitute chg tc) (substitute chg tdest)
+          C_ptrtoint_V tc tdest -> C_ptrtoint_V (substitute chg tc) (substitute chg tdest)
+          C_inttoptr_V tc tdest -> C_inttoptr_V (substitute chg tc) (substitute chg tdest)
+          C_addrspacecast_V tc tdest -> C_addrspacecast_V (substitute chg tc) (substitute chg tdest)
 
           C_getelementptr ib (T t c) l ->
-            C_getelementptr ib (T t (substitute chg c)) (substitute chg l)
+            C_getelementptr ib (T (substitute chg t) (substitute chg c)) (substitute chg l)
           C_getelementptr_V ib (T t c) l ->
-            C_getelementptr_V ib (T t (substitute chg c)) (substitute chg l)
+            C_getelementptr_V ib (T (substitute chg t) (substitute chg c)) (substitute chg l)
 
           C_select_I x -> C_select_I (substitute chg x)
           C_select_F x -> C_select_F (substitute chg x)
@@ -226,8 +268,8 @@ instance Substitutable (Const g) g (Const h) h where
     in change_Const cst1
 
 
-instance Substitutable x g y h => Substitutable (T t x) g (T t y) h where
-  substitute chg (T t a) = T t (substitute chg a)
+instance (Substitutable t g t h, Substitutable x g y h) => Substitutable (T t x) g (T t y) h where
+  substitute chg (T t a) = T (substitute chg t) (substitute chg a)
 
 instance Substitutable (FunctionInterface g) g (FunctionInterface h) h where
   substitute chg fp@FunctionInterface {..} =
@@ -244,7 +286,7 @@ instance Substitutable (FunctionDeclare g) g (FunctionDeclare h) h where
       FunctionDeclareData { fd_linkage = fd_linkage
                           , fd_visibility = fd_visibility
                           , fd_dllstorage = fd_dllstorage
-                          , fd_signature = fd_signature
+                          , fd_signature = substitute chg fd_signature
                           , fd_fun_name = substitute chg fd_fun_name
                           , fd_addr_naming = fd_addr_naming
                           , fd_fun_attrs = fd_fun_attrs
@@ -258,16 +300,18 @@ instance Substitutable (FunctionDeclare g) g (FunctionDeclare h) h where
     FunctionDeclareMeta {..} -> 
       FunctionDeclareMeta { fd_fun_name = substitute chg fd_fun_name 
                           , fd_fun_attrs = fd_fun_attrs
-                          , fd_retType = fd_retType
-                          , fd_metakinds = fd_metakinds
+                          , fd_retType = substitute chg fd_retType
+                          , fd_metakinds = substitute chg fd_metakinds
                           }
 
 instance Substitutable (TlDeclare g) g (TlDeclare h) h where
   substitute chg (TlDeclare fp) = TlDeclare (substitute chg fp)
 
-instance Substitutable a g b h => Substitutable (TlDefine g a) g (TlDefine h b) h where
-  substitute chg (TlDefine fp e g) =
-    TlDefine (substitute chg fp) e (H.mapGraph (substitute chg) g)
+instance (Substitutable a g b h) => Substitutable (TlDefine g a) g (TlDefine h b) h where
+  substitute chg (TlDefine fp e g) = TlDefine (substitute chg fp) e (substitute chg g)
+
+instance (Substitutable a g b h) => Substitutable (H.Graph (Node g a) H.C H.C) g (H.Graph (Node h b) H.C H.C) h where
+  substitute chg g = H.mapGraph (substitute chg) g
 
 instance Substitutable Lname g Lname h where
   substitute chg = change_LocalId chg
@@ -297,7 +341,7 @@ instance Substitutable (Cinst g) g (Cinst h) h where
     let cid = change_LocalId chg
     in case x of
         I_alloca{..} -> I_alloca { inAllocaAttr = inAllocaAttr
-                                 , dtype = dtype
+                                 , dtype = substitute chg dtype
                                  , size = substitute chg size
                                  , alignment = alignment
                                  , result = cid result
@@ -425,7 +469,7 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                              }
         I_insertvalue{..} -> I_insertvalue { record = (substitute chg) record
                                            , element = (substitute chg) element
-                                           , windices = windices                                                       
+                                           , windices = windices
                                            , result = cid result
                                            }
         I_landingpad{..} -> I_landingpad { resultType = resultType
@@ -446,171 +490,171 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                                    , result = cid result
                                                    }
         I_icmp{..} -> I_icmp { icmpOp = icmpOp
-                             , icmpType = icmpType
+                             , icmpType = substitute chg icmpType
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
         I_icmp_V{..} -> I_icmp_V { icmpOp = icmpOp
-                                 , icmpTypeV = icmpTypeV
+                                 , icmpTypeV = substitute chg icmpTypeV
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_fcmp{..} -> I_fcmp { fcmpOp = fcmpOp
-                             , fcmpTypeF = fcmpTypeF
+                             , fcmpTypeF = substitute chg fcmpTypeF
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
         I_fcmp_V{..} -> I_fcmp_V { fcmpOp = fcmpOp
-                                 , fcmpTypeVF = fcmpTypeVF
+                                 , fcmpTypeVF = substitute chg fcmpTypeVF
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_add{..} -> I_add { flagI = flagI
-                           , typeI = typeI
+                           , typeI = substitute chg typeI
                            , operand1 = substitute chg operand1
                            , operand2 = substitute chg operand2
                            , result = cid result
                            }
         I_sub{..} -> I_sub { flagI = flagI
-                           , typeI = typeI
+                           , typeI = substitute chg typeI
                            , operand1 = substitute chg operand1
                            , operand2 = substitute chg operand2
                            , result = cid result
                            }
         I_mul{..} -> I_mul { flagI = flagI
-                           , typeI = typeI
+                           , typeI = substitute chg typeI
                            , operand1 = substitute chg operand1
                            , operand2 = substitute chg operand2
                            , result = cid result
                            }
         I_udiv{..} -> I_udiv { flagE = flagE
-                             , typeI = typeI
+                             , typeI = substitute chg typeI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
         I_sdiv{..} -> I_sdiv { flagE = flagE
-                             , typeI = typeI
+                             , typeI = substitute chg typeI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
-        I_urem{..} -> I_urem { typeI = typeI
+        I_urem{..} -> I_urem { typeI = substitute chg typeI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
-        I_srem{..} -> I_srem { typeI = typeI
+        I_srem{..} -> I_srem { typeI = substitute chg typeI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
         I_shl{..} -> I_shl { flagW = flagW
-                           , typeI = typeI
+                           , typeI = substitute chg typeI
                            , operand1 = substitute chg operand1
                            , operand2 = substitute chg operand2
                            , result = cid result
                            }
         I_lshr{..} -> I_lshr { flagE = flagE
-                             , typeI = typeI
+                             , typeI = substitute chg typeI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
         I_ashr{..} -> I_ashr { flagE = flagE
-                             , typeI = typeI
+                             , typeI = substitute chg typeI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
-        I_and{..} -> I_and { typeI = typeI
+        I_and{..} -> I_and { typeI = substitute chg typeI
                            , operand1 = substitute chg operand1
                            , operand2 = substitute chg operand2
                            , result = cid result
                            }
-        I_or{..} -> I_or { typeI = typeI
+        I_or{..} -> I_or { typeI = substitute chg typeI
                          , operand1 = substitute chg operand1
                          , operand2 = substitute chg operand2
                          , result = cid result
                          }
-        I_xor{..} -> I_xor { typeI = typeI
+        I_xor{..} -> I_xor { typeI = substitute chg typeI
                            , operand1 = substitute chg operand1
                            , operand2 = substitute chg operand2
                            , result = cid result
                            }
         I_add_V{..} -> I_add_V { flagI = flagI
-                               , typeVI = typeVI
+                               , typeVI = substitute chg typeVI
                                , operand1 = substitute chg operand1
                                , operand2 = substitute chg operand2
                                , result = cid result
                                }
         I_sub_V{..} -> I_sub_V { flagI = flagI
-                               , typeVI = typeVI
+                               , typeVI = substitute chg typeVI
                                , operand1 = substitute chg operand1
                                , operand2 = substitute chg operand2
                                , result = cid result
                                }
         I_mul_V{..} -> I_mul_V { flagI = flagI
-                               , typeVI = typeVI
+                               , typeVI = substitute chg typeVI
                                , operand1 = substitute chg operand1
                                , operand2 = substitute chg operand2
                                , result = cid result
                                }
         I_udiv_V{..} -> I_udiv_V { flagE = flagE
-                                 , typeVI = typeVI
+                                 , typeVI = substitute chg typeVI
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_sdiv_V{..} -> I_sdiv_V { flagE = flagE
-                                 , typeVI = typeVI
+                                 , typeVI = substitute chg typeVI
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
-        I_urem_V{..} -> I_urem_V { typeVI = typeVI
+        I_urem_V{..} -> I_urem_V { typeVI = substitute chg typeVI
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
-        I_srem_V{..} -> I_srem_V { typeVI = typeVI
+        I_srem_V{..} -> I_srem_V { typeVI = substitute chg typeVI
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_shl_V{..} -> I_shl_V { flagW = flagW
-                               , typeVI = typeVI
+                               , typeVI = substitute chg typeVI
                                , operand1 = substitute chg operand1
                                , operand2 = substitute chg operand2
                                , result = cid result
                                }
         I_lshr_V{..} -> I_lshr_V { flagE = flagE
-                                 , typeVI = typeVI
+                                 , typeVI = substitute chg typeVI
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_ashr_V{..} -> I_ashr_V { flagE = flagE
-                                 , typeVI = typeVI
+                                 , typeVI = substitute chg typeVI
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
-        I_and_V{..} -> I_and_V { typeVI = typeVI
+        I_and_V{..} -> I_and_V { typeVI = substitute chg typeVI
                                , operand1 = substitute chg operand1
                                , operand2 = substitute chg operand2
                                , result = cid result
                                }
-        I_or_V{..} -> I_or_V { typeVI = typeVI
+        I_or_V{..} -> I_or_V { typeVI = substitute chg typeVI
                              , operand1 = substitute chg operand1
                              , operand2 = substitute chg operand2
                              , result = cid result
                              }
-        I_xor_V{..} -> I_xor_V { typeVI = typeVI
+        I_xor_V{..} -> I_xor_V { typeVI = substitute chg typeVI
                                , operand1 = substitute chg operand1
                                , operand2 = substitute chg operand2
                                , result = cid result
@@ -646,31 +690,31 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                              , result = cid result
                              }
         I_fadd_V{..} -> I_fadd_V { flagF = flagF
-                                 , typeVF = typeVF
+                                 , typeVF = substitute chg typeVF
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_fsub_V{..} -> I_fsub_V { flagF = flagF
-                                 , typeVF = typeVF
+                                 , typeVF = substitute chg typeVF
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_fmul_V{..} -> I_fmul_V { flagF = flagF
-                                 , typeVF = typeVF
+                                 , typeVF = substitute chg typeVF
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_fdiv_V{..} -> I_fdiv_V { flagF = flagF
-                                 , typeVF = typeVF
+                                 , typeVF = substitute chg typeVF
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
                                  }
         I_frem_V{..} -> I_frem_V { flagF = flagF
-                                 , typeVF = typeVF
+                                 , typeVF = substitute chg typeVF
                                  , operand1 = substitute chg operand1
                                  , operand2 = substitute chg operand2
                                  , result = cid result
@@ -716,19 +760,19 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                      , result = cid result
                                      }
         I_inttoptr{..} -> I_inttoptr { srcI = (substitute chg) srcI
-                                     , toP = toP
+                                     , toP = substitute chg toP
                                      , result = cid result
                                      }
         I_addrspacecast{..} -> I_addrspacecast { srcP = (substitute chg) srcP
-                                               , toP = toP
+                                               , toP = substitute chg toP
                                                , result = cid result
                                                }
         I_bitcast{..} -> I_bitcast { srcP = (substitute chg) srcP
-                                   , toP = toP
+                                   , toP = substitute chg toP
                                    , result = cid result
                                    }
         I_bitcast_D{..} -> I_bitcast_D { srcD = (substitute chg) srcD
-                                       , toD = toD
+                                       , toD = substitute chg toD
                                        , result = cid result
                                        }
         I_trunc_V{..} -> I_trunc_V { srcVI = (substitute chg) srcVI
@@ -776,7 +820,7 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                          , result = cid result
                                          }
         I_addrspacecast_V{..} -> I_addrspacecast_V { srcVP = (substitute chg) srcVP
-                                                   , toVP = toVP                                                             
+                                                   , toVP = substitute chg toVP
                                                    , result = cid result
                                                    }
         I_select_I{..} -> I_select_I { cond = (substitute chg) cond
@@ -815,7 +859,7 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                              , result = cid result
                                              }
         I_va_arg{..} -> I_va_arg { dv = (substitute chg) dv
-                                 , typeD = typeD
+                                 , typeD = substitute chg typeD
                                  , result = cid result
                                  }
         I_llvm_va_start{..} -> I_llvm_va_start { arglist = substitute chg arglist }
@@ -824,8 +868,8 @@ instance Substitutable (Cinst g) g (Cinst h) h where
                                   , srcarglist = substitute chg srcarglist
                                   }
         I_llvm_gcroot{..} -> I_llvm_gcroot { ptrloc = substitute chg ptrloc
-                                 , metadata = substitute chg metadata
-                                 }
+                                           , metadata = substitute chg metadata
+                                           }
         I_llvm_gcread{..} -> errorLoc FLC "unsupport"
         I_llvm_gcwrite{..} -> errorLoc FLC "unsupport"
         I_llvm_returnaddress{..} -> I_llvm_returnaddress { level = substitute chg level }
@@ -932,28 +976,57 @@ instance Substitutable (Tinst g) g (Tinst h) h where
     t@T_invoke_asm{..} -> t { invoke_asm_interface = substitute chg invoke_asm_interface
                             , invoke_return = substitute chg invoke_return
                             }
-    T_resume (T dt v) -> T_resume (T dt (substitute chg v))
+    T_resume (T dt v) -> T_resume (T (substitute chg dt) (substitute chg v))
     T_unwind -> T_unwind
 
+{-
 instance Substitutable a g b h => Substitutable (FunSignature a) g (FunSignature b) h where
-  substitute chg x@FunSignature{..} = x { fs_params = substitute chg fs_params }
-                                      
+  substitute chg x@FunSignature{..} = x { fs_type = substitute chg fs_type
+                                        , fs_params = substitute chg fs_params 
+                                        }
+-}
+
+instance Substitutable (FunSignature Lname) g (FunSignature Lname) h where
+  substitute chg x@FunSignature{..} = x { fs_type = substitute chg fs_type
+                                        , fs_params = change_ParamsForDefine chg (substitute chg fs_params)
+                                        }
+
+instance Substitutable (FunSignature ()) g (FunSignature ()) h where
+  substitute chg x@FunSignature{..} = x { fs_type = substitute chg fs_type
+                                        , fs_params = change_ParamsForDeclare chg (substitute chg fs_params)
+                                        }
+
+{-
+instance Substitutable (FunSignature ()) g (FunSignature ()) h where
+  substitute chg x@FunSignature{..} = x { fs_type = substitute chg fs_type
+                                        , fs_params = change_ParamsForDeclareIntrinsic chg 
+                                                      (substitute chg fs_params)
+                                        }
+-}
+
+instance Substitutable (FunSignature (Value g)) g (FunSignature (Value h)) h where
+  substitute chg x@FunSignature{..} = x { fs_type = substitute chg fs_type
+                                        , fs_params = change_ParamsForCall chg (substitute chg fs_params)
+                                        }
+
 instance Substitutable (CallFunInterface g) g (CallFunInterface h) h where
-  substitute chg x@CallFunInterface{..} = x { cfi_signature = substitute chg cfi_signature }
-  
+  substitute chg x@CallFunInterface{..} = x { cfi_castType = substitute chg cfi_castType
+                                            , cfi_signature = substitute chg cfi_signature }
+
 instance Substitutable (InvokeFunInterface g) g (InvokeFunInterface h) h where
-  substitute chg x@InvokeFunInterface{..} = x { ifi_signature = substitute chg ifi_signature }
+  substitute chg x@InvokeFunInterface{..} = x { ifi_castType = substitute chg ifi_castType
+                                              , ifi_signature = substitute chg ifi_signature }
 
 instance Substitutable (CallAsmInterface g) g (CallAsmInterface h) h where
   substitute chg x@CallAsmInterface{..} = x { cai_actualParams = substitute chg cai_actualParams}
 
 instance Substitutable a g b h => Substitutable (FunOperand a) g (FunOperand b) h where
   substitute chg c = case c of
-    FunOperandData dt pa ma v -> FunOperandData dt pa ma (substitute chg v)
-    FunOperandExt e dt pa ma v -> FunOperandExt e dt pa ma (substitute chg v)
-    FunOperandByVal dt pa ma v -> FunOperandByVal dt pa ma (substitute chg v)
+    FunOperandData dt pa ma v -> FunOperandData (substitute chg dt) pa ma (substitute chg v)
+    FunOperandExt e dt pa ma v -> FunOperandExt e (substitute chg dt) pa ma (substitute chg v)
+    FunOperandByVal dt pa ma v -> FunOperandByVal (substitute chg dt) pa ma (substitute chg v)
     FunOperandLabel t pa ma v -> FunOperandLabel t pa ma (substitute chg v)
-    FunOperandAsRet dt pa ma v -> FunOperandAsRet dt pa ma (substitute chg v)
+    FunOperandAsRet dt pa ma v -> FunOperandAsRet (substitute chg dt) pa ma (substitute chg v)
 
 instance Substitutable (Dbg g) g (Dbg h) h where
   substitute chg (Dbg mv mc) = Dbg mv (substitute chg mc)
@@ -961,6 +1034,7 @@ instance Substitutable (Dbg g) g (Dbg h) h where
 instance Substitutable (TlGlobal g) g (TlGlobal h) h where
   substitute chg tg = case tg of
     tl@TlGlobalDtype{..} -> tl { tlg_lhs = substitute chg tlg_lhs
+                               , tlg_dtype = substitute chg tlg_dtype
                                , tlg_const = substitute chg tlg_const
                                , tlg_comdat = substitute chg tlg_comdat
                                }
@@ -975,6 +1049,7 @@ instance Substitutable (TlIntrinsic g) g (TlIntrinsic h) h where
     x@TlIntrinsic_llvm_compiler_used{..}  -> x { tli_const = substitute chg tli_const }
     x@TlIntrinsic_llvm_global_ctors{..}  -> x { tli_const = substitute chg tli_const }
     x@TlIntrinsic_llvm_global_dtors{..}  -> x { tli_const = substitute chg tli_const }
+        
 
 instance Substitutable a g b h => Substitutable (Toplevel g a) g (Toplevel h b) h where
   substitute chg@Changer{..} tpl = case tpl of
@@ -982,6 +1057,7 @@ instance Substitutable a g b h => Substitutable (Toplevel g a) g (Toplevel h b) 
     ToplevelUnamedMd x -> ToplevelUnamedMd (substitute chg x)
     ToplevelNamedMd x -> ToplevelNamedMd (substitute chg x)
     ToplevelDeclare x -> ToplevelDeclare (substitute chg x)
+    ToplevelDeclareIntrinsic x -> ToplevelDeclareIntrinsic x
     ToplevelDefine x -> ToplevelDefine (substitute chg x)
     ToplevelGlobal x -> ToplevelGlobal (substitute chg x)
     ToplevelTypeDef x -> ToplevelTypeDef (substitute chg x)
@@ -991,10 +1067,13 @@ instance Substitutable a g b h => Substitutable (Toplevel g a) g (Toplevel h b) 
     ToplevelAttribute x -> ToplevelAttribute (substitute chg x)
     ToplevelComdat x -> ToplevelComdat (substitute chg x)
     ToplevelIntrinsic x -> ToplevelIntrinsic (substitute chg x)
-
+    ToplevelComment x -> ToplevelComment x
 
 instance Substitutable TlTypeDef g TlTypeDef h  where
-  substitute chg = id
+  substitute chg x = case x of
+    TlDatTypeDef n dt -> TlDatTypeDef n (substitute chg dt)
+    TlOpqTypeDef _ _ -> x
+    TlFunTypeDef n ft -> TlFunTypeDef n (substitute chg ft)
 
 instance Substitutable (TlComdat g) g (TlComdat h) h where
   substitute chg (TlComdat lhs v) = TlComdat (substitute chg lhs) v
@@ -1009,13 +1088,10 @@ instance Substitutable TlModuleAsm g TlModuleAsm h where
   substitute chg = id
 
 instance Substitutable TlUnamedType g TlUnamedType h where
-  substitute chg = id
+  substitute chg (TlUnamedType n dt) = TlUnamedType n (substitute chg dt)
 
 instance Substitutable TlDepLibs g TlDepLibs h where
   substitute chg = id
-
-instance Substitutable g g h h where
-  substitute chg = change_GlobalId chg
 
 instance Substitutable (TlAlias g) g (TlAlias h) h where
   substitute chg tla@TlAlias{..} = tla { tla_lhs = substitute chg tla_lhs
@@ -1041,7 +1117,7 @@ instance Substitutable v g w h => Substitutable (Conversion s v) g (Conversion s
 instance Substitutable (Aliasee g) g (Aliasee h) h where
   substitute chg al = case al of
     Aliasee x -> Aliasee (substitute chg x)
-    AliaseeTyped d x -> AliaseeTyped d (substitute chg x)    
+    AliaseeTyped d x -> AliaseeTyped (substitute chg d) (substitute chg x)    
     AliaseeConversion x -> AliaseeConversion (substitute chg x)
     AliaseeGEP x -> AliaseeGEP (substitute chg x)
 
@@ -1062,18 +1138,22 @@ instance Substitutable (TlUnamedMd g) g (TlUnamedMd h) h where
 
 instance Substitutable (MetaKindedConst g) g (MetaKindedConst h) h where
   substitute chg mk = case mk of
-    MetaKindedConst m mc -> MetaKindedConst m (substitute chg mc)
+    MetaKindedConst m mc -> MetaKindedConst (substitute chg m) (substitute chg mc)
     UnmetaKindedNull -> UnmetaKindedNull
 
 instance Substitutable (FunPtr g) g (FunPtr h) h where
   substitute chg@Changer{..} fp = case fp of
     FunId g -> FunId (substitute chg g)
     FunSsa l -> FunSsa (substitute chg l)
-    FunIdBitcast (T st c) dt -> FunIdBitcast (T st (substitute chg c)) dt
-    FunIdInttoptr (T st c) dt -> FunIdInttoptr (T st (substitute chg c)) dt
+    FunIdBitcast tc dt -> FunIdBitcast (substitute chg tc) (substitute chg dt)
+    FunIdInttoptr tc dt -> FunIdInttoptr (substitute chg tc) (substitute chg dt)
     Fun_null -> Fun_null
     Fun_undef -> Fun_undef
 
+instance Substitutable MetaKind g MetaKind h where
+  substitute chg x = case x of
+    MKtype ut -> MKtype (substitute chg ut)
+    MKmetadata -> x
 
 instance Substitutable (MetaConst g) g (MetaConst h) h where
   substitute chg mc = case mc of
@@ -1086,11 +1166,11 @@ instance Substitutable (MetaConst g) g (MetaConst h) h where
 instance Substitutable a g b h => Substitutable (Module g a) g (Module h b) h where
   substitute chg (Module l) = Module $ substitute chg l
 
-instance Substitutable g g g g where
-  substitute _ = id
-
 instance (Ord g, Ord k, Ord h) => Substitutable (M.Map (g, k) v) g (M.Map (h, k) v) h where
   substitute chg m = M.mapKeys (\(gid, k) -> (substitute chg gid, k)) m
+
+instance (Ord a, Ord b, Substitutable a g b h) => Substitutable (S.Set a) g (S.Set b) h where
+  substitute chg m = S.map (substitute chg) m
 
 instance Substitutable (Prefix g) g (Prefix h) h where
   substitute chg (Prefix x) = Prefix $ substitute chg x

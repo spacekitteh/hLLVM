@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables, GADTs #-}
 import System.IO
 import System.Console.CmdArgs
 import ParserTester
@@ -6,6 +6,7 @@ import Llvm.Pass.Optimizer ()
 import qualified Llvm.Pass.Mem2Reg as M2R ()
 import qualified Llvm.Pass.Liveness as L ()
 import qualified Llvm.Hir.Data as I
+import qualified Llvm.Hir.Composer as I
 import qualified Llvm.Asm as A
 import Llvm.Query.HirCxt
 import Llvm.Pass.PassManager
@@ -45,6 +46,12 @@ chg = Cg.defaultChanger { Cg.change_GlobalId = \x -> case x of
                              _ -> x
                         }
       
+tychg :: Cg.Changer I.Gname I.Gname      
+tychg = Cg.defaultChanger { Cg.change_Ftype = \(I.Tfunction ret paramtypes va) ->
+                             I.Tfunction ret ((I.MtypeData $ I.DtypeScalarI I.i32, Nothing):paramtypes) va
+                          , Cg.change_ParamsForDeclare = \l -> (I.FunOperandData (I.DtypeScalarI I.i32) [] Nothing ()):l
+                          }
+      
 extractSteps :: [String] -> [Step]
 extractSteps l = map (\x -> case toStep x of
                          Just s -> s
@@ -62,6 +69,7 @@ data Sample = Dummy { input :: FilePath, output :: Maybe String }
             | AstCanonic { input :: FilePath, output :: Maybe String }
             | DataUse { input :: FilePath, output :: Maybe String, fuel ::Int}
             | Change { input :: FilePath, output :: Maybe String}
+            | TypeChange { input :: FilePath, output :: Maybe String}              
             | Visualize { input :: FilePath, output :: Maybe String}
             | SrcInfoDbg { input :: FilePath, output :: Maybe String}              
             deriving (Show, Data, Typeable, Eq)
@@ -103,6 +111,11 @@ changer = Change { input = def &= typ "<INPUT>"
                  , output = outFlags Nothing
                  } &= help "Test Change Pass"
 
+typechanger = TypeChange { input = def &= typ "<INPUT>"
+                         , output = outFlags Nothing
+                         } &= help "Test Type Change Pass"
+
+
 visual = Visualize { input = def &= typ "<INPUT>"
                    , output = outFlags Nothing
                    } &= help "Test Visialize Pass"
@@ -126,7 +139,7 @@ phifixup = PhiFixUp { input = def &= typ "<INPUT>"
 mode = cmdArgsMode $ modes [dummy, parser, ast2ir, ir2ast
                            ,pass, astcanonic, phifixup
                            ,datause, changer, visual
-                           ,srcInfo, typeq] &= help "Test sub components"
+                           ,srcInfo, typeq, typechanger] &= help "Test sub components"
        &= program "Test" &= summary "Test driver v1.0"
 
 main :: IO ()
@@ -199,6 +212,17 @@ main = do { sel <- cmdArgsRun mode
                                ; hClose inh
                                ; closeFileOrStdout ox outh
                                }
+            TypeChange ix ox -> do { inh <- openFile ix ReadMode
+                                   ; outh <- openFileOrStdout ox
+                                   ; ast <- testParser ix inh
+                                   ; let ast' = A.simplify ast
+                                   ; let ast'' = transformModule2
+                                                 (\(I.SpecializedModule dlm m) -> 
+                                                   (I.SpecializedModule dlm $ Sub.substitute tychg m, Sub.substitute tychg)) Nothing ast' 
+                                   ; writeOutLlvm ast'' outh
+                                   ; hClose inh
+                                   ; closeFileOrStdout ox outh
+                                   }                            
             Visualize ix ox -> do { inh <- openFile ix ReadMode
                                   ; outh <- openFileOrStdout ox
                                   ; ast <- testParser ix inh

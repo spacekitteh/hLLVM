@@ -3,6 +3,7 @@
 module Llvm.ErrorLoc where
 
 import Language.Haskell.TH
+import Data.Maybe (fromJust)
 
 newtype FileLoc = FileLoc String deriving (Eq, Ord, Show)
 
@@ -21,3 +22,9 @@ srcLoc = do { (Loc f p m s e) <- location
 
 errorLoc :: FileLoc -> String -> a
 errorLoc (FileLoc lc) s = error (lc ++ ":" ++ s)
+
+
+fromJustLoc :: FileLoc -> Maybe a -> a
+fromJustLoc loc x = case x of
+  Just v -> v
+  Nothing -> errorLoc loc "Nothing"
